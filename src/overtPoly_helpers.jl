@@ -284,7 +284,221 @@ function addDim(vec, dim)
     return newVec
 end
 
-function bound_multiariate(expr, lb, ub)
+
+function sameInp(LB, UB)
+    """
+    Takes an overt OA and interpolates to ensure that the lower and upper bounds are over the same set of points
+    """
+    newUB = Any[]
+    newLB = Any[]
+
+    newXs = sort(unique(vcat([tup[1] for tup in LB], [tup[1] for tup in UB])))
+
+    for inp in newXs
+        #Check if this input has a lower bound 
+        lbInd = findall(x->x[1] == inp, LB)
+
+        #If it does, add to newLB, else interpolate
+        if !isempty(lbInd)
+            push!(newLB, LB[lbInd[1]])
+        else
+            #Find the lower bound that is closest to the input
+            lbInd = findall(x->x[1] < inp, LB)
+            #Interpolate
+            push!(newLB, (inp, interpol(inp, LB[lbInd[end]], LB[lbInd[end]+1])))
+        end
+
+        #Check if this input has an upper bound
+        ubInd = findall(x->x[1] == inp, UB)
+
+        #Similarly, if it does, add to newUB, else interpolate
+        if !isempty(ubInd)
+            push!(newUB, UB[ubInd[1]])
+        else
+            #Find the upper bound that is closest to the input
+            ubInd = findall(x->x[1] < inp, UB)
+            #Interpolate
+            push!(newUB, (inp, interpol(inp, UB[ubInd[end]], UB[ubInd[end]+1])))
+        end
+
+    end
+
+    return newLB, newUB
+
+end
+
+function interpol(xInp, tuplb, tupub)
+    """
+    When it's not catching international criminals, this method interpolates the lower and upper bounds of a tuple to ensure that the bounds are over the same set of points
+    """
+
+    #Assert that the input is between lb and ub
+    @assert xInp >= tuplb[1] && xInp <= tupub[1]
+
+    #Assert that the upper bound and lower boud are distinct 
+    @assert tuplb[1] != tupub[1]
+
+    #Use linear interpolation to find the output given UB and LB
+    yInp = tuplb[2] + (xInp - tuplb[1])*(tupub[2] - tuplb[2])/(tupub[1] - tuplb[1])
+
+    return yInp
+end
+
+function boundMV1(expr, lb, ub)
+    """
+    Function to bound a multivariate function over a given interval.
+
+    Assume addition-free chunks
+    """
+
+    #Collect like terms/reduce to univariate chunks 
+    parsed1 = parse_and_reduce(expr)
+
+    v2Func = parsed1[2]
+    #Make expression into Julia function 
+    v2f = Symbolics.build_function(v2Func, find_variables(v2Func)..., expression=Val{false})
+    #Get approximation tuples over the interval
+    v2UB, v2LB = bound_univariate(v2Func, lb, ub, plotflag = true) 
+
+    #Repeat for second chunk 
+    v3Func = parsed1[3]
+    v3f = Symbolics.build_function(v3Func, find_variables(v3Func)..., expression=Val{false})
+    v3UB, v3LB = bound_univariate(v3Func, lb, ub, plotflag = true)
+
+    #Check bounds
+    sum([v2f(tup[1]) < tup[2] for tup in v2LB])
+    sum([v2f(tup[1]) > tup[2] for tup in v2UB])
+
+    sum([v3f(tup[1]) < tup[2] for tup in v3LB])
+    sum([v3f(tup[1]) > tup[2] for tup in v3UB])
+
+    #For future use, interpolate to ensure UB and LB for each is over the same set of points 
+    nv2LB, nv2UB = sameInp(v2LB, v2UB)
+    nv3LB, nv3UB = sameInp(v3LB, v3UB)
+
+    #Check bounds. As expected, interpolation does not break anything new 
+    sum([v2f(tup[1]) < tup[2] for tup in nv2LB])
+    sum([v2f(tup[1]) > tup[2] for tup in nv2UB])
+    sum([v3f(tup[1]) < tup[2] for tup in nv3LB])
+    sum([v3f(tup[1]) > tup[2] for tup in nv3UB])
+
+
+    #Find lower bounds to shift each chunk 
+    v2l = minimum([pt[2] for pt in nv2LB]) #extract lower bounds
+    v3l = minimum([pt[2] for pt in nv3LB]) #extract lower bounds
+
+    #Define log transformation of shifted overapprox (shift by 2*abs(lower bound) to ensure positivity)
+    lv2LB = Any[(tup[1], log(tup[2] + 2*abs(v2l))) for tup in nv2LB]
+    lv2UB = Any[(tup[1], log(tup[2] + 2*abs(v2l))) for tup in nv2UB]
+    lv3LB = Any[(tup[1], log(tup[2] + 2*abs(v3l))) for tup in nv3LB]
+    lv3UB = Any[(tup[1], log(tup[2] + 2*abs(v3l))) for tup in nv3UB]
+
+    lbXs = Any[tup[1] for tup in lv2LB]
+    ubXs = Any[tup[1] for tup in lv2UB]
+    lbYs = Any[tup[1] for tup in lv3LB]
+    ubYs = Any[tup[1] for tup in lv3UB]
+
+    # #For each, plot to check that the transformation is valid
+    # lv2Func = :(log(cos(x)*x + $(2*abs(v2l))))
+
+    # lv2f = Symbolics.build_function(lv2Func, find_variables(lv2Func)..., expression=Val{false})
+    # plotRes2d(lv2Func, lv2f, lb, ub, lv2LB, lv2UB, find_variables(lv2Func)..., false)
+
+    # lv3Func = :(log(cos(y)*y^2 + $(2*abs(v3l))))
+    # lv3f = Symbolics.build_function(lv3Func, find_variables(lv3Func)..., expression=Val{false})
+    # plotRes2d(lv3Func, lv3f, lb, ub, lv3LB, lv3UB, find_variables(lv3Func)..., false)
+
+    #Add dimension to each tuple to make Minkowski sum feasible 
+    #For convenience, introduce new variables for these lifted bounds 
+
+    #Add y axis to x-z overapprox
+    lv2LBl = addDim(lv2LB, 2)
+    lv2UBl = addDim(lv2UB, 2)
+
+    #Add x axis to y-z overapprox
+    lv3LBl = addDim(lv3LB, 1)
+    lv3UBl = addDim(lv3UB, 1)
+
+
+
+    #Compute Minkowski sum of these overapproximations 
+    #So.. add lower bounds to lower bounds and upper bounds to upper bounds
+    lv4LB = MinkSum(lv2LBl, lv3LBl)
+    lv4UB = MinkSum(lv2UBl, lv3UBl)
+
+    # #I claim that this minkowski sum is equiv to log(x) + log(y). Visualize to prove
+    # #Plot the overapproximation 
+    # #dims have form (y,x)
+    surfDim = (size(lbYs)[1],size(lbXs)[1])
+    # combFun = :(log(cos(x)*x + $(2*abs(v2l)))  + log(cos(y)*y^2 + $(2*abs(v3l))))
+    # combF = Symbolics.build_function(combFun, find_variables(combFun)..., expression=Val{false})
+
+
+    # #Check lower bound 
+    # sum([combF(tup[1], tup[2]) < tup[3] for tup in lv4LB])
+
+    # #Check upper bound 
+    # sum([combF(tup[1], tup[2]) > tup[3] for tup in lv4UB])
+
+    # plotSurf(combFun, lb, ub, lv4LB, lv4UB, surfDim, lbXs, lbYs, ubXs, ubYs, true)
+
+    #Compute exponential of the sum of shifted logs 
+    v4LB = Any[(tup[1:end-1]..., exp(tup[end])) for tup in lv4LB]
+    v4UB = Any[(tup[1:end-1]..., exp(tup[end])) for tup in lv4UB]
+
+
+    # #Again, check bounds 
+    # combFun2 = :(exp(log(cos(x)*x + $(2*abs(v2l)))  + log(cos(y)*y^2 + $(2*abs(v3l)))))
+    # combF2 = Symbolics.build_function(combFun2, find_variables(combFun2)..., expression=Val{false})
+
+    # #Check lower bound
+    # sum([combF2(tup[1], tup[2]) < tup[3] for tup in v4LB])
+
+    # #Check upper bound
+    # sum([combF2(tup[1], tup[2]) > tup[3] for tup in v4UB])
+
+    # #Exp maintains overapproximation
+    # plotSurf(combFun2, lb, ub, v4LB, v4UB, surfDim, lbXs, lbYs, ubXs, ubYs, true)
+
+    v5LB = Any[]
+    v5UB = Any[]
+
+    for tup in v4LB
+        xInd = findall(x->x[1] == tup[1], nv2LB)
+        yInd = findall(y->y[1] == tup[2], nv3LB)
+
+        push!(v5LB, (tup[1:end-1]..., tup[end] -2*abs(v3l)*nv2UB[xInd][1][2] -2*abs(v2l)*nv3UB[yInd][1][2]- 4*abs(v2l)*abs(v3l)))
+    end
+
+    for tup in v4UB
+        xInd = findall(x->x[1] == tup[1], nv2UB)
+        yInd = findall(y->y[1] == tup[2], nv3UB)
+
+        push!(v5UB, (tup[1:end-1]..., tup[end] -2*abs(v3l)*nv2LB[xInd][1][2] -2*abs(v2l)*nv3LB[yInd][1][2]- 4*abs(v2l)*abs(v3l)))
+    end
+
+
+    # #Check bounds
+    # combFun3 = :(cos(x)cos(y)x*y^2)
+    # combF3 = Symbolics.build_function(combFun3, find_variables(combFun3)..., expression=Val{false})
+
+    # #Check lower bound
+    # sum([combF3(tup[1], tup[2]) < tup[3] for tup in v5LB])
+
+    # println(minimum([combF3(tup[1], tup[2]) - tup[3] for tup in v5LB]))
+
+    # #Check upper bound
+    # sum([combF3(tup[1], tup[2]) > tup[3] for tup in v5UB])
+
+    # println(maximum([combF3(tup[1], tup[2]) - tup[3] for tup in v5UB]))
+    #Plot the overapproximation
+    plotSurf(expr, lb, ub, v5LB, v5UB, surfDim, lbXs, lbYs, ubXs, ubYs, true)
+
+    return v5LB, v5UB, [lbXs, lbYs, ubXs, ubYs]
+end 
+
+
+function boundMV2(expr, lb, ub)
     #Reduce to addition chunks
     baseParsed = parse_and_reduce(expr)
 
@@ -306,26 +520,33 @@ function bound_multiariate(expr, lb, ub)
     v3f = Symbolics.build_function(v3Func, find_variables(v3Func)..., expression=Val{false})
     v3UB, v3LB = bound_univariate(v3Func, lb, ub, plotflag = true)
 
+    #Check bounds
+    sum([v2f(tup[1]) < tup[2] for tup in v2LB])
+    sum([v2f(tup[1]) > tup[2] for tup in v2UB])
+
+    sum([v3f(tup[1]) < tup[2] for tup in v3LB])
+    sum([v3f(tup[1]) > tup[2] for tup in v3UB])
+
+    #For future use, interpolate to ensure UB and LB for each is over the same set of points 
+    nv2LB, nv2UB = v2LB, v2UB
+    nv3LB, nv3UB = v3LB, v3UB
+
+    #Check bounds. As expected, interpolation does not break anything new 
+    sum([v2f(tup[1]) < tup[2] for tup in nv2LB])
+    sum([v2f(tup[1]) > tup[2] for tup in nv2UB])
+    sum([v3f(tup[1]) < tup[2] for tup in nv3LB])
+    sum([v3f(tup[1]) > tup[2] for tup in nv3UB])
+
 
     #Find lower bounds to shift each chunk 
-    v2l = minimum([pt[2] for pt in v2LB]) #extract lower bounds
-    v3l = minimum([pt[2] for pt in v3LB]) #extract lower bounds
-
-    #Alternative approach 
-    lv2Func = :(log(cos(x)*x + $(2*abs(v2l))))
-    lv3Func = :(log(cos(y)*y^2 + $(2*abs(v3l))))
-
-    lv2f = Symbolics.build_function(lv2Func, find_variables(lv2Func)..., expression=Val{false})
-    lv3f = Symbolics.build_function(lv3Func, find_variables(lv3Func)..., expression=Val{false})
-
-    lv2UB, lv2LB = bound_univariate(lv2Func, lb, ub, plotflag = true)
-    lv3UB, lv3LB = bound_univariate(lv3Func, lb, ub, plotflag = true)
+    v2l = minimum([pt[2] for pt in nv2LB]) #extract lower bounds
+    v3l = minimum([pt[2] for pt in nv3LB]) #extract lower bounds
 
     #Define log transformation of shifted overapprox (shift by 2*abs(lower bound) to ensure positivity)
-    lv2LB = Any[(tup[1], log(tup[2] + 2*abs(v2l))) for tup in v2LB]
-    lv2UB = Any[(tup[1], log(tup[2] + 2*abs(v2l))) for tup in v2UB]
-    lv3LB = Any[(tup[1], log(tup[2] + 2*abs(v3l))) for tup in v3LB]
-    lv3UB = Any[(tup[1], log(tup[2] + 2*abs(v3l))) for tup in v3UB]
+    lv2LB = Any[(tup[1], log(tup[2] + 2*abs(v2l))) for tup in nv2LB]
+    lv2UB = Any[(tup[1], log(tup[2] + 2*abs(v2l))) for tup in nv2UB]
+    lv3LB = Any[(tup[1], log(tup[2] + 2*abs(v3l))) for tup in nv3LB]
+    lv3UB = Any[(tup[1], log(tup[2] + 2*abs(v3l))) for tup in nv3UB]
 
     lbXs = Any[tup[1] for tup in lv2LB]
     ubXs = Any[tup[1] for tup in lv2UB]
@@ -336,11 +557,11 @@ function bound_multiariate(expr, lb, ub)
     lv2Func = :(log(cos(x)*x + $(2*abs(v2l))))
 
     lv2f = Symbolics.build_function(lv2Func, find_variables(lv2Func)..., expression=Val{false})
-    plotRes2d(lv2Func, lv2f, lb, ub, lv2LB, lv2UB, find_variables(lv2Func)..., true)
+    plotRes2d(lv2Func, lv2f, lb, ub, lv2LB, lv2UB, find_variables(lv2Func)..., false)
 
     lv3Func = :(log(cos(y)*y^2 + $(2*abs(v3l))))
     lv3f = Symbolics.build_function(lv3Func, find_variables(lv3Func)..., expression=Val{false})
-    plotRes2d(lv3Func, lv3f, lb, ub, lv3LB, lv3UB, find_variables(lv3Func)..., true)
+    plotRes2d(lv3Func, lv3f, lb, ub, lv3LB, lv3UB, find_variables(lv3Func)..., false)
 
     #Add dimension to each tuple to make Minkowski sum feasible 
     #For convenience, introduce new variables for these lifted bounds 
@@ -353,6 +574,8 @@ function bound_multiariate(expr, lb, ub)
     lv3LBl = addDim(lv3LB, 1)
     lv3UBl = addDim(lv3UB, 1)
 
+
+
     #Compute Minkowski sum of these overapproximations 
     #So.. add lower bounds to lower bounds and upper bounds to upper bounds
     lv4LB = MinkSum(lv2LBl, lv3LBl)
@@ -361,7 +584,7 @@ function bound_multiariate(expr, lb, ub)
     #I claim that this minkowski sum is equiv to log(x) + log(y). Visualize to prove
     #Plot the overapproximation 
     #dims have form (y,x)
-    surfDim = (16,13)
+    surfDim = (size(lbYs)[1],size(lbXs)[1])
     combFun = :(log(cos(x)*x + $(2*abs(v2l)))  + log(cos(y)*y^2 + $(2*abs(v3l))))
     combF = Symbolics.build_function(combFun, find_variables(combFun)..., expression=Val{false})
 
@@ -372,7 +595,6 @@ function bound_multiariate(expr, lb, ub)
     #Check upper bound 
     sum([combF(tup[1], tup[2]) > tup[3] for tup in lv4UB])
 
-    include("overtPoly_helpers.jl")
     plotSurf(combFun, lb, ub, lv4LB, lv4UB, surfDim, lbXs, lbYs, ubXs, ubYs, true)
 
 
@@ -380,6 +602,7 @@ function bound_multiariate(expr, lb, ub)
     #Compute exponential of the sum of shifted logs 
     v4LB = Any[(tup[1:end-1]..., exp(tup[end])) for tup in lv4LB]
     v4UB = Any[(tup[1:end-1]..., exp(tup[end])) for tup in lv4UB]
+
 
 
     #Again, check bounds 
@@ -395,38 +618,72 @@ function bound_multiariate(expr, lb, ub)
     #Exp maintains overapproximation
     plotSurf(combFun2, lb, ub, v4LB, v4UB, surfDim, lbXs, lbYs, ubXs, ubYs, true)
 
-    #Shift the bounds back to the original space accounting to quadratic behavior 
+    #Shift to account for overapprox
     v5LB = Any[(tup[1:end-1]..., tup[end] -2*abs(v3l)*v2f(tup[1]) -2*abs(v2l)*v3f(tup[2])- 4*abs(v2l)*abs(v3l)) for tup in v4LB]
     v5UB = Any[(tup[1:end-1]..., tup[end] -2*abs(v3l)*v2f(tup[1]) -2*abs(v2l)*v3f(tup[2])- 4*abs(v2l)*abs(v3l)) for tup in v4UB]
 
+
     #Check bounds
-    combFun3 = :(cos(x)cos(y)x*y^2 + sin(x)cos(y)y)
+    combFun3 = :(cos(x)cos(y)x*y^2)
     combF3 = Symbolics.build_function(combFun3, find_variables(combFun3)..., expression=Val{false})
-
-    #Find greatest deviation between lower bound and actual function
-    bloatLB = minimum([tup[3] - combF3(tup[1], tup[2]) for tup in v5LB])
-    #Shift lower bound by this amount if it's negative
-    if bloatLB < 0
-        v5LB = Any[(tup[1:end-1]..., tup[end] + bloatLB) for tup in v5LB]
-    end
-
-    #Find greatest deviation between upper bound and actual function
-    bloatUB = maximum([combF3(tup[1], tup[2]) - tup[3] for tup in v5UB])
-    #Shift upper bound by this amount if it's positive
-
-    if bloatUB > 0
-        v5UB = Any[(tup[1:end-1]..., tup[end] + bloatUB) for tup in v5UB]
-    end
 
     #Check lower bound
     sum([combF3(tup[1], tup[2]) < tup[3] for tup in v5LB])
 
+    println(minimum([combF3(tup[1], tup[2]) - tup[3] for tup in v5LB]))
+
     #Check upper bound
     sum([combF3(tup[1], tup[2]) > tup[3] for tup in v5UB])
+
+    println(maximum([combF3(tup[1], tup[2]) - tup[3] for tup in v5UB]))
     #Plot the overapproximation
     plotSurf(baseFunc1, lb, ub, v5LB, v5UB, surfDim, lbXs, lbYs, ubXs, ubYs,true)
 
     return v5LB, v5UB
 
 end
+
+function bound_multivariate(expr, lb, ub; sound_sub=true)
+    if sound_sub
+        return boundMV1(expr, lb, ub)
+    else
+        return boundMV2(expr, lb, ub)
+    end
+
+end
+
+###Testing and Debugging bound_multiariate
+expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y)
+lb, ub = -pi, pi
+    
+#Reduce to addition chunks
+baseParsed = parse_and_reduce(expr)
+
+LB1, UB1, bounds1 = boundMV1(baseParsed[2], lb, ub)
+LB2, UB2, bounds2 = boundMV1(baseParsed[3], lb, ub)
+
+LB1
+LB2
+
+boo1 = [tup[1] for tup in LB1]
+boo2 = [tup[1] for tup in LB2]
+
+lbXs = sort(unique(vcat(boo1, boo2)))
+ubXs = lbXs
+
+boo3 = [tup[2] for tup in LB1]
+boo4 = [tup[2] for tup in LB2]
+
+lbYs = sort(unique(vcat(boo3, boo4)))
+ubYs = lbYs
+
+surfDim = (size(lbYs)[1],size(lbXs)[1])
+
+
+newLB = MinkSum(LB1, LB2)
+newUB = MinkSum(UB1, UB2)
+
+plotSurf(expr, lb, ub, newLB, newUB, surfDim, lbXs, lbYs, ubXs, ubYs, true)
+
+NPLOTS = 0
 
