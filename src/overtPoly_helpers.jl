@@ -1,5 +1,5 @@
-include("../OVERT/src/overapprox_nd.jl")
-include("../OVERT/src/overt_utils.jl")
+include("../OVERT.jl/src/overapprox_nd.jl")
+include("../OVERT.jl/src/overt_utils.jl")
 using Symbolics
 using IntervalRootFinding, IntervalArithmetic
 using MacroTools: prewalk, postwalk
