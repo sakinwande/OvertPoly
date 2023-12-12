@@ -3,6 +3,7 @@ include("../OVERT.jl/src/overt_utils.jl")
 using Symbolics
 using IntervalRootFinding, IntervalArithmetic
 using MacroTools: prewalk, postwalk
+using Interpolations
 
 
 function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-2, npoint=2, rel_error_tol=1e-2, plotflag=false)
@@ -284,66 +285,6 @@ function addDim(vec, dim)
     return newVec
 end
 
-
-function sameInp(LB, UB)
-    """
-    Takes an overt OA and interpolates to ensure that the lower and upper bounds are over the same set of points
-    """
-    newUB = Any[]
-    newLB = Any[]
-
-    newXs = sort(unique(vcat([tup[1] for tup in LB], [tup[1] for tup in UB])))
-
-    for inp in newXs
-        #Check if this input has a lower bound 
-        lbInd = findall(x->x[1] == inp, LB)
-
-        #If it does, add to newLB, else interpolate
-        if !isempty(lbInd)
-            push!(newLB, LB[lbInd[1]])
-        else
-            #Find the lower bound that is closest to the input
-            lbInd = findall(x->x[1] < inp, LB)
-            #Interpolate
-            push!(newLB, (inp, interpol(inp, LB[lbInd[end]], LB[lbInd[end]+1])))
-        end
-
-        #Check if this input has an upper bound
-        ubInd = findall(x->x[1] == inp, UB)
-
-        #Similarly, if it does, add to newUB, else interpolate
-        if !isempty(ubInd)
-            push!(newUB, UB[ubInd[1]])
-        else
-            #Find the upper bound that is closest to the input
-            ubInd = findall(x->x[1] < inp, UB)
-            #Interpolate
-            push!(newUB, (inp, interpol(inp, UB[ubInd[end]], UB[ubInd[end]+1])))
-        end
-
-    end
-
-    return newLB, newUB
-
-end
-
-function interpol(xInp, tuplb, tupub)
-    """
-    When it's not catching international criminals, this method interpolates the lower and upper bounds of a tuple to ensure that the bounds are over the same set of points
-    """
-
-    #Assert that the input is between lb and ub
-    @assert xInp >= tuplb[1] && xInp <= tupub[1]
-
-    #Assert that the upper bound and lower boud are distinct 
-    @assert tuplb[1] != tupub[1]
-
-    #Use linear interpolation to find the output given UB and LB
-    yInp = tuplb[2] + (xInp - tuplb[1])*(tupub[2] - tuplb[2])/(tupub[1] - tuplb[1])
-
-    return yInp
-end
-
 function boundMV1(expr, lb, ub)
     """
     Function to bound a multivariate function over a given interval.
@@ -373,8 +314,8 @@ function boundMV1(expr, lb, ub)
     sum([v3f(tup[1]) > tup[2] for tup in v3UB])
 
     #For future use, interpolate to ensure UB and LB for each is over the same set of points 
-    nv2LB, nv2UB = sameInp(v2LB, v2UB)
-    nv3LB, nv3UB = sameInp(v3LB, v3UB)
+    nv2LB, nv2UB = interpol(v2LB, v2UB)
+    nv3LB, nv3UB = interpol(v3LB, v3UB)
 
     #Check bounds. As expected, interpolation does not break anything new 
     sum([v2f(tup[1]) < tup[2] for tup in nv2LB])
@@ -496,7 +437,6 @@ function boundMV1(expr, lb, ub)
 
     return v5LB, v5UB, [lbXs, lbYs, ubXs, ubYs]
 end 
-
 
 function boundMV2(expr, lb, ub)
     #Reduce to addition chunks
@@ -652,6 +592,95 @@ function bound_multivariate(expr, lb, ub; sound_sub=true)
 
 end
 
+function gen_interpol(oA)
+    """
+    Method to generate an interpolating function for an overt approximation
+    """
+    #First, convert inputs to a vector of vectors
+    vecVecs = [collect(tup[1:end-1]) for tup in oA]
+    #Convert to a matrix
+    vecMat = copy(reduce(hcat,vecVecs)')
+    #Convert matrix to a tuple of unique vectors
+    tupVecs = Tuple(unique(col[:]) for col in eachcol(vecMat))
+
+    #For the output, we need to basically convert the tuples to a surface
+    #First, convert to a matrix
+    outs = [collect(tup) for tup in oA]
+    outMat = copy(reduce(hcat,outs)')
+    #Extract shape of surface
+    outMatR = reverse(outMat, dims=2)
+    surfDim = Tuple(length(unique(col)) for col in eachcol(outMatR[:,2:end]))
+    #  surfDim = Tuple(length(unique(col)) for col in eachcol(outMat[:,1:end-1]))
+    Amat = reshape([tup[end] for tup in oA], surfDim)
+    AmatT = copy(Amat')
+
+    #Use extrapolation boundary condition.
+    #Note that we are not exactly extrapolating, but we run into floating point soundness issues with irrational numbers, and so we allow for extrapolation to avoid this. We would never interpolation outside of the bounds anyway
+    #WARNING: This may not be sound. We need to find a better way to handle this
+    if size(outMat)[2] > 2
+        interp = linear_interpolation(tupVecs, AmatT, extrapolation_bc = Line())
+    else
+        interp = linear_interpolation(tupVecs, Amat, extrapolation_bc = Line())
+
+    end
+    return interp    
+
+end
+
+function interpol(oA1, oA2)
+    """
+    When it is not catching international criminals, this method interpolates two overt approximations to ensure that they are over the same set of points
+    """
+    #Create a new array of inputs that are the same for both approximations
+    #TODO: Consider using rounding here to ensure that the points are the same
+    #Unsound flag, this is removing symmetric points. Basically, 
+    oAComb = sort(vcat(oA1, oA2))
+    oAVecs = [collect(tup[1:end-1]) for tup in oAComb]
+    oAMat = copy(reduce(hcat,oAVecs)')
+    oAMatR = reverse(oAMat, dims=2)
+    oACol = [unique(col[:]) for col in eachcol(oAMat)]
+    newInps = Iterators.product(oACol...)
+
+
+    #Generate interpolation function for each approximation
+    interp1 = gen_interpol(oA1)
+    interp2 = gen_interpol(oA2)
+
+    #Loop through both approximations and interpolate to ensure that the bounds are over the same set of points (and that the points are evenly spaced)
+
+    newOA1 = Any[]
+    newOA2 = Any[]
+    for tup in newInps
+        tup1 = (tup..., interp1(tup...))
+        tup2 = (tup..., interp2(tup...))
+        push!(newOA1, tup1)
+        push!(newOA2, tup2)
+    end
+
+    return newOA1, newOA2
+
+end
+
+function sound_IA(LB1, UB1, LB2, UB2, op)
+    """
+    Method to soundly add or subtract two overapproximations
+    """
+    LB = Any[]
+    UB = Any[]
+    if op == :+
+        for i = 1:size(LB1)[1]
+            push!(LB, (LB1[i][1:end-1]..., LB1[i][end] + LB2[i][end]))
+            push!(UB, (UB1[i][1:end-1]..., UB1[i][end] + UB2[i][end]))
+        end
+    elseif op == :-
+        for i = 1:size(LB1)[1]
+            push!(LB, (LB1[i][1:end-1]..., LB1[i][end] - UB2[i][end]))
+            push!(UB, (UB1[i][1:end-1]..., UB1[i][end] - LB2[i][end]))
+        end
+    end
+    return LB, UB
+end
+
 ###Testing and Debugging bound_multiariate
 expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y)
 lb, ub = -pi, pi
@@ -659,31 +688,80 @@ lb, ub = -pi, pi
 #Reduce to addition chunks
 baseParsed = parse_and_reduce(expr)
 
+#We know that each LB, UB combination is over the same set of points. So we don't have to perform 4 interpolations
 LB1, UB1, bounds1 = boundMV1(baseParsed[2], lb, ub)
 LB2, UB2, bounds2 = boundMV1(baseParsed[3], lb, ub)
 
 LB1
 LB2
+sort(LB1)
 
-boo1 = [tup[1] for tup in LB1]
-boo2 = [tup[1] for tup in LB2]
+#This interpolation is not sound. Fix now 
+nLB1, nLB2 = interpol(LB1, LB2)
+nUB1, nUB2 = interpol(UB1, UB2)
 
-lbXs = sort(unique(vcat(boo1, boo2)))
-ubXs = lbXs
+sort(nLB1)
+#Plot this 
+nLB1 = sort(nLB1)
+nUB1 = sort(nUB1)
+LBVec = [collect(tup) for tup in nLB1]
+UBVec = [collect(tup) for tup in nUB1]
+LBMat = copy(reduce(hcat,LBVec)')
+UBMat = copy(reduce(hcat,UBVec)')
+#Extract shape of surface
+#reverse
+LBMatR = reverse(LBMat, dims=2)
+surfDim = Tuple(length(unique(col)) for col in eachcol(LBMat[:,1:end-1]))
+xS, yS = [unique(col) for col in eachcol(LBMat[:,1:end-1])]
+NPLOTS -= 1
 
-boo3 = [tup[2] for tup in LB1]
-boo4 = [tup[2] for tup in LB2]
+plotSurf(baseParsed[2], lb, ub, nLB1, nUB1, surfDim, xS, yS, xS, yS, true)
 
-lbYs = sort(unique(vcat(boo3, boo4)))
-ubYs = lbYs
+sort(nLB1)
+plotSurf(baseParsed[2], lb, ub, nLB1, nUB1, surfDim, xS, yS, xS, yS, true)
+#Add separate chunks 
 
-surfDim = (size(lbYs)[1],size(lbXs)[1])
+LB3, UB3 = sound_IA(nLB1, nUB1, nLB2, nUB2, baseParsed[1])
+
+#Plot this 
+LBVec = [collect(tup) for tup in LB3]
+LBMat = copy(reduce(hcat,LBVec)')
+#Extract shape of surface
+surfDim = Tuple(length(unique(col)) for col in eachcol(LBMat[:,1:end-1]))
+
+xS, yS = [unique(round.(col, digits=5)) for col in eachcol(LBMat[:,1:end-1])]
 
 
-newLB = MinkSum(LB1, LB2)
-newUB = MinkSum(UB1, UB2)
+plotSurf(baseParsed[2], lb, ub, nLB1, nUB1, surfDim, xS, yS, xS, yS, true)
 
-plotSurf(expr, lb, ub, newLB, newUB, surfDim, lbXs, lbYs, ubXs, ubYs, true)
+################Test 1#######################
+LB1
+oAComb = sort(vcat(LB1, LB2))
+oAVecs = [collect(tup[1:end-1]) for tup in oAComb]
+oAMat = copy(reduce(hcat,oAVecs)')
+oAMatR = reverse(oAMat, dims=2)
+oACol = [unique(col[:]) for col in eachcol(oAMatR)]
+newInps = collect(Iterators.product(oACol...))
 
-NPLOTS = 0
 
+#Generate interpolation function for each approximation
+#?Could it be an interpolation function? - No Interpolation works fine over sampled pints 
+#Loop through both approximations and interpolate to ensure that the bounds are over the same set of points (and that the points are evenly spaced)
+
+LB1
+
+newOA1 = Any[]
+newOA2 = Any[]
+
+newInps[2]
+interp1(newInps[2]...)
+
+for tup in newInps
+    tup1 = (tup..., interp1(tup...))
+    tup2 = (tup..., interp2(tup...))
+    push!(newOA1, tup1)
+    push!(newOA2, tup2)
+end
+
+return newOA1, newOA2
+#############################################

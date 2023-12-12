@@ -1,21 +1,20 @@
 using MiniQhull
 
 
-function OA2PWA(LB, UB)
+function OA2PWA(Bound)
     """
-    Takes an overt upper/lower bound and returns a piecewise affine function (defined in the style of Boyd) with a corresponding triangulation.
+    Takes an overt upper or lower bound and returns a piecewise affine function (defined in the style of Boyd) with a corresponding triangulation.
+
+    Originally used to treat upper and lower bound separately but they should now be defined over the same interval
     """
 
-    lbDom = [tup[1:end-1] for tup in LB]
-    ubDom = [tup[1:end-1] for tup in UB]
+    Dom = [tup[1:end-1] for tup in Bound]
 
-    lbTri = delaunay(lbDom)
-    ubTri = delaunay(ubDom)
+    Tri = delaunay(Dom)
 
-    lbInc = vertex2inc(lbTri)
-    ubInc = vertex2inc(ubTri)
+    Inc = vertex2inc(Tri)
 
-    return lbInc, ubInc
+    return Inc
 end
 
 function vertex2inc(vert)
