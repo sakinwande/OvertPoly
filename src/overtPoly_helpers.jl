@@ -1,10 +1,10 @@
-include("../OVERT.jl/src/overapprox_nd.jl")
-include("../OVERT.jl/src/overt_utils.jl")
 using Symbolics
 using IntervalRootFinding, IntervalArithmetic
 using MacroTools: prewalk, postwalk
 using Interpolations
-
+using OVERT: bound, find_variables, to_pairs 
+using Plots
+global NPLOTS = 0
 
 function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-2, npoint=2, rel_error_tol=1e-2, plotflag=false)
     """
@@ -104,7 +104,7 @@ function parse_and_reduce(expr::Expr)
         subExprVec = distribMul(subExprVec)
         likeExprVec = [likeTerms(subExprVec, var) for var in find_variables(expr)]
         newExprVec = Any[array2expr(chunk) for chunk in likeExprVec]
-    elseif subExprVec[1] == :+
+    elseif subExprVec[1] == :+ || subExprVec[1] == :-
         newExprVec = Any[array2expr(chunk) for chunk in subExprVec[2:end]]
     end
 
@@ -155,6 +155,28 @@ function distribMul(arr)
     return newArr
 end
 
+function distribDiv(arr)
+    """
+    Function to distribute division
+    """
+    @assert arr[1] == :/
+    #Check for division over division
+    if arr[1] == arr[2][1]
+        #Check for recursive cases
+        if arr[2][2][1] == arr[2][1]
+            arr[2] = distribDiv(arr[2])
+        end
+        newArr = Any[arr[1], arr[2][2:end]..., arr[3:end]...]
+    #Check for division over addition
+    elseif arr[2][1] == :+
+        #Skip recursive cases for now
+        newArr = Any[arr[2][1], Any[Any[arr[1], innAdd, arr[3:end]...] for innAdd in arr[2][2:end]]...]
+    else
+        newArr = Any[arr[1], arr[2:end]...]
+    end
+
+    return newArr
+end
 function likeTerms(arr, var)
     """
     Given a symbolic variable var, and an array of symbols or simple expressions arr, group like terms
@@ -334,10 +356,13 @@ function boundMV1(expr, lb, ub)
     lv3LB = Any[(tup[1], log(tup[2] + 2*abs(v3l))) for tup in nv3LB]
     lv3UB = Any[(tup[1], log(tup[2] + 2*abs(v3l))) for tup in nv3UB]
 
-    lbXs = Any[tup[1] for tup in lv2LB]
-    ubXs = Any[tup[1] for tup in lv2UB]
-    lbYs = Any[tup[1] for tup in lv3LB]
-    ubYs = Any[tup[1] for tup in lv3UB]
+    # lbXs = Any[tup[1] for tup in lv2LB]
+    # ubXs = Any[tup[1] for tup in lv2UB]
+    # lbYs = Any[tup[1] for tup in lv3LB]
+    # ubYs = Any[tup[1] for tup in lv3UB]
+
+    xS = Any[tup[1] for tup in lv2LB]
+    yS = Any[tup[1] for tup in lv3LB]
 
     # #For each, plot to check that the transformation is valid
     # lv2Func = :(log(cos(x)*x + $(2*abs(v2l))))
@@ -370,7 +395,7 @@ function boundMV1(expr, lb, ub)
     # #I claim that this minkowski sum is equiv to log(x) + log(y). Visualize to prove
     # #Plot the overapproximation 
     # #dims have form (y,x)
-    surfDim = (size(lbYs)[1],size(lbXs)[1])
+    surfDim = (size(yS)[1],size(xS)[1])
     # combFun = :(log(cos(x)*x + $(2*abs(v2l)))  + log(cos(y)*y^2 + $(2*abs(v3l))))
     # combF = Symbolics.build_function(combFun, find_variables(combFun)..., expression=Val{false})
 
@@ -433,9 +458,9 @@ function boundMV1(expr, lb, ub)
 
     # println(maximum([combF3(tup[1], tup[2]) - tup[3] for tup in v5UB]))
     #Plot the overapproximation
-    plotSurf(expr, lb, ub, v5LB, v5UB, surfDim, lbXs, lbYs, ubXs, ubYs, true)
+    plotSurf(expr, lb, ub, v5LB, v5UB, surfDim, xS, yS, xS, yS, true)
 
-    return v5LB, v5UB, [lbXs, lbYs, ubXs, ubYs]
+    return v5LB, v5UB
 end 
 
 function boundMV2(expr, lb, ub)
@@ -584,12 +609,46 @@ function boundMV2(expr, lb, ub)
 end
 
 function bound_multivariate(expr, lb, ub; sound_sub=true)
-    if sound_sub
-        return boundMV1(expr, lb, ub)
-    else
-        return boundMV2(expr, lb, ub)
-    end
+    """
+    Ideally, this function can take an arbitrary multivariate function and compute bouds over a given interval. However, achieving this is difficult. 
 
+    Continue to update this function as we find more cases that it can handle
+    """
+    #Reduce to addition chunks
+    baseParsed = parse_and_reduce(expr)
+
+    #We know that each LB, UB combination is over the same set of points. So we don't have to perform 4 interpolations
+    LB1, UB1 = boundMV1(baseParsed[2], lb, ub)
+    LB2, UB2 = boundMV1(baseParsed[3], lb, ub)
+
+    #This interpolation is not sound. Fix now 
+    nLB1, nLB2 = interpol(LB1, LB2)
+    nUB1, nUB2 = interpol(UB1, UB2)
+
+    #Interpolation results are unsorted.
+    nLB1 = sort(nLB1)
+    nUB1 = sort(nUB1)
+    LBVec = [collect(tup) for tup in nLB1]
+    UBVec = [collect(tup) for tup in nUB1]
+    LBMat = copy(reduce(hcat,LBVec)')
+    UBMat = copy(reduce(hcat,UBVec)')
+    #Extract shape of surface
+    #reverse
+    LBMatR = reverse(LBMat, dims=2)
+    #Surfdim expects the form (y,x). This is the source of the bug
+    surfDim = Tuple(length(unique(col)) for col in eachcol(LBMatR[:,2:end]))
+    xS, yS = [unique(col) for col in eachcol(LBMat[:,1:end-1])] #xS and yS are sorted
+
+    plotSurf(baseParsed[2], lb, ub, nLB1, nUB1, surfDim, xS, yS, xS, yS, true)
+
+    nLB2 = sort(nLB2)
+    nUB2 = sort(nUB2)
+    plotSurf(baseParsed[3], lb, ub, nLB2, nUB2, surfDim, xS, yS, xS, yS, true)
+    #Add separate chunks 
+
+    LB3, UB3 = sound_IA(nLB1, nUB1, nLB2, nUB2, baseParsed[1])
+
+    return LB3, UB3
 end
 
 function gen_interpol(oA)
@@ -657,7 +716,7 @@ function interpol(oA1, oA2)
         push!(newOA2, tup2)
     end
 
-    return newOA1, newOA2
+    return sort(newOA1), sort(newOA2)
 
 end
 
@@ -685,83 +744,13 @@ end
 expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y)
 lb, ub = -pi, pi
     
-#Reduce to addition chunks
+LB, UB = bound_multivariate(expr, lb, ub)
+
+#Plot this 
+plotSurf(expr, lb, ub, LB, UB, surfDim, xS, yS, xS, yS, true)
+
+
+
+expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y -y^2)
 baseParsed = parse_and_reduce(expr)
-
-#We know that each LB, UB combination is over the same set of points. So we don't have to perform 4 interpolations
-LB1, UB1, bounds1 = boundMV1(baseParsed[2], lb, ub)
-LB2, UB2, bounds2 = boundMV1(baseParsed[3], lb, ub)
-
-LB1
-LB2
-sort(LB1)
-
-#This interpolation is not sound. Fix now 
-nLB1, nLB2 = interpol(LB1, LB2)
-nUB1, nUB2 = interpol(UB1, UB2)
-
-sort(nLB1)
-#Plot this 
-nLB1 = sort(nLB1)
-nUB1 = sort(nUB1)
-LBVec = [collect(tup) for tup in nLB1]
-UBVec = [collect(tup) for tup in nUB1]
-LBMat = copy(reduce(hcat,LBVec)')
-UBMat = copy(reduce(hcat,UBVec)')
-#Extract shape of surface
-#reverse
-LBMatR = reverse(LBMat, dims=2)
-surfDim = Tuple(length(unique(col)) for col in eachcol(LBMat[:,1:end-1]))
-xS, yS = [unique(col) for col in eachcol(LBMat[:,1:end-1])]
-NPLOTS -= 1
-
-plotSurf(baseParsed[2], lb, ub, nLB1, nUB1, surfDim, xS, yS, xS, yS, true)
-
-sort(nLB1)
-plotSurf(baseParsed[2], lb, ub, nLB1, nUB1, surfDim, xS, yS, xS, yS, true)
-#Add separate chunks 
-
-LB3, UB3 = sound_IA(nLB1, nUB1, nLB2, nUB2, baseParsed[1])
-
-#Plot this 
-LBVec = [collect(tup) for tup in LB3]
-LBMat = copy(reduce(hcat,LBVec)')
-#Extract shape of surface
-surfDim = Tuple(length(unique(col)) for col in eachcol(LBMat[:,1:end-1]))
-
-xS, yS = [unique(round.(col, digits=5)) for col in eachcol(LBMat[:,1:end-1])]
-
-
-plotSurf(baseParsed[2], lb, ub, nLB1, nUB1, surfDim, xS, yS, xS, yS, true)
-
-################Test 1#######################
-LB1
-oAComb = sort(vcat(LB1, LB2))
-oAVecs = [collect(tup[1:end-1]) for tup in oAComb]
-oAMat = copy(reduce(hcat,oAVecs)')
-oAMatR = reverse(oAMat, dims=2)
-oACol = [unique(col[:]) for col in eachcol(oAMatR)]
-newInps = collect(Iterators.product(oACol...))
-
-
-#Generate interpolation function for each approximation
-#?Could it be an interpolation function? - No Interpolation works fine over sampled pints 
-#Loop through both approximations and interpolate to ensure that the bounds are over the same set of points (and that the points are evenly spaced)
-
-LB1
-
-newOA1 = Any[]
-newOA2 = Any[]
-
-newInps[2]
-interp1(newInps[2]...)
-
-for tup in newInps
-    tup1 = (tup..., interp1(tup...))
-    tup2 = (tup..., interp2(tup...))
-    push!(newOA1, tup1)
-    push!(newOA2, tup2)
-end
-
-return newOA1, newOA2
-#############################################
+parse_and_reduce(baseParsed[3])
