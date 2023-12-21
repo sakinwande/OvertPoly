@@ -740,17 +740,17 @@ function sound_IA(LB1, UB1, LB2, UB2, op)
     return LB, UB
 end
 
-###Testing and Debugging bound_multiariate
-expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y)
-lb, ub = -pi, pi
+# ###Testing and Debugging bound_multiariate
+# expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y)
+# lb, ub = -pi, pi
     
-LB, UB = bound_multivariate(expr, lb, ub)
+# LB, UB = bound_multivariate(expr, lb, ub)
 
-#Plot this 
-plotSurf(expr, lb, ub, LB, UB, surfDim, xS, yS, xS, yS, true)
+# #Plot this 
+# plotSurf(expr, lb, ub, LB, UB, surfDim, xS, yS, xS, yS, true)
 
 
 
-expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y -y^2)
-baseParsed = parse_and_reduce(expr)
-parse_and_reduce(baseParsed[3])
+# expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y -y^2)
+# baseParsed = parse_and_reduce(expr)
+# parse_and_reduce(baseParsed[3])

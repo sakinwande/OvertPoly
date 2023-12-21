@@ -11,10 +11,11 @@ function OA2PWA(Bound)
     Dom = [tup[1:end-1] for tup in Bound]
 
     Tri = delaunay(Dom)
+    vecVecs = sort([[col...] for col in eachcol(Tri)])
 
-    Inc = vertex2inc(Tri)
+    # Inc = vertex2inc(Tri)
 
-    return Inc
+    return vecVecs
 end
 
 function vertex2inc(vert)
@@ -37,4 +38,24 @@ function vertex2inc(vert)
         end
     end
     return M
+end
+
+struct BivariatePWLFunction{D}
+    """
+    A struct to hold the overapproximation object as well as its triangulation
+    Will be modified as needed
+    """
+    #Vector of tuples holding inputs (dimension agnostic)
+    x::Vector{NTuple{D,Float64}}
+    #Vector of outputs
+    z::Vector{Float64}
+    #List of lists describing which tuples are in which simplex
+    T::Vector{Vector{Int32}}
+end
+
+function BivariatePWLFunction(x, z, T)
+    """
+    Takes an overt enclosure for a bivariate function and returns a PWL object in the format of PiecewiseLinearOpt.jl
+    """
+    return PWLFunction(x, convert(Vector{Float64}, z), T)
 end
