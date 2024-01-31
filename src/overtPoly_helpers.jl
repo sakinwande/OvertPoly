@@ -6,7 +6,7 @@ using OVERT: bound, find_variables, to_pairs
 using Plots
 global NPLOTS = 0
 
-function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-2, npoint=2, rel_error_tol=1e-2, plotflag=false)
+function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-4, npoint=2, rel_error_tol=5e-3, plotflag=false)
     """
     Method to bound a univariate function
 
@@ -637,6 +637,8 @@ function bound_multivariate(expr, lb, ub; sound_sub=true)
     LBMatR = reverse(LBMat, dims=2)
     #Surfdim expects the form (y,x). This is the source of the bug
     surfDim = Tuple(length(unique(col)) for col in eachcol(LBMatR[:,2:end]))
+
+    print(surfDim)
     xS, yS = [unique(col) for col in eachcol(LBMat[:,1:end-1])] #xS and yS are sorted
 
     plotSurf(baseParsed[2], lb, ub, nLB1, nUB1, surfDim, xS, yS, xS, yS, true)
@@ -691,10 +693,11 @@ function interpol(oA1, oA2)
     When it is not catching international criminals, this method interpolates two overt approximations to ensure that they are over the same set of points
     """
     #Create a new array of inputs that are the same for both approximations
-    #TODO: Consider using rounding here to ensure that the points are the same
+    #TODO Consider using rounding here to ensure that the points are the same
     #Unsound flag, this is removing symmetric points. Basically, 
     oAComb = sort(vcat(oA1, oA2))
-    oAVecs = [collect(tup[1:end-1]) for tup in oAComb]
+    #NOTE: This is where the precision of the input domain is set. 
+    oAVecs = [round.(collect(tup[1:end-1]), digits=5) for tup in oAComb]
     oAMat = copy(reduce(hcat,oAVecs)')
     oAMatR = reverse(oAMat, dims=2)
     oACol = [unique(col[:]) for col in eachcol(oAMat)]
@@ -740,6 +743,80 @@ function sound_IA(LB1, UB1, LB2, UB2, op)
     return LB, UB
 end
 
+# ####Debug 
+# #Reduce to addition chunks
+# expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y)
+# lb, ub = -pi, pi
+# baseParsed = parse_and_reduce(expr)
+
+# #We know that each LB, UB combination is over the same set of points. So we don't have to perform 4 interpolations
+# LB1, UB1 = boundMV1(baseParsed[2], lb, ub)
+# LB2, UB2 = boundMV1(baseParsed[3], lb, ub)
+
+
+# ##############################Debug Interpol########################
+# # oA1 = LB1
+# # oA2 = LB2
+
+# # oAComb = sort(vcat(oA1, oA2))
+# # oAVecs = [round.(collect(tup[1:end-1]), digits=5) for tup in oAComb]
+# # oAMat = copy(reduce(hcat,oAVecs)')
+# # oAMatR = reverse(oAMat, dims=2)
+# # oACol = [unique(col[:]) for col in eachcol(oAMat)]
+# # newInps = Iterators.product(oACol...)
+
+
+# # #Generate interpolation function for each approximation
+# # interp1 = gen_interpol(oA1)
+# # interp2 = gen_interpol(oA2)
+
+# # #Loop through both approximations and interpolate to ensure that the bounds are over the same set of points (and that the points are evenly spaced)
+
+# # newOA1 = Any[]
+# # newOA2 = Any[]
+# # for tup in newInps
+# #     tup1 = (tup..., interp1(tup...))
+# #     tup2 = (tup..., interp2(tup...))
+# #     push!(newOA1, tup1)
+# #     push!(newOA2, tup2)
+# # end
+# ###################################################################
+
+# #This interpolation is not sound. Fix now 
+# nLB1, nLB2 = interpol(LB1, LB2)
+# nUB1, nUB2 = interpol(UB1, UB2)
+
+
+# #Interpolation results are sorted.
+# nLB1 = sort(nLB1)
+# nUB1 = sort(nUB1)
+
+# LBVec = [collect(tup) for tup in nLB1]
+# UBVec = [collect(tup) for tup in nUB1]
+
+# LBMat = copy(reduce(hcat,LBVec)')
+# UBMat = copy(reduce(hcat,UBVec)')
+# #Extract shape of surface
+# #reverse
+# LBMatR = reverse(LBMat, dims=2)
+# #Surfdim expects the form (y,x). This is the source of the bug
+# surfDim = Tuple(length(unique(col)) for col in eachcol(LBMatR[:,2:end]))
+
+# print(surfDim)
+# xS, yS = [unique(col) for col in eachcol(LBMat[:,1:end-1])] #xS and yS are sorted
+
+# plotSurf(baseParsed[2], lb, ub, nLB1, nUB1, surfDim, xS, yS, xS, yS, true)
+
+# nLB2 = sort(nLB2)
+# nUB2 = sort(nUB2)
+# plotSurf(baseParsed[3], lb, ub, nLB2, nUB2, surfDim, xS, yS, xS, yS, true)
+# #Add separate chunks 
+
+# LB3, UB3 = sound_IA(nLB1, nUB1, nLB2, nUB2, baseParsed[1])
+
+
+
+
 # ###Testing and Debugging bound_multiariate
 # expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y)
 # lb, ub = -pi, pi
@@ -751,6 +828,9 @@ end
 
 
 
-# expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y -y^2)
-# baseParsed = parse_and_reduce(expr)
+expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y -y^2)
+baseParsed = parse_and_reduce(expr)
 # parse_and_reduce(baseParsed[3])
+test = baseParsed[3]
+
+Symbolics.parse_expr_to_symbolic(test)

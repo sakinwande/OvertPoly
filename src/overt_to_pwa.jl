@@ -40,7 +40,7 @@ function vertex2inc(vert)
     return M
 end
 
-struct BivariatePWLFunction{D}
+struct PWLFunction{D}
     """
     A struct to hold the overapproximation object as well as its triangulation
     Will be modified as needed
@@ -48,7 +48,7 @@ struct BivariatePWLFunction{D}
     #Vector of tuples holding inputs (dimension agnostic)
     x::Vector{NTuple{D,Float64}}
     #Vector of outputs
-    z::Vector{Float64}
+    y::Vector{Float64}
     #List of lists describing which tuples are in which simplex
     T::Vector{Vector{Int32}}
 end
