@@ -54,8 +54,8 @@ function ccEncoding(xS, yLB, yUB, Tri)
 
     #Define the generic function value in terms of the convex combination of its upper and lower bounds
     #NOTE: Control is changed here. Very bad 
-    @constraint(model, yₗ == sum(λ[i]*yLB[i] + u for i in 1:m))
-    @constraint(model, yᵤ == sum(λ[i]*yUB[i] + u for i in 1:m))
+    @constraint(model, yₗ == sum(λ[i]*yLB[i] + 8*u for i in 1:m))
+    @constraint(model, yᵤ == sum(λ[i]*yUB[i] + 8*u for i in 1:m))
 
 
     #We will also need to define additional constraints on x and y, but those will be added later
@@ -86,6 +86,5 @@ end
 
 # # lbPWL = BivariatePWLFunction(xS, yLB, Tri)
 # # ubPWL = BivariatePWLFunction(xS, yUB, Tri)
-
 
 

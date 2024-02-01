@@ -39,33 +39,39 @@ function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-4, npoint=2, rel_error_t
 
     symExpr = Symbolics.parse_expr_to_symbolic(standExpr, Main)
 
-    #Compute second derivative
-    d2f = expand_derivatives(D2(symExpr))
-    #d2f is an expression. Convert to a Julia function so IntervalRootFinding can use it
-    #NB: expression=Val{false} returns a runtime gen function to avoid world age issues. This way we avoid evaluating expressions 
-    d2func = Symbolics.build_function(d2f, :xₚ; expression = Val{false})
-
-
-    #Then find the roots over the given interval using the function
-    rootVals = IntervalRootFinding.roots(d2func, IntervalArithmetic.Interval(lb, ub))
-    #TODO: This is not sound, make sound
-    rootsGuess = [mid.([root.interval for root in rootVals])]
-    d2f_zeros = sort(rootsGuess[1])
-
-
-    convex = nothing 
-
     #Return a standard Julia function that can be evaluated from the expression
     fun = Symbolics.build_function(baseExpr, varBase, expression=Val{false})
     df = expand_derivatives(D(eval(symExpr)))
     dfunc = Symbolics.build_function(df, :xₚ; expression=Val{false})
 
-    UB = bound(fun, lb, ub, npoint; rel_error_tol=rel_error_tol, conc_method="continuous", lowerbound=false, df = dfunc,d2f = d2func, d2f_zeros=d2f_zeros, convex=nothing, plot=true)
-    UBpoints = unique(sort(to_pairs(UB), by = x -> x[1]))
+    #Compute second derivative
+    d2f = expand_derivatives(D2(symExpr))
+    #d2f is an expression. Convert to a Julia function so IntervalRootFinding can use it
+    #NB: expression=Val{false} returns a runtime gen function to avoid world age issues. This way we avoid evaluating expressions 
 
-    LB = bound(fun, lb, ub, npoint; rel_error_tol=rel_error_tol, conc_method="continuous", lowerbound=true, df = dfunc,d2f = d2func, d2f_zeros=d2f_zeros, convex=nothing, plot=true)
-    LBpoints = unique(sort(to_pairs(LB), by = x -> x[1]))
+    if d2f != 0
+        d2func = Symbolics.build_function(d2f, :xₚ; expression = Val{false})
 
+        #Then find the roots over the given interval using the function
+        rootVals = IntervalRootFinding.roots(d2func, IntervalArithmetic.Interval(lb, ub))
+        #TODO: This is not sound, make sound
+        rootsGuess = [mid.([root.interval for root in rootVals])]
+        d2f_zeros = sort(rootsGuess[1])
+
+
+        convex = nothing 
+
+        UB = bound(fun, lb, ub, npoint; rel_error_tol=rel_error_tol, conc_method="continuous", lowerbound=false, df = dfunc,d2f = d2func, d2f_zeros=d2f_zeros, convex=nothing, plot=true)
+        UBpoints = unique(sort(to_pairs(UB), by = x -> x[1]))
+
+        LB = bound(fun, lb, ub, npoint; rel_error_tol=rel_error_tol, conc_method="continuous", lowerbound=true, df = dfunc,d2f = d2func, d2f_zeros=d2f_zeros, convex=nothing, plot=true)
+        LBpoints = unique(sort(to_pairs(LB), by = x -> x[1]))
+    else
+        #Account for linear case
+        UBpoints = [(lb, fun(lb)), (ub, fun(ub))] 
+        LBpoints = [(lb, fun(lb)), (ub, fun(ub))]
+
+    end
     if plotflag
         plotRes2d(baseExpr, fun, lb, ub, LBpoints, UBpoints, varBase, true)
     end
@@ -679,9 +685,9 @@ function gen_interpol(oA)
     #Note that we are not exactly extrapolating, but we run into floating point soundness issues with irrational numbers, and so we allow for extrapolation to avoid this. We would never interpolation outside of the bounds anyway
     #WARNING: This may not be sound. We need to find a better way to handle this
     if size(outMat)[2] > 2
-        interp = linear_interpolation(tupVecs, AmatT, extrapolation_bc = Line())
+        interp = linear_interpolation(tupVecs, AmatT, extrapolation_bc = Interpolations.Line())
     else
-        interp = linear_interpolation(tupVecs, Amat, extrapolation_bc = Line())
+        interp = linear_interpolation(tupVecs, Amat, extrapolation_bc = Interpolations.Line())
 
     end
     return interp    
@@ -828,9 +834,45 @@ end
 
 
 
-expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y -y^2)
-baseParsed = parse_and_reduce(expr)
-# parse_and_reduce(baseParsed[3])
-test = baseParsed[3]
+expr = :(0*x)
+expr = :(2sin(x))
 
-Symbolics.parse_expr_to_symbolic(test)
+varBase = find_variables(expr)[1]
+
+#Define differentiation variable
+@variables xₚ
+
+#Define derivative
+D = Differential(xₚ)
+#Define second derivative
+D2 = Differential(xₚ)^2
+
+strExpr = string(expr)
+strExpr = replace(strExpr, string(varBase) => "xₚ")
+standExpr = Meta.parse(strExpr) #Standardized expression with xₚ as the variable
+
+symExpr = Symbolics.parse_expr_to_symbolic(standExpr, Main)
+
+fun = Symbolics.build_function(expr, varBase, expression=Val{false})
+df = expand_derivatives(D(eval(symExpr)))
+dfunc = Symbolics.build_function(df, :xₚ; expression=Val{false})
+
+#Compute second derivative
+d2f = expand_derivatives(D2(symExpr))
+#d2f is an expression. Convert to a Julia function so IntervalRootFinding can use it
+#NB: expression=Val{false} returns a runtime gen function to avoid world age issues. This way we avoid evaluating expressions 
+d2func = Symbolics.build_function(d2f, :xₚ; expression = Val{false})
+
+typeof(d2f)
+if eval(d2f) == 0
+    boo = 1 
+end
+
+d2f
+try 
+    if d2f == 0
+        boo = 1
+    end
+catch 
+    println("Error")
+end

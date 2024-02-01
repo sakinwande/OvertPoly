@@ -92,9 +92,9 @@ version = "0.12.5"
 
 [[Bzip2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "19a35467a82e236ff51bc17a3a44b69ef35185a2"
+git-tree-sha1 = "9e2a6b69137e6969bab0152632dcb3bc108c8bdd"
 uuid = "6e34b625-4abd-537c-b88f-471c36dfa7a0"
-version = "1.0.8+0"
+version = "1.0.8+1"
 
 [[CDDLib]]
 deps = ["LinearAlgebra", "MathOptInterface", "Polyhedra", "SparseArrays", "cddlib_jll"]
@@ -534,6 +534,18 @@ git-tree-sha1 = "d972031d28c8c8d9d7b41a536ad7bb0c2579caca"
 uuid = "0656b61e-2033-5cc2-a64a-77c0f6c09b89"
 version = "3.3.8+0"
 
+[[GLPK]]
+deps = ["GLPK_jll", "MathOptInterface"]
+git-tree-sha1 = "e37c68890d71c2e6555d3689a5d5fc75b35990ef"
+uuid = "60bf3e95-4087-53dc-ae20-288a0d20c6a6"
+version = "1.1.3"
+
+[[GLPK_jll]]
+deps = ["Artifacts", "GMP_jll", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "fe68622f32828aa92275895fdb324a85894a5b1b"
+uuid = "e8aa6df9-e6ca-548a-97ff-1f85fc5b8b98"
+version = "5.0.1+0"
+
 [[GMP_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "781609d7-10c4-51f6-84f2-b8444358ff6d"
@@ -804,9 +816,9 @@ version = "0.1.5"
 
 [[IntelOpenMP_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "31d6adb719886d4e32e38197aae466e98881320b"
+git-tree-sha1 = "199288db29b37c0d3fbd30c66c9b66fa4aea5ceb"
 uuid = "1d5cc7b8-4909-519e-a0f8-d0f5ad9712d0"
-version = "2024.0.0+0"
+version = "2024.0.0+1"
 
 [[InteractiveUtils]]
 deps = ["Markdown"]
@@ -976,6 +988,12 @@ uuid = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
 git-tree-sha1 = "a560dd966b386ac9ae60bdd3a3d3a326062d3c3e"
 uuid = "8cdb02fc-e678-4876-92c5-9defec4f444e"
 version = "0.3.1"
+
+[[LazySets]]
+deps = ["Distributed", "GLPK", "IntervalArithmetic", "JuMP", "LinearAlgebra", "Random", "ReachabilityBase", "RecipesBase", "Reexport", "Requires", "SharedArrays", "SparseArrays", "StaticArraysCore"]
+git-tree-sha1 = "8b6daff020df131aaf2c798ac8913cdd4751bbfc"
+uuid = "b4f0291d-fe17-52bc-9479-3d1a343d9043"
+version = "2.11.3"
 
 [[LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
@@ -1525,6 +1543,12 @@ deps = ["Requires"]
 git-tree-sha1 = "1342a47bf3260ee108163042310d26f2be5ec90b"
 uuid = "c84ed2f1-dad5-54f0-aa8e-dbefe2724439"
 version = "0.4.5"
+
+[[ReachabilityBase]]
+deps = ["ExprTools", "InteractiveUtils", "LinearAlgebra", "Random", "Requires", "SparseArrays"]
+git-tree-sha1 = "088663f184e833c28c672653bec214845a7f18b7"
+uuid = "379f33d0-9447-4353-bd03-d664070e549f"
+version = "0.2.2"
 
 [[RealDot]]
 deps = ["LinearAlgebra"]
