@@ -49,7 +49,8 @@ function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-4, npoint=2, rel_error_t
     #d2f is an expression. Convert to a Julia function so IntervalRootFinding can use it
     #NB: expression=Val{false} returns a runtime gen function to avoid world age issues. This way we avoid evaluating expressions 
 
-    if d2f != 0
+    #TODO: Debug this to elegantly handle case of linear functions
+    if true
         d2func = Symbolics.build_function(d2f, :xₚ; expression = Val{false})
 
         #Then find the roots over the given interval using the function
@@ -70,8 +71,34 @@ function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-4, npoint=2, rel_error_t
         #Account for linear case
         UBpoints = [(lb, fun(lb)), (ub, fun(ub))] 
         LBpoints = [(lb, fun(lb)), (ub, fun(ub))]
-
     end
+
+    try 
+        #Linear case 
+        if d2f == 0
+            UBpoints = [(lb, fun(lb)), (ub, fun(ub))] 
+            LBpoints = [(lb, fun(lb)), (ub, fun(ub))]
+        end
+    catch
+        #Nonlinear case 
+        d2func = Symbolics.build_function(d2f, :xₚ; expression = Val{false})
+
+        #Then find the roots over the given interval using the function
+        rootVals = IntervalRootFinding.roots(d2func, IntervalArithmetic.Interval(lb, ub))
+        #TODO: This is not sound, make sound
+        rootsGuess = [mid.([root.interval for root in rootVals])]
+        d2f_zeros = sort(rootsGuess[1])
+
+
+        convex = nothing 
+
+        UB = bound(fun, lb, ub, npoint; rel_error_tol=rel_error_tol, conc_method="continuous", lowerbound=false, df = dfunc,d2f = d2func, d2f_zeros=d2f_zeros, convex=nothing, plot=true)
+        UBpoints = unique(sort(to_pairs(UB), by = x -> x[1]))
+
+        LB = bound(fun, lb, ub, npoint; rel_error_tol=rel_error_tol, conc_method="continuous", lowerbound=true, df = dfunc,d2f = d2func, d2f_zeros=d2f_zeros, convex=nothing, plot=true)
+        LBpoints = unique(sort(to_pairs(LB), by = x -> x[1]))
+    end
+
     if plotflag
         plotRes2d(baseExpr, fun, lb, ub, LBpoints, UBpoints, varBase, true)
     end
@@ -278,18 +305,32 @@ function MinkSum(vec1, vec2)
 
 end
 
-function plotSurf(baseFunc, lb, ub, lbVec, ubVec, surfDim, xlb, ylb, xub, yub, saveFlag=false)
+function plotSurf(baseFunc, lbVec, ubVec, surfDim, xS, yS, saveFlag=false)
+    """
+    Method to plot the surface overapproximation of a function
+    Args:
+        baseFunc: The bi-variate function we wish to plot 
+        xS: The x values over which the function is overapproximated
+        yS: The y values over which the function is overapproximated
+        lbVec: Lower bound of the overapproximation (vector of values)
+        ubVec: Upper bound of the overapproximation (vector of values)
+        surfDim: The dimensions of the surface
+        saveFlag: Flag to save the plot as an html file or not
+
+        TODO: Modified plot function. Fix dependencies
+
+    """
 
     fun1 = Symbolics.build_function(baseFunc, find_variables(baseFunc)..., expression=Val{false})
-    xC = collect(range(lb, ub, length=100))
-    yC = collect(range(lb, ub, length=100))
+    xC = collect(range(minimum(xS), maximum(xS), length=100))
+    yC = collect(range(minimum(yS), maximum(yS), length=100))
 
     lbMat = reshape([p[3] for p in lbVec], surfDim)
     ubMat = reshape([p[3] for p in ubVec], surfDim)
 
     sPlot = plot(xC, yC, fun1, st=:surface, camera=(-30,30), color="black", label="function", opacity = 1.0)
-    plot!(sPlot, [p[1] for p in xlb], [p[1] for p in ylb], lbMat, st=:surface, color="blue", label="lower bound", showscale=false, opacity=1.0)
-    plot!(sPlot, [p[1] for p in xub], [p[1] for p in yub], ubMat, st=:surface, color="orange", label="upper bound", showscale=false,opacity=1.0)
+    plot!(sPlot, [p[1] for p in xS], [p[1] for p in yS], lbMat, st=:surface, color="orange", label="lower bound", showscale=false, opacity=1.0)
+    plot!(sPlot, [p[1] for p in xS], [p[1] for p in yS], ubMat, st=:surface, color="blue", label="upper bound", showscale=false,opacity=1.0)
 
     if saveFlag
         global NPLOTS
@@ -832,47 +873,65 @@ end
 # #Plot this 
 # plotSurf(expr, lb, ub, LB, UB, surfDim, xS, yS, xS, yS, true)
 
+# lb = 1.0
+# ub = 1.2
 
+# ϵ=1e-4
+# npoint=2
+# rel_error_tol=5e-3
 
-expr = :(0*x)
-expr = :(2sin(x))
+# expr = :(0*x)
+# expr = :(2sin(x))
 
-varBase = find_variables(expr)[1]
+# varBase = find_variables(expr)[1]
 
-#Define differentiation variable
-@variables xₚ
+# #Define differentiation variable
+# @variables xₚ
 
-#Define derivative
-D = Differential(xₚ)
-#Define second derivative
-D2 = Differential(xₚ)^2
+# #Define derivative
+# D = Differential(xₚ)
+# #Define second derivative
+# D2 = Differential(xₚ)^2
 
-strExpr = string(expr)
-strExpr = replace(strExpr, string(varBase) => "xₚ")
-standExpr = Meta.parse(strExpr) #Standardized expression with xₚ as the variable
+# strExpr = string(expr)
+# strExpr = replace(strExpr, string(varBase) => "xₚ")
+# standExpr = Meta.parse(strExpr) #Standardized expression with xₚ as the variable
 
-symExpr = Symbolics.parse_expr_to_symbolic(standExpr, Main)
+# symExpr = Symbolics.parse_expr_to_symbolic(standExpr, Main)
 
-fun = Symbolics.build_function(expr, varBase, expression=Val{false})
-df = expand_derivatives(D(eval(symExpr)))
-dfunc = Symbolics.build_function(df, :xₚ; expression=Val{false})
+# fun = Symbolics.build_function(expr, varBase, expression=Val{false})
+# df = expand_derivatives(D(eval(symExpr)))
+# dfunc = Symbolics.build_function(df, :xₚ; expression=Val{false})
 
-#Compute second derivative
-d2f = expand_derivatives(D2(symExpr))
+# #Compute second derivative
+# d2f = expand_derivatives(D2(symExpr))
 #d2f is an expression. Convert to a Julia function so IntervalRootFinding can use it
 #NB: expression=Val{false} returns a runtime gen function to avoid world age issues. This way we avoid evaluating expressions 
-d2func = Symbolics.build_function(d2f, :xₚ; expression = Val{false})
+# d2func = Symbolics.build_function(d2f, :xₚ; expression = Val{false})
 
-typeof(d2f)
-if eval(d2f) == 0
-    boo = 1 
-end
 
-d2f
-try 
-    if d2f == 0
-        boo = 1
-    end
-catch 
-    println("Error")
-end
+# try 
+#     #Linear case 
+#     if d2f == 0
+#         UBpoints = [(lb, fun(lb)), (ub, fun(ub))] 
+#         LBpoints = [(lb, fun(lb)), (ub, fun(ub))]
+#     end
+# catch
+#     #Nonlinear case 
+#     d2func = Symbolics.build_function(d2f, :xₚ; expression = Val{false})
+
+#     #Then find the roots over the given interval using the function
+#     rootVals = IntervalRootFinding.roots(d2func, IntervalArithmetic.Interval(lb, ub))
+#     #TODO: This is not sound, make sound
+#     rootsGuess = [mid.([root.interval for root in rootVals])]
+#     d2f_zeros = sort(rootsGuess[1])
+
+
+#     convex = nothing 
+
+#     UB = bound(fun, lb, ub, npoint; rel_error_tol=rel_error_tol, conc_method="continuous", lowerbound=false, df = dfunc,d2f = d2func, d2f_zeros=d2f_zeros, convex=nothing, plot=true)
+#     UBpoints = unique(sort(to_pairs(UB), by = x -> x[1]))
+
+#     LB = bound(fun, lb, ub, npoint; rel_error_tol=rel_error_tol, conc_method="continuous", lowerbound=true, df = dfunc,d2f = d2func, d2f_zeros=d2f_zeros, convex=nothing, plot=true)
+#     LBpoints = unique(sort(to_pairs(LB), by = x -> x[1]))
+# end

@@ -198,11 +198,13 @@ function encode_layer!(::BoundedMixedIntegerLP,
                        δ::Vector,
                        bounds::Hyperrectangle)
 
+    #This is where bounds are used in the network encoding
     ẑ = layer.weights * z_current + layer.bias
     ẑ_bound = approximate_affine_map(layer, bounds)
     l̂, û = low(ẑ_bound), high(ẑ_bound)
 
     for j in 1:length(layer.bias) # For evey node
+        #if bounds are tight, we actually eliminate 3 additional constraints but it appears the number of bin vars may stay the same? 
         if l̂[j] >= 0.0
             @constraint(model, z_next[j] == ẑ[j])
         elseif û[j] <= 0.0
