@@ -11,7 +11,7 @@ using Dates
 pend_mass, pend_len, grav_const, friction = 0.5, 0.5, 1., 0.0
 controller_type = "small" # pass from command line, e.g. "small"
 controller = "Networks/nnet/single_pendulum_$(controller_type)_controller.nnet"
-expr = :($(grav_const/pend_len) * sin(x1) + $(1/(pend_mass*pend_len^2)) * u1 - $(friction/(pend_mass*pend_len^2)) * x2)
+expr = [:($(grav_const/pend_len) * sin(x1) + $(1/(pend_mass*pend_len^2)) * u1 - $(friction/(pend_mass*pend_len^2)) * x2)]
 firstDec = parse_and_reduce(expr)
 secDec = parse_and_reduce(firstDec[2])
 control_coef = 8.0
@@ -75,13 +75,11 @@ function bound_pend(SinglePendulum)
     lv2LB = MinkSum(lv2LBl, lv22LBl)
     lv2UB = MinkSum(lv2UBl, lv22UBl)
 
-    # #Try to plot
-    # xS
-    # yS
-    # surfDim = (size(yS)[1],size(xS)[1])
-    # saveFlag = true
-    # exp2Plot = :($(grav_const/pend_len) * sin(x1) - $(friction/(pend_mass*pend_len^2)) * x2)
-    # plotSurf(exp2Plot, lv2LB, lv2UB, surfDim, xS, yS, true)
+    #Try to plot
+    surfDim = (size(yS)[1],size(xS)[1])
+    saveFlag = true
+    exp2Plot = :($(grav_const/pend_len) * sin(x1) - $(friction/(pend_mass*pend_len^2)) * x2)
+    plotSurf(exp2Plot, lv2LB, lv2UB, surfDim, xS, yS, true)
     bounds = [lv2LB, lv2UB]
     return bounds
 end
@@ -92,221 +90,58 @@ SinglePendulum = OvertPProblem(
     dec_expr, #decomposed form of the dynamics
     control_coef, # control coefficient
     Hyperrectangle(low=[1., 0.], high=[1.2, 0.2]), # domain
+    [:dθ], #List of variables that have OVERT bounds
 	nothing, #undefined bounds to start
 	single_pend_update_rule
 )
 
 query = OvertPQuery(
 	SinglePendulum,    # problem
+    bound_pend,        # bound function
 	controller,        # network file
 	Id(),              # last layer activation layer Id()=linear, or ReLU()=relu
 	"MIP",             # query solver, "MIP" or "ReluPlex"
 	25,                # ntime
 	0.1,               # dt
 	2,                # N_overt
+    nothing,         # var_dict
+    nothing         # mod_dict
+)
+
+#Use concrete reachability to trace out the trajectory
+reachSets, boundSets = multi_step_concreach(query)
+
+#Define new problem with symbolic dynamics
+symPendulum = OvertPProblem(
+    expr, # dynamics
+    dec_expr, #decomposed form of the dynamics
+    control_coef, # control coefficient
+    Hyperrectangle(low=[1., 0.], high=[1.2, 0.2]), # domain
+	boundSets, #undefined bounds to start
+	single_pend_update_rule
+)
+
+#Define new symbolic query
+symQuery = OvertPQuery(
+    symPendulum,    # problem
+    controller,        # network file
+    Id(),              # last layer activation layer Id()=linear, or ReLU()=relu
+    "MIP",             # query solver, "MIP" or "ReluPlex"
+    10,                # ntime
+    0.1,               # dt
+    2,                # N_overt
     nothing         # var_dict
 )
 
-# #Use concrete reachability to trace out the trajectory
-# reachSets, boundSets = multi_step_concreach(query)
-
-# #Define new problem with symbolic dynamics
-# symPendulum = OvertPProblem(
-#     expr, # dynamics
-#     dec_expr, #decomposed form of the dynamics
-#     control_coef, # control coefficient
-#     Hyperrectangle(low=[1., 0.], high=[1.2, 0.2]), # domain
-# 	boundSets, #undefined bounds to start
-# 	single_pend_update_rule
-# )
-
-# #Define new symbolic query
-# symQuery = OvertPQuery(
-#     symPendulum,    # problem
-#     controller,        # network file
-#     Id(),              # last layer activation layer Id()=linear, or ReLU()=relu
-#     "MIP",             # query solver, "MIP" or "ReluPlex"
-#     25,                # ntime
-#     0.1,               # dt
-#     2,                # N_overt
-#     nothing         # var_dict
-# )
-
-# ###############Individual Sym MIP Encoding################
-# function ccSymEncoding(xS, yLB, yUB, Tri, symQuery, ind, model)
-#     """
-#     Method to encode a piecewise affine function as a mixed integer program following the convex combination method as defined in Gessler et. al. 2012
-#         (https://www.dl.behinehyab.com/Ebooks/IP/IP011_655874_www.behinehyab.com.pdf#page=308)
-
-#     args:
-#         problem: OvertPProblem that encodes the dynamics of the system as well as some useful system info 
-#         xS: List of vertices of the triangulation
-#         yLB: List of lower bounds of the function at the vertices of the triangulation
-#         yUB: List of upper bounds of the function at the vertices of the triangulation
-#         Tri: List of simplices of the triangulation
-#     """
-
-#     #Following the convention from Gessler et. al. 
-#     m = size(xS, 1) #Number of vertices
-#     d = size(xS[1], 1) #Dimension of the space
-#     n = size(Tri, 1) #Number of simplices
-
-#     #Define indexed symbols for the convex coefficients and binary variables
-#     lamb_var = Meta.parse("λ_$(ind)")
-#     bin_var = Meta.parse("b_$(ind)")
-
-#     #Define indexed convex coefficients as a MIP variable 
-#     #NOTE: This is an anonymous variable. Won't appear in named model variables
-#     λ_var = @variable(model, [1:m], base_name = "$lamb_var")
-#     symQuery.var_dict[lamb_var] = λ_var
-
-#     #Define indexed binary variables indicating with simplex is active. Use b to avoid conflict with network binary variables 
-#     b_var = @variable(model, [1:n], Bin, base_name = "$bin_var")
-#     symQuery.var_dict[bin_var] = b_var
 
 
-#     #Begin constraining our auxilliary variables
-#     #Convex combiation constraints (Gessler et. al. eq. 3.2)
-#     symQuery.var_dict
-#     @constraint(model, λ_var .>= 0)
-#     @constraint(model, sum(λ_var) == 1)
+sym_mip = encode_sym_dynamics(symQuery)
+sym_mip = encode_sym_control(sym_mip, symQuery, reachSets)
+sym_mip = encode_time(sym_mip, symQuery)
 
-#     #This is equation 3.4 from Gessler et. al.
-#     #Here, we iterate through all vertices. Then, we constrain the convex coefficient of each vertex to be leq the sum of the binary variables corresponding to the simplices containing that vertex
-
-#     #NOTE This relates a convex coefficient to its neighbors 
-#     for j in 1:m
-#         #Below we find all simplices where index j is present 
-#         @constraint(model, λ_var[j] <= sum(b_var[i] for i in findall(x -> j in x, Tri)))
-#     end
-
-#     #Next, enforce that at most one simplex can be active at a time (Gessler et. al. eq. 3.5)
-#     @constraint(model, sum(b_var) <= 1)
-
-
-#     #Create indices for state variables and output variables
-#     x_ind = Meta.parse("x_$(ind)")
-#     y_ind = Meta.parse("y_$(ind)")
-#     yl_ind = Meta.parse("yl_$(ind)")
-#     yu_ind = Meta.parse("yu_$(ind)")
-#     u_ind = Meta.parse("u_$(ind)")
-
-#     #Now, define function variables as MIP variables
-#     x_var = @variable(model, [1:d], base_name = "$x_ind")
-#     symQuery.var_dict[x_ind] = x_var
-#     y_var = @variable(model, [1], base_name = "$y_ind")
-#     symQuery.var_dict[y_ind] = y_var
-#     yₗ = @variable(model, [1], base_name = "$yl_ind")
-#     symQuery.var_dict[yl_ind] = yₗ
-#     yᵤ = @variable(model, [1], base_name = "$yu_ind")
-#     symQuery.var_dict[yu_ind] = yᵤ
-#     u = @variable(model, [1], base_name = "$u_ind")
-#     symQuery.var_dict[u_ind] = u
-
-#     #Define the generic vertex as a convex combination of its neighbors 
-#     #This exploits casting. NOTE: Could be dangerous 
-#     @constraint(model, x_var .== sum(λ_var[i]*[xS[i]...] for i in 1:m))
-
-#     #Define the generic function value in terms of the convex combination of its upper and lower bounds
-#     #NOTE: Control is changed here. Very bad 
-#     @constraint(model, yₗ[1] == sum(λ_var[i]*yLB[i] for i in 1:m))
-#     @constraint(model, yᵤ[1] == sum(λ_var[i]*yUB[i] for i in 1:m))
-#     @constraint(model, yₗ[1] + symQuery.problem.control_coef*u[1] <= y_var[1])
-#     @constraint(model, y_var[1] <= yᵤ[1] + symQuery.problem.control_coef*u[1])
-
-
-#     #We will also need to define additional constraints on x and y, but those will be added later
-#     return model 
-
-# end
-
-# ####### Encode Symbolic Dynamics ########
-# function encode_sym_dynamics(symQuery::OvertPQuery)
-#     """
-#     Function to encode the dynamics over a trajectory of overapproximations. 
-#     TODO: Revisit this. Can be done more efficiently by exploiting the overlap between the domains of the overapproximations. This should result in significantly fewer vertices in the final MIP encoding.
-#     """
-#     #Define symbolic MIP model
-#     optimizer = JuMP.optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0)
-#     #Define model
-#     symMip = Model(optimizer)
-
-#     #Define dictionary to store MIP variables
-#     symQuery.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
-
-#     for ind in 1:size(symQuery.problem.bounds)[1]
-#         boundVec = symQuery.problem.bounds[ind]
-#         LBs = boundVec[1]
-#         UBs = boundVec[2]
-
-#         Tri = OA2PWA(LBs)
-
-#         xS = [(tup[1:end-1]) for tup in LBs]
-#         yUB = [tup[end] for tup in UBs]
-#         yLB = [tup[end] for tup in LBs]
-
-#         symMip = ccSymEncoding(xS, yLB, yUB, Tri, symQuery, ind, symMip)
-#     end
-
-#     symMip
-#     return symMip
-# end
-
-# #######Encode Symbolic Controller########
-# function encode_sym_control(sym_mip, symQuery, reachSets)
-#     input_set = symQuery.problem.domain  
-#     network_file = symQuery.network_file
-#     ntime = symQuery.ntime
-#     #Get dictionary of MIP variables 
-#     varDict = symQuery.var_dict
-
-#     #####Enter loop for time steps#################
-#     for i = 1:symQuery.ntime
-#         input_set = reachSets[i]
-#         input_vars_curr = Meta.parse("x_$i") 
-#         control_vars_curr = Meta.parse("u_$i") 
-
-#         x_curr = varDict[input_vars_curr]
-#         u_curr = varDict[control_vars_curr][1]
-
-#         controller_bound = add_controller_constraints!(sym_mip, network_file, input_set, x_curr, u_curr)
-#     end
-#     return sym_mip
-# end
-
-# ##########Symbolically link time steps########
-# function encode_time(sym_mip, symQuery)
-#     """
-#     Method to encode the time evolution of the system as a MIP. Links distinct overappoximation objects across time steps to complete the symbolic encoding. 
-#     """
-#     ##########First loop#############
-#     for i = 1:symQuery.ntime-1
-#         y_now = symQuery.var_dict[Meta.parse("y_$i")]
-#         u_now = symQuery.var_dict[Meta.parse("u_$i")]
-#         x_now = symQuery.var_dict[Meta.parse("x_$i")]
-#         x_next = symQuery.var_dict[Meta.parse("x_$(i+1)")]
-
-#         integration_map = single_pend_update_rule(x_now, u_now, y_now)
-
-#         #######Second loop#############
-#         for j = 1:length(x_now)
-#             v = x_now[j]
-#             dv = integration_map[v]
-#             next_v = x_next[j]
-
-#             @constraint(sym_mip, next_v == v + symQuery.dt*dv)
-#         end
-#     end
-#     return sym_mip
-# end
-
-# sym_mip = encode_sym_dynamics(symQuery)
-# sym_mip = encode_sym_control(sym_mip, symQuery, reachSets)
-# sym_mip = encode_time(sym_mip, symQuery)
-
-# #Solve the symbolic MIP
-# reach_solve(sym_mip, symQuery, symQuery.ntime)
-
+#Solve the symbolic MIP
+@time reach_solve(sym_mip, symQuery, symQuery.ntime)
+set = 
 
 ############Testing Area############
 # network = read_nnet(controller, last_layer_activation=Id())
@@ -339,11 +174,12 @@ queryCROWN = OvertPQuery(
 	controller,        # network file
 	Id(),              # last layer activation layer Id()=linear, or ReLU()=relu
 	"MIP",             # query solver, "MIP" or "ReluPlex"
-	25,                # ntime
+	5,                # ntime
 	0.1,               # dt
 	2,                # N_overt
     nothing         # var_dict
 )
+
 
 ######Simulating concreach
 #OG method

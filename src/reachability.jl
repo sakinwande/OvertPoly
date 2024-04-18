@@ -6,80 +6,120 @@ include("problems.jl")
 using LazySets
 
 
-function encode_dynamics(query::OvertPQuery)
+function encode_dynamics!(query::OvertPQuery)
     """
     Method to encode the dynamics as a MIP (using the Gessing et al. method)
     """
-    LB, UB = query.problem.bounds
-    Tri = OA2PWA(LB)
-    #These are the vertices of the triangulation
-    xS = [(tup[1:end-1]) for tup in LB]
-    yUB = [tup[end] for tup in UB]
-    yLB = [tup[end] for tup in LB]
-
-    mipModel = ccEncoding(xS, yLB, yUB, Tri, query)
-    return mipModel
+    i = 0
+    #For each model with an overt approximation, encode the dynamics in a MIP model, and add to the corresponding dictionary
+    for sym in query.problem.varList
+        i += 1
+        LB, UB = query.problem.bounds[i]
+        Tri = OA2PWA(LB)
+        #These are the vertices of the triangulation
+        xS = [(tup[1:end-1]) for tup in LB]
+        yUB = [tup[end] for tup in UB]
+        yLB = [tup[end] for tup in LB]
+        query.mod_dict[sym] = ccEncoding(xS, yLB, yUB, Tri, query,sym)
+    end
 end
 
-function encode_control!(query, mipModel)
+function encode_control!(query::OvertPQuery)
     """
     Method to encode the controller as a MIP (using the Tjeng et al. method)
     Modifies the MIP model in place
+
+    TODO: Fix to generalize to multiple control inputs and vector valued dynamics
     """
     input_set = query.problem.domain   ###For controller MIP encoding, need model, network address, input set, input variable names, output variable names
     network_file = query.network_file
 
-    #Get dictionary of MIP variables 
-    input_vars = query.var_dict[:x]
-    control_vars = query.var_dict[:u][1]
-    output_vars = query.var_dict[:y][1]
+    for sym in query.problem.varList
+        mipModel = query.mod_dict[sym]
+        #Get dictionary of MIP variables 
+        input_vars = query.var_dict[sym][1]
+        control_vars = query.var_dict[sym][3]
+        output_vars = query.var_dict[sym][2]
 
-    controller_bound = add_controller_constraints!(mipModel, network_file, input_set, input_vars, control_vars)
+        controller_bound = add_controller_constraints!(mipModel, network_file, input_set, input_vars, control_vars)
+    end
 end
 
 
-function reach_solve(mipModel, query, t_idx::Union{Nothing,Int64}=nothing)
+function reach_solve(query, t_idx::Union{Nothing,Int64}=nothing)
     """
     Solve contrete reachability problem using MIP. Given a MIP encoding a pwl overapproximation of the dynamics, as well as MIP for the controlller, find the overapproximation of the reachable set
+
+    This version of reach_solve generalizes to multiple functions
     """
-    lows = Array{Float64}(undef, 0)
-    highs = Array{Float64}(undef, 0)
+    stateVar = query.problem.varList
+    trueInp = Any[]
+    trueOut = Any[]
+    stateVarTimed = Any[]
     
-
-
-    #Account for case where dynamics are timed
-    if !isnothing(t_idx)
-        input_vars = query.var_dict[Meta.parse("x_$t_idx")]
-        control_vars = query.var_dict[Meta.parse("u_$t_idx")][1]
-        output_vars = query.var_dict[Meta.parse("y_$t_idx")][1]
-        integration_map = query.problem.update_rule(input_vars, control_vars, [output_vars])
-    else
-        control_vars = query.var_dict[:u][1]
-        input_vars = query.var_dict[:x]
-        output_vars = query.var_dict[:y][1]
-        integration_map = query.problem.update_rule(input_vars, control_vars, [output_vars]) 
+    #Compute true input and output variables 
+    i = 0
+    for sym in stateVar
+        i += 1
+        if !isnothing(t_idx)
+            #Account for symbolic case where dynamics are timed
+            sym_timed = Meta.parse("$(sym)_$t_idx")
+            input_vars = query.var_dict[sym_timed][1]
+            output_vars = query.var_dict[sym_timed][2]
+            push!(stateVarTimed, sym_timed)
+        else   
+            input_vars = query.var_dict[sym][1]
+            output_vars = query.var_dict[sym][2]
+        end
+        #Case 1: Multiple functions
+        #Here, stateVar = varList. States are (x, y, z, etc). Simply loop over var list and find the appropriate symbol to match to the input and output variables
+        if query.case == 1
+            push!(trueInp, input_vars[i])
+            push!(trueOut, output_vars)
+        else
+            #Case 2: Mix of single and multiple functions
+            #Here, stateVar != varList. States are (x, dx, y, dy, etc)
+            push!(trueInp, input_vars[i:i+1])
+            i += 1 #increment by 1 to account for the fact that we are skipping over the derivative
+            push!(trueOut, output_vars)
+        end
     end
+
+    integration_map = query.problem.update_rule(trueInp, trueOut)
     
     timestep_nplus1_vars = GenericAffExpr{Float64,VariableRef}[]
-    #####Enter loop here#################
-    #Loop over elements of input_vars_last
-    for v in input_vars
-        dv = integration_map[v]
-    
-        next_v = v + query.dt*dv
-        push!(timestep_nplus1_vars, next_v)
-        @objective(mipModel, Min, next_v)
-        JuMP.optimize!(mipModel)
-        @assert termination_status(mipModel) == MOI.OPTIMAL
-        objective_bound(mipModel)
-        push!(lows, objective_bound(mipModel))
-        @objective(mipModel, Max, next_v)
-        JuMP.optimize!(mipModel)
-        @assert termination_status(mipModel) == MOI.OPTIMAL
-        objective_bound(mipModel)
-        push!(highs, objective_bound(mipModel))
+    lows = Array{Float64}(undef, 0)
+    highs = Array{Float64}(undef, 0)
+
+    #Loop over symbols with OVERT approximations to compute reach steps
+    for sym in stateVar
+        #Account for symbolic case with timed dynamics
+        if !isnothing(t_idx)
+            symTimed = Meta.parse("$(sym)_$t_idx")
+            input_vars = query.var_dict[symTimed][1]
+        else
+            input_vars = query.var_dict[sym][1]
+        end
+        mipModel = query.mod_dict[sym]
+        for v in input_vars 
+            if v in trueInp
+                dv = integration_map[v][1]
+                next_v = v + query.dt*dv
+                push!(timestep_nplus1_vars, next_v)
+                @objective(mipModel, Min, next_v)
+                JuMP.optimize!(mipModel)
+                @assert termination_status(mipModel) == MOI.OPTIMAL
+                objective_bound(mipModel)
+                push!(lows, objective_bound(mipModel))
+                @objective(mipModel, Max, next_v)
+                JuMP.optimize!(mipModel)
+                @assert termination_status(mipModel) == MOI.OPTIMAL
+                objective_bound(mipModel)
+                push!(highs, objective_bound(mipModel))
+            end
+        end
     end
-    
+    #NOTE: Hyperrectangle can plot in higher dimensions as well
     reacheable_set = Hyperrectangle(low=lows, high=highs)
     return reacheable_set
 end
@@ -89,16 +129,19 @@ function concreach!(query::OvertPQuery)
     Method to solve the concrete reachability problem using MIP.
     Modifies the query object in place (specifically the bounds generated by OVERT)
     """
-    query.problem.bounds = bound_pend(query.problem)
+    query.problem.bounds = query.bound_func(query.problem)
     query.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
-    mipModel = encode_dynamics(query)
-    query.var_dict[:u] 
-    encode_control!(query, mipModel)
+    query.mod_dict = Dict{Symbol,JuMP.Model}()
+    encode_dynamics!(query)
 
-    reachSet =  reach_solve(mipModel, query)
+    #Encode the controller if it exists
+    if !isnothing(query.network_file)
+        encode_control!(query)
+    end
+
+    reachSet =  reach_solve(query)
     return reachSet, query.problem.bounds
 end
-
 
 function multi_step_concreach(query::OvertPQuery)
     """
@@ -118,5 +161,240 @@ function multi_step_concreach(query::OvertPQuery)
         query.problem.domain = reachSet
     end
     return reachSets, boundSets
+end
+
+##################Implementing Sym Encoding###########
+function ccSymEncoding(xS, yLB, yUB, Tri, symQuery, ind, sym, model)
+    """
+    Method to encode a piecewise affine function as a mixed integer program following the convex combination method as defined in Gessler et. al. 2012
+        (https://www.dl.behinehyab.com/Ebooks/IP/IP011_655874_www.behinehyab.com.pdf#page=308)
+
+    args:
+        problem: OvertPProblem that encodes the dynamics of the system as well as some useful system info 
+        xS: List of vertices of the triangulation
+        yLB: List of lower bounds of the function at the vertices of the triangulation
+        yUB: List of upper bounds of the function at the vertices of the triangulation
+        Tri: List of simplices of the triangulation
+    """
+
+    #Following the convention from Gessler et. al. 
+    m = size(xS, 1) #Number of vertices
+    d = size(xS[1], 1) #Dimension of the space
+    n = size(Tri, 1) #Number of simplices
+
+    #Define indexed symbols for the convex coefficients and binary variables
+    lamb_var = Meta.parse("λ_$(sym)_$(ind)")
+    bin_var = Meta.parse("b_$(sym)_$(ind)")
+
+    #Define indexed convex coefficients as a MIP variable 
+    #NOTE: This is an anonymous variable. Won't appear in named model variables
+    λ_var = @variable(model, [1:m], base_name = "$lamb_var")
+    # symQuery.var_dict[lamb_var] = λ_var
+
+    #Define indexed binary variables indicating with simplex is active. Use b to avoid conflict with network binary variables 
+    b_var = @variable(model, [1:n], Bin, base_name = "$bin_var")
+    # symQuery.var_dict[bin_var] = b_var
+
+
+    #Begin constraining our auxilliary variables
+    #Convex combiation constraints (Gessler et. al. eq. 3.2)
+    @constraint(model, λ_var .>= 0)
+    @constraint(model, sum(λ_var) == 1)
+
+    #This is equation 3.4 from Gessler et. al.
+    #Here, we iterate through all vertices. Then, we constrain the convex coefficient of each vertex to be leq the sum of the binary variables corresponding to the simplices containing that vertex
+
+    #NOTE This relates a convex coefficient to its neighbors 
+    for j in 1:m
+        #Below we find all simplices where index j is present 
+        @constraint(model, λ_var[j] <= sum(b_var[i] for i in findall(x -> j in x, Tri)))
+    end
+
+    #Next, enforce that at most one simplex can be active at a time (Gessler et. al. eq. 3.5)
+    @constraint(model, sum(b_var) <= 1)
+
+
+    #Create indices for state variables and output variables
+    x_ind = Meta.parse("x_$(sym)_$(ind)")
+    y_ind = Meta.parse("y_$(sym)_$(ind)")
+    yl_ind = Meta.parse("yl_$(sym)_$(ind)")
+    yu_ind = Meta.parse("yu_$(sym)_$(ind)")
+    u_ind = Meta.parse("u_$(sym)_$(ind)")
+
+    #Now, define function variables as MIP variables
+    x_var = @variable(model, [1:d], base_name = "$x_ind")
+    # symQuery.var_dict[x_ind] = x_var
+    y_var = @variable(model, [1], base_name = "$y_ind")
+    # symQuery.var_dict[y_ind] = y_var
+    yₗ = @variable(model, [1], base_name = "$yl_ind")
+    # symQuery.var_dict[yl_ind] = yₗ
+    yᵤ = @variable(model, [1], base_name = "$yu_ind")
+    # symQuery.var_dict[yu_ind] = yᵤ
+    u = @variable(model, [1], base_name = "$u_ind")
+    # symQuery.var_dict[u_ind] = u
+
+    #Define the generic vertex as a convex combination of its neighbors 
+    #This exploits casting. NOTE: Could be dangerous 
+    @constraint(model, x_var .== sum(λ_var[i]*[xS[i]...] for i in 1:m))
+
+    #Define the generic function value in terms of the convex combination of its upper and lower bounds
+    #NOTE: Control is changed here. Very bad 
+    @constraint(model, yₗ[1] == sum(λ_var[i]*yLB[i] for i in 1:m))
+    @constraint(model, yᵤ[1] == sum(λ_var[i]*yUB[i] for i in 1:m))
+    @constraint(model, yₗ[1] + symQuery.problem.control_coef*u[1] <= y_var[1])
+    @constraint(model, y_var[1] <= yᵤ[1] + symQuery.problem.control_coef*u[1])
+
+    #Add model inputs and outputs to variable dictionary
+    sym_ind = Meta.parse("$(sym)_$(ind)")
+    symQuery.var_dict[sym_ind] = [x_var, y_var, u]
+
+    #We will also need to define additional constraints on x and y, but those will be added later
+    return model 
+
+end
+
+####### Encode Symbolic Dynamics ########
+function encode_sym_dynamics!(symQuery::OvertPQuery)
+    """
+    Function to encode the dynamics over a trajectory of overapproximations. 
+    TODO: Revisit this. Can be done more efficiently by exploiting the overlap between the domains of the overapproximations. This should result in significantly fewer vertices in the final MIP encoding.
+    """
+    #Define symbolic MIP model
+    optimizer = JuMP.optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0)
+    #Define dictionary to store MIP variables
+    symQuery.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
+    symQuery.mod_dict = Dict{Symbol,JuMP.Model}()
+
+    for ind in 1:symQuery.ntime
+        #index used to iterate over variables with overapproximations
+        i = 0
+        for sym in symQuery.problem.varList
+            i += 1
+            LBs, UBs = symQuery.problem.bounds[ind][i]
+            Tri = OA2PWA(LBs)
+            xS = [(tup[1:end-1]) for tup in LBs]
+            yUB = [tup[end] for tup in UBs]
+            yLB = [tup[end] for tup in LBs]
+
+            #If this is the first index, initialize model, otherwise use the model associated with the symbol
+            if ind == 1
+                symMip = Model(optimizer)
+            else
+                symMip = symQuery.mod_dict[sym]
+            end
+
+            symQuery.mod_dict[sym] = ccSymEncoding(xS, yLB, yUB, Tri, symQuery, ind, sym, symMip)
+        end
+    end
+end
+
+#######Encode Symbolic Controller########
+function encode_sym_control(symQuery, reachSets)
+    network_file = symQuery.network_file
+    #Get dictionary of MIP variables 
+
+    #####Enter loop for time steps#################
+    for i = 1:symQuery.ntime
+        for sym in symQuery.problem.varList
+            sym_mip = symQuery.mod_dict[sym]
+            input_set = reachSets[i]
+            sym_curr = Meta.parse("$(sym)_$(i)")
+            x_curr = symQuery.var_dict[sym_curr][1]
+            u_curr = symQuery.var_dict[sym_curr][3]
+            y_curr = symQuery.var_dict[sym_curr][2]
+
+            controller_bound = add_controller_constraints!(sym_mip, network_file, input_set, x_curr, u_curr)
+        end
+    end
+end
+
+##########Symbolically link time steps########
+function encode_time(symQuery::OvertPQuery)
+    """
+    Method to encode the time evolution of the system as a MIP. Links distinct overappoximation objects across time steps to complete the symbolic encoding. 
+    """
+    ##########First loop#############
+    for i = 1:symQuery.ntime-1 
+        j = 0
+        trueInp = Any[]
+        trueOut = Any[]
+        #First, define the inputs that go into the integration map
+        for sym in symQuery.problem.varList 
+            j += 1
+            #Use metaprogramming to get the current and next symbol
+            sym_now = Meta.parse("$(sym)_$(i)")
+            sym_next = Meta.parse("$(sym)_$(i+1)")
+            #Get the MIP variables associated with the symbols
+            y_now = symQuery.var_dict[sym_now][2]
+            u_now = symQuery.var_dict[sym_now][3]
+            x_now = symQuery.var_dict[sym_now][1]
+            x_next = symQuery.var_dict[sym_next][1]
+
+            #Account for different cases 
+            if query.case == 1
+                push!(trueInp, x_now[j])
+                push!(trueOut, y_now)
+            else
+                push!(trueInp, x_now[j:j+1])
+                push!(trueOut, y_now)
+            end
+        end
+
+        #Define the integration map 
+        integration_map = symQuery.problem.update_rule(trueInp, trueOut)
+        #Iterate through each MIP model and link current and future time steps
+        for sym in symQuery.problem.varList
+            #Use metaprogramming to get the current and next symbol
+            sym_now = Meta.parse("$(sym)_$(i)")
+            sym_next = Meta.parse("$(sym)_$(i+1)")
+            #Get the MIP variables associated with the symbols
+            y_now = symQuery.var_dict[sym_now][2]
+            u_now = symQuery.var_dict[sym_now][3]
+            x_now = symQuery.var_dict[sym_now][1]
+            x_next = symQuery.var_dict[sym_next][1]
+
+            sym_mip = symQuery.mod_dict[sym]
+
+            #######Second loop#############
+            #Iterate through each input variable, find the variable that controls its evolution, then link the input variable of the next time step to the output variable of the current time step
+            for k = 1:length(x_now)
+                v = x_now[k]
+                if v in trueInp
+                    dv = integration_map[v][1]
+                    next_v = x_next[k]
+
+                    @constraint(sym_mip, next_v == v + symQuery.dt*dv)
+                end
+            end
+        end
+    end
+end
+
+function symReach(symQuery::OvertPQuery)
+    """
+    Method to solve the concrete reachability problem using MIP for multiple time steps.
+    """
+    #Define dictionary to store MIP variables
+    symQuery.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
+    symQuery.mod_dict = Dict{Symbol,JuMP.Model}()
+
+    #Encode the dynamics over the trajectory
+    encode_sym_dynamics!(symQuery)
+
+    #Encode the controller if it exists
+    #TODO: Fix this 
+    if !isnothing(symQuery.network_file)
+        encode_sym_control(symQuery)
+    end
+
+    #Link the time steps
+    encode_time(symQuery)
+
+    #Solve the reachability problem
+    t1 = Dates.now()
+    reachSet = reach_solve(symQuery, symQuery.ntime)
+    t2 = Dates.now()
+    println("Time for symbolic reach is ", t2-t1)
+    return reachSet
 end
 

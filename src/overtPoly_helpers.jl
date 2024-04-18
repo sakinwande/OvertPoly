@@ -3,7 +3,7 @@ using IntervalRootFinding, IntervalArithmetic
 using MacroTools: prewalk, postwalk
 using Interpolations
 using OVERT: bound, find_variables, to_pairs 
-using Plots
+using Plots; plotly()
 global NPLOTS = 0
 
 function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-4, npoint=2, rel_error_tol=5e-3, plotflag=false)
@@ -15,16 +15,14 @@ function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-4, npoint=2, rel_error_t
         lb: Lower bound of the interval over which to bound the function
         ub: Upper bound of the interval over which to bound the function
     """
-
-    #Found the symbolic variable in the Julia expression (for replacement)
+    #Find the symbolic variable in the Julia expression (for replacement)
     varBase = find_variables(baseExpr)[1]
 
     #Define differentiation variable
-    @variables xₚ
+    Symbolics.@variables xₚ
 
-    #Define derivative
+    #Define differentiation operators
     D = Differential(xₚ)
-    #Define second derivative
     D2 = Differential(xₚ)^2
 
     #Replace expression variable with xₚ
@@ -33,77 +31,89 @@ function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-4, npoint=2, rel_error_t
     #I choose xₚ because I can define a case to ensure we don't use this variable in input expressions
 
     #NOTE: you can actually do better. Convert baseExpr to symExpr in its native form, then use symbolics.get_variables to get the variables in the expression. Next, use Symbolics.substitute to replace problem specific variables with xₚ. This way, you avoid using Meta.parse on a string
+    #TODO: Implement this
     strExpr = string(baseExpr)
-    strExpr = replace(strExpr, string(varBase) => "xₚ")
-    standExpr = Meta.parse(strExpr) #Standardized expression with xₚ as the variable
+    strExpr = replace(strExpr, string(varBase) => xₚ)
+    standExpr = Meta.parse(strExpr)
 
-    symExpr = Symbolics.parse_expr_to_symbolic(standExpr, Main)
+    #obtain functions that can be evaluated from the expressions
+    f = Symbolics.parse_expr_to_symbolic(standExpr, Main) 
+    func = Symbolics.build_function(f, xₚ, expression=false)
+    df = expand_derivatives(D(f))
+    dFunc = Symbolics.build_function(df, xₚ, expression=false)
+    d2f = expand_derivatives(D2(f))
+    d2Func = Symbolics.build_function(d2f, xₚ, expression=false)
 
-    #Return a standard Julia function that can be evaluated from the expression
-    fun = Symbolics.build_function(baseExpr, varBase, expression=Val{false})
-    df = expand_derivatives(D(eval(symExpr)))
-    dfunc = Symbolics.build_function(df, :xₚ; expression=Val{false})
+    if isa(Symbolics.value(f), Number)
+        #In this case, the expression is just a constant
+        throw(ArgumentError("Bounds not implemented for constant expressions"))
+    elseif isa(Symbolics.value(df), Number)
+        #In this case, the expression is linear
+        ϵₗ = 0.001 #small parameter to control linear conservativeness
+        UBPoints = [(lb, func(lb) + ϵₗ), (ub, func(ub) + ϵₗ)]
+        LBPoints = [(lb, func(lb) - ϵₗ), (ub, func(ub) - ϵₗ)]
+    elseif isa(Symbolics.value(d2f), Number)
+        #In this case, the expression is quadratic. This is a constant curvature instance
+        if d2f > 0
+            #Convex case 
+            UB = bound(func, lb, ub, npoint; rel_error_tol=rel_error_tol,conc_method="continuous", lowerbound=false, df = dFunc, d2f = d2Func, d2f_zeros=nothing, convex=true, plot=true)
+            LB = bound(func, lb, ub, npoint; rel_error_tol=rel_error_tol,conc_method="continuous", lowerbound=true, df = dFunc, d2f = d2Func, d2f_zeros=nothing, convex=true, plot=true)
+            
+            UBPoints = unique(sort(to_pairs(UB), by = x->x[1]))
+            LBPoints = unique(sort(to_pairs(LB), by = x->x[1]))
+        else
+            #Concave Case 
+            UB = bound(func, lb, ub, npoint; rel_error_tol=rel_error_tol,conc_method="continuous", lowerbound=false, df = dFunc, d2f = d2Func, d2f_zeros=nothing, convex=false, plot=true)
+            LB = bound(func, lb, ub, npoint; rel_error_tol=rel_error_tol,conc_method="continuous", lowerbound=true, df = dFunc, d2f = d2Func, d2f_zeros=nothing, convex=false, plot=true)
 
-    #Compute second derivative
-    d2f = expand_derivatives(D2(symExpr))
-    #d2f is an expression. Convert to a Julia function so IntervalRootFinding can use it
-    #NB: expression=Val{false} returns a runtime gen function to avoid world age issues. This way we avoid evaluating expressions 
-
-    #TODO: Debug this to elegantly handle case of linear functions
-    if true
-        d2func = Symbolics.build_function(d2f, :xₚ; expression = Val{false})
-
-        #Then find the roots over the given interval using the function
-        rootVals = IntervalRootFinding.roots(d2func, IntervalArithmetic.Interval(lb, ub))
-        #TODO: This is not sound, make sound
-        rootsGuess = [mid.([root.interval for root in rootVals])]
-        d2f_zeros = sort(rootsGuess[1])
-
-
-        convex = nothing 
-
-        UB = bound(fun, lb, ub, npoint; rel_error_tol=rel_error_tol, conc_method="continuous", lowerbound=false, df = dfunc,d2f = d2func, d2f_zeros=d2f_zeros, convex=nothing, plot=true)
-        UBpoints = unique(sort(to_pairs(UB), by = x -> x[1]))
-
-        LB = bound(fun, lb, ub, npoint; rel_error_tol=rel_error_tol, conc_method="continuous", lowerbound=true, df = dfunc,d2f = d2func, d2f_zeros=d2f_zeros, convex=nothing, plot=true)
-        LBpoints = unique(sort(to_pairs(LB), by = x -> x[1]))
-    else
-        #Account for linear case
-        UBpoints = [(lb, fun(lb)), (ub, fun(ub))] 
-        LBpoints = [(lb, fun(lb)), (ub, fun(ub))]
-    end
-
-    try 
-        #Linear case 
-        if d2f == 0
-            UBpoints = [(lb, fun(lb)), (ub, fun(ub))] 
-            LBpoints = [(lb, fun(lb)), (ub, fun(ub))]
+            UBPoints = unique(sort(to_pairs(UB), by = x->x[1]))
+            LBPoints = unique(sort(to_pairs(LB), by = x->x[1]))
         end
-    catch
-        #Nonlinear case 
-        d2func = Symbolics.build_function(d2f, :xₚ; expression = Val{false})
+    else
+        #Mixed convexity case 
+        try
+            #Find the roots over the given interval 
+            rootVals = IntervalRootFinding.roots(d2Func, IntervalArithmetic.Interval(lb, ub))
+            #TODO: Fix soundness concerns. Soundness concern follows from the fact that the the roots are floating point numbers and technically the roots returned are an interval and not a single value
+            #These intervals have widths on the order of 10^-8
+            #Choose midpoints of these intervals 
+            rootsGuess = [mid.([root.interval for root in rootVals])]
+            d2f_zeros = sort(rootsGuess[1])
 
-        #Then find the roots over the given interval using the function
-        rootVals = IntervalRootFinding.roots(d2func, IntervalArithmetic.Interval(lb, ub))
-        #TODO: This is not sound, make sound
-        rootsGuess = [mid.([root.interval for root in rootVals])]
-        d2f_zeros = sort(rootsGuess[1])
+            convex = nothing 
 
+            UB = bound(func, lb, ub, npoint; rel_error_tol=rel_error_tol,conc_method="continuous", lowerbound=false, df = dFunc, d2f = d2Func, d2f_zeros=d2f_zeros, convex=convex, plot=true)
+            LB = bound(func, lb, ub, npoint; rel_error_tol=rel_error_tol,conc_method="continuous", lowerbound=true, df = dFunc, d2f = d2Func, d2f_zeros=d2f_zeros, convex=convex, plot=true)
 
-        convex = nothing 
+            UBPoints = unique(sort(to_pairs(UB), by = x->x[1]))
+            LBPoints = unique(sort(to_pairs(LB), by = x->x[1]))
+        catch
+            #Case where second derivative has no zeros over the interval. This means that over the interval, the function has a constant curvature
+            #NOTE: This could theoretically return an error for some other reason. Test this
+            if d2Func(lb) > 0
+                #Convex case
+                UB = bound(func, lb, ub, npoint; rel_error_tol=rel_error_tol,conc_method="continuous", lowerbound=false, df = dFunc, d2f = d2Func, d2f_zeros=nothing, convex=true, plot=true)
+                LB = bound(func, lb, ub, npoint; rel_error_tol=rel_error_tol,conc_method="continuous", lowerbound=true, df = dFunc, d2f = d2Func, d2f_zeros=nothing, convex=true, plot=true)
 
-        UB = bound(fun, lb, ub, npoint; rel_error_tol=rel_error_tol, conc_method="continuous", lowerbound=false, df = dfunc,d2f = d2func, d2f_zeros=d2f_zeros, convex=nothing, plot=true)
-        UBpoints = unique(sort(to_pairs(UB), by = x -> x[1]))
+                UBPoints = unique(sort(to_pairs(UB), by = x->x[1]))
+                LBPoints = unique(sort(to_pairs(LB), by = x->x[1]))
+            else
+                #Concave case
+                UB = bound(func, lb, ub, npoint; rel_error_tol=rel_error_tol,conc_method="continuous", lowerbound=false, df = dFunc, d2f = d2Func, d2f_zeros=nothing, convex=false, plot=true)
+                LB = bound(func, lb, ub, npoint; rel_error_tol=rel_error_tol,conc_method="continuous", lowerbound=true, df = dFunc, d2f = d2Func, d2f_zeros=nothing, convex=false, plot=true)
 
-        LB = bound(fun, lb, ub, npoint; rel_error_tol=rel_error_tol, conc_method="continuous", lowerbound=true, df = dfunc,d2f = d2func, d2f_zeros=d2f_zeros, convex=nothing, plot=true)
-        LBpoints = unique(sort(to_pairs(LB), by = x -> x[1]))
+                UBPoints = unique(sort(to_pairs(UB), by = x->x[1]))
+                LBPoints = unique(sort(to_pairs(LB), by = x->x[1]))
+            end
+        end
     end
+
 
     if plotflag
-        plotRes2d(baseExpr, fun, lb, ub, LBpoints, UBpoints, varBase, true)
+        plotRes2d(baseExpr, func, lb, ub, LBPoints, UBPoints, varBase, true)
     end
     
-    return UBpoints, LBpoints
+    return UBPoints, LBPoints
 end
 
 function parse_and_reduce(expr::Expr)
@@ -321,6 +331,7 @@ function plotSurf(baseFunc, lbVec, ubVec, surfDim, xS, yS, saveFlag=false)
 
     """
 
+    
     fun1 = Symbolics.build_function(baseFunc, find_variables(baseFunc)..., expression=Val{false})
     xC = collect(range(minimum(xS), maximum(xS), length=100))
     yC = collect(range(minimum(yS), maximum(yS), length=100))
@@ -505,7 +516,7 @@ function boundMV1(expr, lb, ub)
 
     # println(maximum([combF3(tup[1], tup[2]) - tup[3] for tup in v5UB]))
     #Plot the overapproximation
-    plotSurf(expr, lb, ub, v5LB, v5UB, surfDim, xS, yS, xS, yS, true)
+    plotSurf(expr, v5LB, v5UB, surfDim, xS, yS, true)
 
     return v5LB, v5UB
 end 
@@ -725,7 +736,7 @@ function gen_interpol(oA)
     #Use extrapolation boundary condition.
     #Note that we are not exactly extrapolating, but we run into floating point soundness issues with irrational numbers, and so we allow for extrapolation to avoid this. We would never interpolation outside of the bounds anyway
     #WARNING: This may not be sound. We need to find a better way to handle this
-    if size(outMat)[2] > 2
+        if size(outMat)[2] > 2
         interp = linear_interpolation(tupVecs, AmatT, extrapolation_bc = Interpolations.Line())
     else
         interp = linear_interpolation(tupVecs, Amat, extrapolation_bc = Interpolations.Line())
@@ -788,6 +799,19 @@ function sound_IA(LB1, UB1, LB2, UB2, op)
         end
     end
     return LB, UB
+end
+
+function inpShiftLog(lb,ub)
+    """
+    Method to shift the input domain of a function to ensure that the log transformation is sound
+
+    returns: amount by which to shift f(x) to ensure that log(f(x)) is defined
+    """
+    shiftVal = 0
+    if lb < 0 
+        shiftVal = 2*abs(lb)
+    end
+    return shiftVal
 end
 
 # ####Debug 
