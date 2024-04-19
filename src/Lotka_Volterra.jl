@@ -171,7 +171,7 @@ xExpr = :(3*x - 3*x*y)
 yExpr = :(x*y - y)
 expr = [xExpr, yExpr]
 
-nsteps = 200
+nsteps = 50
 dt = 0.008
 # # domain = Hyperrectangle(low=[1.2, 0.9], high=[1.4,1.1])
 # domain = Hyperrectangle(low=[-2, -2], high=[2,2])
@@ -204,9 +204,10 @@ query = OvertPQuery(
 
 reachSets, boundSets = multi_step_concreach(query)
 
-# #Plot the results
-plot(reachSets, title="Lotka_Volterra_Concrete_$(nsteps)")
+query.mod_dict
 
+#Plot the results
+plot(reachSets, title="Lotka_Volterra_Concrete_$(nsteps)")
 
 #Define symbolic problem
 symLotkaVolterra = OvertPProblem(
@@ -234,30 +235,6 @@ symQuery = OvertPQuery(
     1 #Case of variables
 )
 
-
 reach_set = symReach(symQuery)
-
-
 plot(reach_set, title="Symbolic_Reachable_Set_t=$(nsteps)", label="Sym Reach Set")
 plot!(reachSets[end], label="Conc Reach Set")
-
-
-# #Encode symbolic dynamics
-# encode_sym_dynamics!(symQuery)
-
-# symQuery.mod_dict[:x]
-# symQuery.mod_dict[:y]
-# #in this case there's no control 
-
-# #Encode time evolution
-# encode_time(symQuery)
-
-# symQuery.mod_dict[:x]
-# symQuery.mod_dict[:y]
-# #Solve the symbolic problem
-# reach_set = reach_solve(symQuery, symQuery.ntime)
-
-# plot(reach_set, title="Symbolic_Reachable_Set_t=$(nsteps)")
-# plot!(reachSets[end])
-
-
