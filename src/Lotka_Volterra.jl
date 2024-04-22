@@ -171,7 +171,7 @@ xExpr = :(3*x - 3*x*y)
 yExpr = :(x*y - y)
 expr = [xExpr, yExpr]
 
-nsteps = 50
+nsteps = 10
 dt = 0.008
 # # domain = Hyperrectangle(low=[1.2, 0.9], high=[1.4,1.1])
 # domain = Hyperrectangle(low=[-2, -2], high=[2,2])
@@ -238,3 +238,13 @@ symQuery = OvertPQuery(
 reach_set = symReach(symQuery)
 plot(reach_set, title="Symbolic_Reachable_Set_t=$(nsteps)", label="Sym Reach Set")
 plot!(reachSets[end], label="Conc Reach Set")
+
+symReachSets = multi_step_symreach(symQuery)
+
+plot(reachSets, title="Comparing_LV_Concrete_and_Symbolic_$(nsteps)", label="Conc Reach Set")
+plot!(symReachSets, label="Sym Reach Set")
+
+symReachSets[1]
+reachSets[1]
+
+plot(symReachSets[end])
