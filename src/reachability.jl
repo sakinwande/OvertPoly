@@ -496,3 +496,21 @@ function sym_reach_solve(query, t_idx::Union{Nothing,Int64}=nothing)
     reacheable_set = Hyperrectangle(low=lows, high=highs)
     return reacheable_set
 end
+
+function multi_step_symreach(symQuery::OvertPQuery)
+    """
+    Method to solve the concrete reachability problem using MIP for multiple time steps.
+    """
+    input_set = symQuery.problem.domain
+    reachSets = [input_set]
+    totTime = copy(symQuery.ntime)
+    for i = 1:totTime
+        t1 = Dates.now()
+        symQuery.ntime = i
+        reachSet = symReach(symQuery)
+        t2 = Dates.now()
+        println("Time for step ", i, " is ", t2-t1)
+        push!(reachSets, reachSet)
+    end
+    return reachSets
+end
