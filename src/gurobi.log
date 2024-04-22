@@ -1,0 +1,6 @@
+
+Gurobi 9.5.0 (linux64, gurobi_cl) logging started Mon Apr 22 12:35:17 2024
+
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter LogFile to value "gurobi.log"
+Using license file /barrett/scratch/akinwande/gurobi.lic
