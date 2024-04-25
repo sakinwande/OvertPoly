@@ -174,7 +174,10 @@ xExpr = :(3*x - 3*x*y)
 yExpr = :(x*y - y)
 expr = [xExpr, yExpr]
 
+<<<<<<< HEAD
 totalsteps = 450
+=======
+>>>>>>> 7db1857 (VDP Bounds)
 nsteps = 50
 dt = 0.008
 
@@ -346,6 +349,11 @@ symQuery = OvertPQuery(
     nothing, #Model dictionary
     1 #Case of variables
 )
+<<<<<<< HEAD
+=======
+
+#Compute symbolic reachable set
+>>>>>>> 7db1857 (VDP Bounds)
 reach_set = symReach(symQuery)
 extrema(reach_set)
 a = area(reach_set)
@@ -355,6 +363,7 @@ a = area(reach_set)
 #b = (0.779331 - 0.742348) * (0.953271 - 0.929644)
 b = (1.03734 - 1.00236) * (0.855737 - 0.835147)
 
+<<<<<<< HEAD
 b/a
 
 plot(reach_set)
@@ -393,3 +402,12 @@ extrema(set)[1][1]
 rand((2,2.1))
 
 randn()
+=======
+# #TEST: Multi-step symbolic reachability. Takes a LOT of time to run
+# plot(reachSets, title="Comparing_LV_Concrete_and_Symbolic_$(nsteps)", fillcolor=:blue)
+# plot!(symReachSets, fillcolor=:red)
+
+# symReachSets
+# reachSets
+
+>>>>>>> 7db1857 (VDP Bounds)

@@ -44,12 +44,79 @@ lbs, ubs = extrema(CVDP.domain)
 baseFunc1 = :($(μ) * (1 - x₁^2)*y₁)
 lbs1, ubs1 = lbs[1:2], ubs[1:2]
 
-#Decompose by hand
+#Decompose by hand. f(x)*f(y) = log(f(x)) + log(f(y))
 bF1sub1 = :(1- x₁^2)
 bF1sub2 = :($(μ)*y₁)
 
 #Define bounds for the first expression
 bF1s1LB, bF1s1UB = bound_univariate(bF1sub1, lbs1[1], ubs1[1], plotflag=true)
+bF1s2LB, bF1s2UB = bound_univariate(bF1sub2, lbs1[2], ubs1[2], plotflag=true)
+
+bF1s1LB, bF1s1UB = interpol(bF1s1LB, bF1s1UB)
+bF1s2LB, bF1s2UB = interpol(bF1s2LB, bF1s2UB)
+
+#Convert to log in preparation for Minkowski sum
+sₓ₁ = inpShiftLog(lbs1[1], ubs1[1]; bounds=bF1s1LB)
+sᵧ₁ = inpShiftLog(lbs1[2], ubs1[2]; bounds=bF1s2LB)
+
+lbF1s1LB = [(tup[1:end-1]..., log(tup[end] + sₓ₁)) for tup in bF1s1LB]
+lbF1s1UB = [(tup[1:end-1]..., log(tup[end] + sₓ₁)) for tup in bF1s1UB]
+
+lbF1s2LB = [(tup[1:end-1]..., log(tup[end] + sᵧ₁)) for tup in bF1s2LB]
+lbF1s2UB = [(tup[1:end-1]..., log(tup[end] + sᵧ₁)) for tup in bF1s2UB]
+
+#Add a dimension to prepare for Minkowski sum
+lbF1s1LB_l = addDim(lbF1s1LB, 2)
+lbF1s1UB_l = addDim(lbF1s1UB, 2)
+
+lbF1s2LB_l = addDim(lbF1s2LB, 1)
+lbF1s2UB_l = addDim(lbF1s2UB, 1)
+
+#Combine to get log(f(x)) + log(f(y))
+lbF1LB = MinkSum(lbF1s1LB_l, lbF1s2LB_l)
+lbF1UB = MinkSum(lbF1s1UB_l, lbF1s2UB_l)
+
+#Compute the exp to get f(x)*f(y)
+bF1LB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in lbF1LB]
+bF1UB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in lbF1UB]
+
+#Account for the shift
+bF1LB = Any[]
+bF1UB = Any[]
+
+#Shift down by sₓ₁ and sᵧ₁
+for tup in bF1LB_s
+    #First find the corresponding f(x) and f(y) values
+    xInd = findall(x->x[1] == tup[1], bF1s1LB)
+    yInd = findall(y->y[1] == tup[2], bF1s2LB)
+
+    #Quadratic shift down
+    newXY = tup[end] - sᵧ₁ * bF1s1LB[xInd][1][1] - sₓ₁ * bF1s2LB[yInd][1][1] - sₓ₁*sᵧ₁
+
+    push!(bF1LB, (tup[1:end-1]..., newXY))
+end
+
+for tup in bF1UB_s
+    #First find the corresponding f(x) and f(y) values
+    xInd = findall(x->x[1] == tup[1], bF1s1LB)
+    yInd = findall(y->y[1] == tup[2], bF1s2LB)
+
+    #Quadratic shift down
+    newXY = tup[end] - sᵧ₁ * bF1s1LB[xInd][1][1] - sₓ₁ * bF1s2LB[yInd][1][1] - sₓ₁*sᵧ₁
+
+    push!(bF1UB, (tup[1:end-1]..., newXY))
+end
+
+plotFlag = false
+####Plot the surface
+if plotFlag
+    xS = Any[tup[1] for tup in bF1s1LB]
+    yS = Any[tup[2] for tup in bF1s2LB]
+
+    surfDim = (size(yS)[1], size(xS)[1])
+
+    plotSurf(baseFunc1, bF1LB, bF1UB, surfDim, xS, yS, true)
+end
 ###############################################
 
 query = OvertPQuery(
@@ -66,9 +133,4 @@ query = OvertPQuery(
     2 #CVDP has form (x, dx, y, dy, z)
 )
 
-#############Implementing bound univariate#################
 
-
-
-
-UBPoints

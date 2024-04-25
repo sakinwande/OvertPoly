@@ -801,7 +801,7 @@ function sound_IA(LB1, UB1, LB2, UB2, op)
     return LB, UB
 end
 
-function inpShiftLog(lb,ub)
+function inpShiftLog(lb,ub;bounds=nothing)
     """
     Method to shift the input domain of a function to ensure that the log transformation is sound
 
@@ -810,6 +810,13 @@ function inpShiftLog(lb,ub)
     shiftVal = 0
     if lb < 0 
         shiftVal = 2*abs(lb)
+    end
+    if !isnothing(bounds)
+        boundVals = [tup[end] for tup in bounds]
+        lowestBound = minimum(boundVals)
+        if lowestBound < 0
+            shiftVal = max(shiftVal, 2*abs(lowestBound))
+        end
     end
     return shiftVal
 end
