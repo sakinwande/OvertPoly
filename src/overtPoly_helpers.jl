@@ -821,6 +821,47 @@ function inpShiftLog(lb,ub;bounds=nothing)
     return shiftVal
 end
 
+function sample_hyperrectangle(h)
+    """
+    Method to sample a random point from a hyperrectangle
+
+    args:
+    h: Hyperrectangle object
+    """
+    x = zeros(dim(h))
+    lbs = low(h)
+    ubs = high(h)
+    for i = 1:dim(h)
+        x[i] = lbs[i] + rand()*(ubs[i] - lbs[i])
+    end
+    return x
+end
+
+
+function simulateTraj(query, ntraj)
+    """
+    Method to simulate random Trajectories for a given dynamical system
+
+    args:
+    query: OvertPQuery object
+    ntraj: Number of trajectories to simulate
+    """
+    #Array to hold the trajectories 
+    traj = []
+    set = query.problem.domain
+    totalSteps = query.ntime
+    for i = 1:ntraj
+        #Sample a random point from the domain
+        x0 = sample_hyperrectangle(set)
+        for j = 1:totalSteps
+            xNew = xNew = query.problem.dynamics(x0)
+            x0 = xNew
+        end
+        push!(traj, x0)
+    end
+    return traj  
+end
+
 # ####Debug 
 # #Reduce to addition chunks
 # expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y)

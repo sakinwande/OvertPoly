@@ -13,6 +13,8 @@ mutable struct OvertPProblem
 	varList #List of variables that have OVERT bounds
     bounds #List of bounds in the same order as varList
     update_rule
+	dynamics::Function 
+	bound_func::Function
 end
 
 ##Can include input vars and control vars 
@@ -22,7 +24,6 @@ end
 
 mutable struct OvertPQuery
 	problem::OvertPProblem
-	bound_func::Function
 	network_file::Union{Nothing,String}
 	last_layer_activation ##::ActivationFunction
 	solver::String

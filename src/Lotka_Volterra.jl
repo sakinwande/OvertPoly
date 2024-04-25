@@ -6,7 +6,7 @@ include("problems.jl")
 include("reachability.jl")
 using LazySets
 using Dates
-import Logging
+using Logging
 
 Logging.disable_logging(Logging.Warn)
 
@@ -169,13 +169,21 @@ function bound_lv(LotkaVolterra, ϵ=0.001, Nᵢ=2, plotFlag=false)
     return [[dxLB, dxUB], [dyLB, dyUB]]
 end
 
+function lotka_volterra_dynamics(x)
+    "Method to compute a single time step of the Lotka-Volterra dynamics"
+    dx = 3*x[1] - 3*x[1]*x[2]
+    dy = x[1]*x[2] - x[2]
+
+    xNew = [x[1] + dt*dx, x[2] + dt*dy]
+    return xNew
+end
+
 # #Define equations of motion 
 xExpr = :(3*x - 3*x*y)
 yExpr = :(x*y - y)
 expr = [xExpr, yExpr]
 
-totalsteps = 450
-nsteps = 50
+nsteps = 1
 dt = 0.008
 
 ϵ = 0.02
@@ -188,13 +196,14 @@ LotkaVolterra = OvertPProblem(
     domain, #Domain of the problem
     [:x, :y], #List of variables with OVERT bounds
     nothing, #undefined bounds to start 
-    lotka_volterra_update_rule #Update rule for the system
+    lotka_volterra_update_rule, #Update rule for the system
+    lotka_volterra_dynamics, #Dynamics function
+    bound_lv #Bound function
 )
 
 #Define OVERT query
 query = OvertPQuery(
     LotkaVolterra, #Problem to solve
-    bound_lv, #Bound function
     nothing, #Network file
     nothing, #Last layer activation
     "MIP", #Solver
@@ -206,54 +215,62 @@ query = OvertPQuery(
     1 #Case of variables
 )
 
-# reachSets, boundSets = multi_step_concreach(query)
+reachSets, boundSets = multi_step_concreach(query)
 
-# # Plot the results
-# # plot(reachSets, title="Lotka_Volterra_Concrete_$(nsteps)")
+# Plot the results and compare to simulated trajectories 
+reachSets
 
-# # Define symbolic problem
-# symLotkaVolterra = OvertPProblem(
-#     expr, #list of equations 
-#     nothing, #Decomposed form of dynamics. Done manually
-#     0, #Control coefficients. Not used in this case
-#     Hyperrectangle(low=[1.28, 0.99], high=[1.312,1.01]), #Domain of the problem
-#     [:x, :y], #List of variables
-#     boundSets, #Bounds from concrete problem
-#     lotka_volterra_update_rule #Update rule for the system
-# )
-# #Define symbolic query
-# symQuery = OvertPQuery(
-#     symLotkaVolterra, #Problem to solve
-#     bound_lv, #Bound function
-#     nothing, #No controller file
-#     nothing, #Last layer activation
-#     "MIP", #Solver
-#     nsteps, #Number of time steps
-#     dt, #Time step size
-#     2, #Number of overapproximation points
-#     nothing, #Variable dictionary
-#     nothing, #Model dictionary
-#     1 #Case of variables
-# )
+simTraj = simulateTraj(query,1000)
+xVals = [x[1] for x in simTraj]
+yVals = [x[2] for x in simTraj]
 
-# # reach_set = symReach(symQuery)
-# # plot(reach_set, title="Symbolic_Reachable_Set_t=$(nsteps)", label="Sym Reach Set")
-# # plot!(reachSets[end], label="Conc Reach Set")
+plot(reachSets[end], title="Lotka_Volterra_Concrete_$(nsteps)", label="Concrete Reach Set")
+scatter!(xVals, yVals, label="Simulated Trajectory")
+# Define symbolic problem
+symLotkaVolterra = OvertPProblem(
+    expr, #list of equations 
+    nothing, #Decomposed form of dynamics. Done manually
+    0, #Control coefficients. Not used in this case
+    domain, #Domain of the problem
+    [:x, :y], #List of variables
+    boundSets, #Bounds from concrete problem
+    lotka_volterra_update_rule, #Update rule for the system
+    lotka_volterra_dynamics, #Dynamics function
+    bound_lv #Bound function
+)
+#Define symbolic query
+symQuery = OvertPQuery(
+    symLotkaVolterra, #Problem to solve
+    nothing, #No controller file
+    nothing, #Last layer activation
+    "MIP", #Solver
+    nsteps, #Number of time steps
+    dt, #Time step size
+    2, #Number of overapproximation points
+    nothing, #Variable dictionary
+    nothing, #Model dictionary
+    1 #Case of variables
+)
 
-# symReachSets = multi_step_symreach(symQuery)
-# symReachSets[end]
+# reach_set = symReach(symQuery)
+# plot(reach_set, title="Symbolic_Reachable_Set_t=$(nsteps)", label="Sym Reach Set")
+# plot!(reachSets[end], label="Conc Reach Set")
 
-# plot(reachSets, title="Comparing_LV_Concrete_and_Symbolic_$(nsteps)", fillcolor=:blue)
-# plot!(symReachSets, fillcolor=:red)
+symReachSets = multi_step_symreach(symQuery)
+symReachSets[end]
 
+plot(reachSets, title="Comparing_LV_Concrete_and_Symbolic_$(nsteps)", fillcolor=:blue)
+plot!(symReachSets, fillcolor=:red)
 
+##############################################################################
+######Defining hybrid symbolic loop######
 totalReachSets = [domain]
 symReachSets = []
 numConc = ceil(totalsteps/nsteps)
 totalBoundSets = []
 totalConcReachSets = [domain]
 
-######Defining hybrid symbolic loop######
+
 # tStart = Dates.now()
 cumSteps = 0
 for i = 1:numConc
@@ -299,21 +316,7 @@ totalReachSets
 cumSteps
 totalBoundSets
 
-# totalReachSets
-# plot(totalReachSets)
-
-# extrema(totalReachSets[456])
-
-a = area(totalReachSets[end])
-extrema(totalReachSets[end])
-
-b = (1.33815 - 1.29095) * (1.0109 - 0.985862)
-
-a/b
-
-totalBoundSets
-totalReachSets
-##############Try to do straight shot with hybrid-symbolic bounds##############
+#######Try to do straight shot with hybrid-symbolic bounds##############
 # Define symbolic problem
 symBoundSets = Any[]
 for set in totalReachSets
@@ -350,46 +353,6 @@ reach_set = symReach(symQuery)
 extrema(reach_set)
 a = area(reach_set)
 
-#b = (1.23936 - 1.18530) * (1.13026 - 1.09866)
-#b = (0.861708 - 0.816375) * (1.14685 - 1.11876)
-#b = (0.779331 - 0.742348) * (0.953271 - 0.929644)
-b = (1.03734 - 1.00236) * (0.855737 - 0.835147)
-
-b/a
-
-plot(reach_set)
-
-######################Simulate random trajectories
-using Random
-ntraj = 1000
-traj = []
-for i = 1:ntraj
-    set = Hyperrectangle(low=[1.3-ϵ, 1-ϵ/2], high=[1.3 + ϵ,1 + ϵ/2])
-    x0 = [0,0]
-    x0[1] = extrema(set)[1][1] + rand()*(extrema(set)[2][1] - extrema(set)[1][1])
-    x0[2] = extrema(set)[1][2] + rand()*(extrema(set)[2][2] - extrema(set)[1][2])
-    for j = 1:totalsteps
-        xNew = [x0[1] + dt*(3*x0[1] - 3*x0[1]*x0[2]), x0[2] + dt*(x0[1]*x0[2] - x0[2])]
-        x0 = xNew
-    end
-    push!(traj, x0)
-end
 
 
-xVals = [x[1] for x in traj]
-yVals = [x[2] for x in traj]
-plot(xVals, yVals)
 
-minimum(xVals)
-maximum(xVals)
-
-minimum(yVals)
-maximum(yVals)
-
-set = Hyperrectangle(low=[1.3-ϵ, 1-ϵ/2], high=[1.3 + ϵ,1 + ϵ/2])
-x0 = rand(extrema(set))
-extrema(set)[1][1]
-
-rand((2,2.1))
-
-randn()
