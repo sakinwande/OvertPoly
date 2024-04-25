@@ -296,7 +296,7 @@ function ccSymEncoding(xS, yLBs, yUBs, Tri, symQuery, ind, model)
     u = @variable(model, [1], base_name = "$u_ind")
     # symQuery.var_dict[u_ind] = u
 
-    #Define the generic vertex as a convex combination of its neighbors 
+    #Defines the generic vertex as a convex combination of its neighbors 
     #This exploits casting. NOTE: Could be dangerous 
     @constraint(model, x_var .== sum(λ_var[i]*[xS[i]...] for i in 1:m))
 
@@ -326,8 +326,11 @@ function ccSymEncoding(xS, yLBs, yUBs, Tri, symQuery, ind, model)
         #Add model inputs and outputs to variable dictionary
         #NOTE: x_var and u are independent of sym. We simply duplicate them for each symbol
         sym_ind = Meta.parse("$(sym)_$(ind)")
-        symQuery.var_dict[sym_ind] = [x_var, y_var, u]
+        symQuery.var_dict[sym_ind] = [y_var]
     end
+    #Time_Ind holds non bound variables to avoid duplication
+    time_ind = Meta.parse("t_$(ind)")
+    symQuery.var_dict[time_ind] = [x_var, u]
 
     #We will also need to define additional constraints on x and y, but those will be added later
 
@@ -342,13 +345,11 @@ function encode_sym_control(symQuery, reachSets)
     for i = 1:symQuery.ntime
         #Same MIP for all symbols and time steps
         sym_mip = symQuery.mod_dict[:sym]
-        #Since x and u are identical across syms, simply select one at random to represent current x and u
-        sym = symQuery.problem.varList[1]
+        #Select x and u for the appropriate time step
         input_set = reachSets[i]
-        sym_curr = Meta.parse("$(sym)_$(i)")
-        x_curr = symQuery.var_dict[sym_curr][1]
-        u_curr = symQuery.var_dict[sym_curr][3]
-        y_curr = symQuery.var_dict[sym_curr][2]
+        time_curr = Meta.parse("$t_$(i)")
+        x_curr = symQuery.var_dict[time_curr][1]
+        u_curr = symQuery.var_dict[time_curr][2]
 
         controller_bound = add_controller_constraints!(sym_mip, network_file, input_set, x_curr, u_curr)
 
@@ -369,7 +370,7 @@ function encode_time(symQuery::OvertPQuery)
             #Use metaprogramming to get the current and next symbol
             sym_now = Meta.parse("$(sym)_$(i)")
             #Get the MIP variables associated with the symbols
-            y_now = symQuery.var_dict[sym_now][2]
+            y_now = symQuery.var_dict[sym_now][1]
             push!(trueOut, y_now)
         end
 
@@ -380,12 +381,12 @@ function encode_time(symQuery::OvertPQuery)
         sym = symQuery.problem.varList[1]
 
         #Use metaprogramming to get the current and next symbol
-        sym_now = Meta.parse("$(sym)_$(i)")
-        sym_next = Meta.parse("$(sym)_$(i+1)")
+        time_now = Meta.parse("t_$(i)")
+        time_next = Meta.parse("t_$(i+1)")
 
         #Get the input variables associated with the symbols
-        x_now = symQuery.var_dict[sym_now][1]
-        x_next = symQuery.var_dict[sym_next][1]
+        x_now = symQuery.var_dict[time_now][1]
+        x_next = symQuery.var_dict[time_next][1]
 
         #Define the integration map 
         integration_map = symQuery.problem.update_rule(x_now, trueOut)
@@ -436,40 +437,18 @@ function sym_reach_solve(query, t_idx::Union{Nothing,Int64}=nothing)
 
     This version of reach_solve generalizes to multiple functions
     """
-    stateVar = query.problem.varList
     trueInp = Any[]
     trueOut = Any[]
-    stateVarTimed = Any[]
     
     #Compute true input and output variables 
-    i = 0
     for sym in query.problem.varList
-        i += 1
-        if !isnothing(t_idx)
-            #Account for symbolic case where dynamics are timed
-            sym_timed = Meta.parse("$(sym)_$t_idx")
-            input_vars = query.var_dict[sym_timed][1]
-            output_vars = query.var_dict[sym_timed][2]
-            push!(stateVarTimed, sym_timed)
-        else   
-            input_vars = query.var_dict[sym][1]
-            output_vars = query.var_dict[sym][2]
-        end
-        #Case 1: Multiple functions
-        #Here, stateVar = varList. States are (x, y, z, etc). Simply loop over var list and find the appropriate symbol to match to the input and output variables
-        # if query.case == 1
-        #     # push!(trueInp, input_vars[i])
-        #     push!(trueOut, output_vars)
-        # else
-        #     #Case 2: Mix of single and multiple functions
-        #     #Here, stateVar != varList. States are (x, dx, y, dy, etc)
-        #     # push!(trueInp, input_vars[i:i+1])
-        #     # i += 1 #increment by 1 to account for the fact that we are skipping over the derivative
-        #     push!(trueOut, output_vars)
-        # end
+        #Account for symbolic case where dynamics are timed
+        sym_timed = Meta.parse("$(sym)_$t_idx")
+        output_vars = query.var_dict[sym_timed][1]
         push!(trueOut, output_vars)
-        trueInp = input_vars
     end
+    time_sym = Meta.parse("t_$(t_idx)")
+    trueInp = query.var_dict[time_sym][1]
 
     integration_map = query.problem.update_rule(trueInp, trueOut)
     

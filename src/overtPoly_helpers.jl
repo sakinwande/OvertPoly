@@ -850,11 +850,12 @@ function simulateTraj(query, ntraj)
     traj = []
     set = query.problem.domain
     totalSteps = query.ntime
+    dt = query.dt
     for i = 1:ntraj
         #Sample a random point from the domain
         x0 = sample_hyperrectangle(set)
         for j = 1:totalSteps
-            xNew = xNew = query.problem.dynamics(x0)
+            xNew = xNew = query.problem.dynamics(x0,dt)
             x0 = xNew
         end
         push!(traj, x0)
