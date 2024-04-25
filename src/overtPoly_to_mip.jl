@@ -26,6 +26,7 @@ function ccEncoding(xS, yLB, yUB, Tri, query,sym)
     n = size(Tri, 1) #Number of simplices
 
     model = Model(optimizer)
+    set_silent(model)
 
     #Define convex coefficients as a MIP variable 
     #TODO Fix to be a float (not an int).Done 

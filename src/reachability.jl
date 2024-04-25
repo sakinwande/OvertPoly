@@ -147,18 +147,18 @@ function multi_step_concreach(query::OvertPQuery)
     Method to solve the concrete reachability problem using MIP for multiple time steps.
     """
     input_set = query.problem.domain
-    reachSets = [input_set]
+    reachSets = []
     boundSets = []
     
+    t1 = Dates.now()
     for i = 1:query.ntime
-        t1 = Dates.now()
         reachSet, boundSet = concreach!(query)
-        t2 = Dates.now()
-        println("Time for step ", i, " is ", t2-t1)
         push!(reachSets, reachSet)
         push!(boundSets, boundSet)
         query.problem.domain = reachSet
     end
+    t2 = Dates.now()
+    println("Time for concrete reachability is ", t2-t1)
     return reachSets, boundSets
 end
 
@@ -167,6 +167,7 @@ end
 function encode_sym_dynamics!(symQuery)
     optimizer = JuMP.optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0)
     model = JuMP.Model(optimizer)
+    set_silent(model)
     #Define dictionary to store MIP variables
     symQuery.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
     symQuery.mod_dict = Dict{Symbol,JuMP.Model}()
@@ -421,10 +422,10 @@ function symReach(symQuery::OvertPQuery)
     encode_time(symQuery)
 
     #Solve the reachability problem
-    t1 = Dates.now()
+    # t1 = Dates.now()
     reachSet = sym_reach_solve(symQuery, symQuery.ntime)
-    t2 = Dates.now()
-    println("Time for symbolic reach is ", t2-t1)
+    # t2 = Dates.now()
+    # println("Time for symbolic reach is ", t2-t1)
     return reachSet
 end
 
@@ -502,15 +503,15 @@ function multi_step_symreach(symQuery::OvertPQuery)
     Method to solve the concrete reachability problem using MIP for multiple time steps.
     """
     input_set = symQuery.problem.domain
-    reachSets = [input_set]
+    reachSets = []
     totTime = copy(symQuery.ntime)
+    t1 = Dates.now()
     for i = 1:totTime
-        t1 = Dates.now()
         symQuery.ntime = i
-        reachSet = symReach(symQuery)
-        t2 = Dates.now()
-        println("Time for step ", i, " is ", t2-t1)
+        reachSet = symReach(symQuery);
         push!(reachSets, reachSet)
     end
+    t2 = Dates.now()
+    println("Time for symbolic reachability is ", t2-t1)
     return reachSets
 end
