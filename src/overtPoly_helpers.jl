@@ -863,6 +863,15 @@ function simulateTraj(query, ntraj)
     return traj  
 end
 
+function plotBounds(boundSets, expr)
+    LBs, UBs = boundSets
+    xS = unique([tup[1] for tup in LBs])
+    yS = unique([tup[2] for tup in LBs])
+    surfDim = (size(yS)[1], size(xS)[1])
+
+    plotSurf(expr, sort(LBs), sort(UBs), surfDim, xS, yS, true)
+end
+
 # ####Debug 
 # #Reduce to addition chunks
 # expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y)

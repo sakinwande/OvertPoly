@@ -167,6 +167,8 @@ function bound_lv(LotkaVolterra, ϵ=0.001, Nᵢ=2, plotFlag=false)
         plotSurf(yExpr, sort(dyLB), sort(dyUB), surfDim, xRange, yRange, true)
     end
     return [[dxLB, dxUB], [dyLB, dyUB]]
+    # #TEST: swap y and x 
+    # return [[dyLB, dyUB], [dxLB, dxUB]]
 end
 
 function lotka_volterra_dynamics(x,dt)
@@ -183,11 +185,13 @@ xExpr = :(3*x - 3*x*y)
 yExpr = :(x*y - y)
 expr = [xExpr, yExpr]
 
-nsteps = 100
+nsteps = 1
 dt = 0.008
 
 ϵ = 0.02
 domain = Hyperrectangle(low=[1.3-ϵ, 1-ϵ/2], high=[1.3 + ϵ,1 + ϵ/2])
+low(domain)
+high(domain)
 
 LotkaVolterra = OvertPProblem(
     expr, #list of equations 
@@ -215,7 +219,7 @@ query = OvertPQuery(
     1 #Case of variables
 )
 
-bound_lv(LotkaVolterra, true)
+#bound_lv(LotkaVolterra, 0.001, 2, true)
 #Simulate first because multi_step_concreach updates starting domain
 simTraj = simulateTraj(query,1000)
 xVals = [x[1] for x in simTraj]
@@ -229,13 +233,17 @@ reachSets, boundSets = multi_step_concreach(query)
 
 plot(reachSets[end], title="Lotka_Volterra_Concrete_$(nsteps)", label="Concrete Reach Set")
 scatter!(xVals, yVals, label="Simulated Trajectory")
+
+###rotate the order of sets in boundSets
+reverse!(boundSets)
+
 # Define symbolic problem
 symLotkaVolterra = OvertPProblem(
     expr, #list of equations 
     nothing, #Decomposed form of dynamics. Done manually
     0, #Control coefficients. Not used in this case
     domain, #Domain of the problem
-    [:x, :y], #List of variables
+    [:y, :x], #List of variables
     boundSets, #Bounds from concrete problem
     lotka_volterra_update_rule, #Update rule for the system
     lotka_volterra_dynamics, #Dynamics function
@@ -264,6 +272,7 @@ plot!(reach_set, label="Sym Reach Set")
 
 # # plot(reachSets, title="Comparing_LV_Concrete_and_Symbolic_$(nsteps)", fillcolor=:blue)
 # plot!(symReachSets[end], label="Symbolic Reach Set")
+
 
 #####################Debugging Symbolic Reach##########################
 function encode_sym_dynamics!(symQuery)
@@ -597,6 +606,38 @@ function multi_step_symreach(symQuery::OvertPQuery)
     return reachSets
 end
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ##############################################################################
 ######Defining hybrid symbolic loop######
 totalReachSets = [domain]
@@ -604,6 +645,7 @@ symReachSets = []
 numConc = ceil(totalsteps/nsteps)
 totalBoundSets = []
 totalConcReachSets = [domain]
+
 
 
 # tStart = Dates.now()

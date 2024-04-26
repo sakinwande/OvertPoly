@@ -1,7 +1,7 @@
 include("overtPoly_helpers.jl")
 include("overt_to_pwa.jl")
 using PiecewiseLinearOpt, JuMP, Gurobi, MathOptInterface
-ENV["GRB_LICENSE_FILE"] = "/barrett/scratch/akinwande/gurobi.lic"
+# ENV["GRB_LICENSE_FILE"] = "/barrett/scratch/akinwande/gurobi.lic"
 
 function ccEncoding(xS, yLB, yUB, Tri, query,sym)
     """
