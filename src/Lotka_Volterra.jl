@@ -167,8 +167,8 @@ function bound_lv(LotkaVolterra, ϵ=0.001, Nᵢ=2, plotFlag=false)
         plotSurf(yExpr, sort(dyLB), sort(dyUB), surfDim, xRange, yRange, true)
     end
     return [[dxLB, dxUB], [dyLB, dyUB]]
-    # #TEST: swap y and x 
-    # return [[dyLB, dyUB], [dxLB, dxUB]]
+    #TEST: swap order
+    # return [[dxLB, dyLB], [dxUB, dyUB]]
 end
 
 function lotka_volterra_dynamics(x,dt)
@@ -185,13 +185,11 @@ xExpr = :(3*x - 3*x*y)
 yExpr = :(x*y - y)
 expr = [xExpr, yExpr]
 
-nsteps = 1
+nsteps = 50
 dt = 0.008
 
 ϵ = 0.02
 domain = Hyperrectangle(low=[1.3-ϵ, 1-ϵ/2], high=[1.3 + ϵ,1 + ϵ/2])
-low(domain)
-high(domain)
 
 LotkaVolterra = OvertPProblem(
     expr, #list of equations 
@@ -229,13 +227,10 @@ yVals = [x[2] for x in simTraj]
 reachSets, boundSets = multi_step_concreach(query)
 
 # Plot the results and compare to simulated trajectories 
-
+####################################################
 
 plot(reachSets[end], title="Lotka_Volterra_Concrete_$(nsteps)", label="Concrete Reach Set")
-scatter!(xVals, yVals, label="Simulated Trajectory")
-
-###rotate the order of sets in boundSets
-reverse!(boundSets)
+scatter!(xVals, yVals, label="Simulated Trajectory") 
 
 # Define symbolic problem
 symLotkaVolterra = OvertPProblem(
@@ -243,7 +238,7 @@ symLotkaVolterra = OvertPProblem(
     nothing, #Decomposed form of dynamics. Done manually
     0, #Control coefficients. Not used in this case
     domain, #Domain of the problem
-    [:y, :x], #List of variables
+    [:x, :y], #List of variables
     boundSets, #Bounds from concrete problem
     lotka_volterra_update_rule, #Update rule for the system
     lotka_volterra_dynamics, #Dynamics function
@@ -267,8 +262,8 @@ reach_set = symReach(symQuery)
 plot!(reach_set, label="Sym Reach Set")
 # plot!(reachSets[end], label="Conc Reach Set")
 
-# symReachSets = multi_step_symreach(symQuery)
-# symReachSets[end]
+symReachSets = multi_step_symreach(symQuery)
+symReachSets[end]
 
 # # plot(reachSets, title="Comparing_LV_Concrete_and_Symbolic_$(nsteps)", fillcolor=:blue)
 # plot!(symReachSets[end], label="Symbolic Reach Set")
@@ -363,55 +358,55 @@ function ccSymEncoding(xS, yLBs, yUBs, Tri, symQuery, ind, model)
     m = size(xS, 1) #Number of vertices
     d = size(xS[1], 1) #Dimension of the space
     n = size(Tri, 1) #Number of simplices
-
-    #Define indexed symbols for the convex coefficients and binary variables
-    lamb_var = Meta.parse("λ_$(ind)")
-    bin_var = Meta.parse("b_$(ind)")
-
-    #Define indexed convex coefficients as a MIP variable 
-    #NOTE: This is an anonymous variable. Won't appear in named model variables
-    λ_var = @variable(model, [1:m], base_name = "$lamb_var")
-    # symQuery.var_dict[lamb_var] = λ_var
-
-    #Define indexed binary variables indicating with simplex is active. Use b to avoid conflict with network binary variables 
-    b_var = @variable(model, [1:n], Bin, base_name = "$bin_var")
-    # symQuery.var_dict[bin_var] = b_var
-
-    #Begin constraining our auxilliary variables
-    #Convex combiation constraints (Gessler et. al. eq. 3.2)
-    @constraint(model, λ_var .>= 0)
-    @constraint(model, sum(λ_var) == 1)
-
-    #This is equation 3.4 from Gessler et. al.
-    #Here, we iterate through all vertices. Then, we constrain the convex coefficient of each vertex to be leq the sum of the binary variables corresponding to the simplices containing that vertex
-
-    #NOTE This relates a convex coefficient to its neighbors 
-    for j in 1:m
-        #Below we find all simplices where index j is present 
-        @constraint(model, λ_var[j] <= sum(b_var[i] for i in findall(x -> j in x, Tri)))
-    end
-
-    #Next, enforce that at most one simplex can be active at a time (Gessler et. al. eq. 3.5)
-    @constraint(model, sum(b_var) <= 1)
-
-    #Create indices for state variables and output variables
-    #Use i for input and o for output to avoid conflict with potential variables 
-    #TEST: We try to keep control and input variables independent of overapproximation variables (y)
-    x_ind = Meta.parse("i_$(ind)")
-    u_ind = Meta.parse("u_$(ind)")
-
-    #Now, define function variables as MIP variables
-    x_var = @variable(model, [1:d], base_name = "$x_ind")
-    # symQuery.var_dict[x_ind] = x_var
-    u = @variable(model, [1], base_name = "$u_ind")
-    # symQuery.var_dict[u_ind] = u
-
-    #Defines the generic vertex as a convex combination of its neighbors 
-    #This exploits casting. NOTE: Could be dangerous 
-    @constraint(model, x_var .== sum(λ_var[i]*[xS[i]...] for i in 1:m))
-
     yCounter = 1
+
+    
+    u = @variable(model, [1], base_name = "$u_ind")
     for sym in symQuery.problem.varList
+        #Define indexed symbols for the convex coefficients and binary variables
+        lamb_var = Meta.parse("λ_$(sym)_$(ind)")
+        bin_var = Meta.parse("b_$(sym)_$(ind)")
+
+        #Define indexed convex coefficients as a MIP variable 
+        #NOTE: This is an anonymous variable. Won't appear in named model variables
+        λ_var = @variable(model, [1:m], base_name = "$lamb_var")
+        # symQuery.var_dict[lamb_var] = λ_var
+
+        #Define indexed binary variables indicating with simplex is active. Use b to avoid conflict with network binary variables 
+        b_var = @variable(model, [1:n], Bin, base_name = "$bin_var")
+        # symQuery.var_dict[bin_var] = b_var
+
+        #Begin constraining our auxilliary variables
+        #Convex combiation constraints (Gessler et. al. eq. 3.2)
+        @constraint(model, λ_var .>= 0)
+        @constraint(model, sum(λ_var) == 1)
+
+        #This is equation 3.4 from Gessler et. al.
+        #Here, we iterate through all vertices. Then, we constrain the convex coefficient of each vertex to be leq the sum of the binary variables corresponding to the simplices containing that vertex
+
+        #NOTE This relates a convex coefficient to its neighbors 
+        for j in 1:m
+            #Below we find all simplices where index j is present 
+            @constraint(model, λ_var[j] <= sum(b_var[i] for i in findall(x -> j in x, Tri)))
+        end
+
+        #Next, enforce that at most one simplex can be active at a time (Gessler et. al. eq. 3.5)
+        @constraint(model, sum(b_var) <= 1)
+
+        #Create indices for state variables and output variables
+        #Use i for input and o for output to avoid conflict with potential variables 
+        #TEST: We try to keep control and input variables independent of overapproximation variables (y)
+        x_ind = Meta.parse("i_$(sym)_$(ind)")
+
+        #Now, define function variables as MIP variables
+        x_var = @variable(model, [1:d], base_name = "$x_ind")
+
+        #Defines the generic vertex as a convex combination of its neighbors 
+        #This exploits casting. NOTE: Could be dangerous 
+        @constraint(model, x_var .== sum(λ_var[i]*[xS[i]...] for i in 1:m))
+
+    
+    
         #Define yLB and yUB for the corresponding symbol 
         yLB = yLBs[yCounter]
         yUB = yUBs[yCounter]
@@ -436,11 +431,11 @@ function ccSymEncoding(xS, yLBs, yUBs, Tri, symQuery, ind, model)
         #Add model inputs and outputs to variable dictionary
         #NOTE: x_var and u are independent of sym. We simply duplicate them for each symbol
         sym_ind = Meta.parse("$(sym)_$(ind)")
-        symQuery.var_dict[sym_ind] = [y_var]
+        symQuery.var_dict[sym_ind] = [x_var, y_var]
     end
     #Time_Ind holds non bound variables to avoid duplication
     time_ind = Meta.parse("t_$(ind)")
-    symQuery.var_dict[time_ind] = [x_var, u]
+    symQuery.var_dict[time_ind] = [u]
 
     #We will also need to define additional constraints on x and y, but those will be added later
 
@@ -473,40 +468,43 @@ function encode_time(symQuery::OvertPQuery)
     ##########First loop#############
     for i = 1:symQuery.ntime-1 
         j = 0
+        trueInp_now = Any[]
+        trueInp_next = Any[]
         trueOut = Any[]
         #First, define the inputs that go into the integration map
         for sym in symQuery.problem.varList 
             j += 1
             #Use metaprogramming to get the current and next symbol
             sym_now = Meta.parse("$(sym)_$(i)")
+            sym_next = Meta.parse("$(sym)_$(i+1)")
             #Get the MIP variables associated with the symbols
-            y_now = symQuery.var_dict[sym_now][1]
+            y_now = symQuery.var_dict[sym_now][2]
+            if symQuery.case == 1
+                #here, each input variable correponds to function 
+                x_now = symQuery.var_dict[sym_now][1][j]
+                x_next = symQuery.var_dict[sym_next][1][j]
+            else
+                x_now = symQuery.var_dict[sym_now][1][j:j+1]
+                x_next = symQuery.var_dict[sym_next][1][j:j+1]
+                j += 1
+            end
             push!(trueOut, y_now)
+            push!(trueInp_now, x_now)
+            push!(trueInp_next, x_next)
         end
 
         #Explicitly define the MIP model
         sym_mip = symQuery.mod_dict[:sym]
-       
-        #Inputs are identical across symbols, select one at random to define the current and next inputs 
-        sym = symQuery.problem.varList[1]
-
-        #Use metaprogramming to get the current and next symbol
-        time_now = Meta.parse("t_$(i)")
-        time_next = Meta.parse("t_$(i+1)")
-
-        #Get the input variables associated with the symbols
-        x_now = symQuery.var_dict[time_now][1]
-        x_next = symQuery.var_dict[time_next][1]
 
         #Define the integration map 
-        integration_map = symQuery.problem.update_rule(x_now, trueOut)
+        integration_map = symQuery.problem.update_rule(trueInp_now, trueOut)
 
         #######Second loop#############
         #Iterate through each input variable, find the variable that controls its evolution, then link the input variable of the next time step to the output variable of the current time step
-        for k = 1:length(x_now)
-            v = x_now[k]
+        for k = 1:length(trueInp_now)
+            v = trueInp_now[k]
             dv = integration_map[v][1]
-            next_v = x_next[k]
+            next_v = trueInp_next[k]
             @constraint(sym_mip, next_v == v + symQuery.dt*dv)
         end
 
@@ -551,15 +549,21 @@ function sym_reach_solve(query, t_idx::Union{Nothing,Int64}=nothing)
     trueOut = Any[]
     
     #Compute true input and output variables 
+    j = 0
     for sym in query.problem.varList
         #Account for symbolic case where dynamics are timed
         sym_timed = Meta.parse("$(sym)_$t_idx")
-        output_vars = query.var_dict[sym_timed][1]
+        output_vars = query.var_dict[sym_timed][2]
+        j += 1
+        if query.case == 1
+            input_vars = query.var_dict[sym_timed][1][j]
+        else
+            input_vars = query.var_dict[sym_timed][1][j:j+1]
+            j += 1
+        end
         push!(trueOut, output_vars)
+        push!(trueInp, input_vars)
     end
-    time_sym = Meta.parse("t_$(t_idx)")
-    trueInp = query.var_dict[time_sym][1]
-
     integration_map = query.problem.update_rule(trueInp, trueOut)
     
     timestep_nplus1_vars = GenericAffExpr{Float64,VariableRef}[]
@@ -593,7 +597,7 @@ function multi_step_symreach(symQuery::OvertPQuery)
     Method to solve the concrete reachability problem using MIP for multiple time steps.
     """
     input_set = symQuery.problem.domain
-    reachSets = []
+    reachSets = [input_set]
     totTime = copy(symQuery.ntime)
     t1 = Dates.now()
     for i = 1:totTime
@@ -605,9 +609,6 @@ function multi_step_symreach(symQuery::OvertPQuery)
     println("Time for symbolic reachability is ", t2-t1)
     return reachSets
 end
-
-
-
 
 
 

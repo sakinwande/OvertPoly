@@ -763,8 +763,9 @@ function interpol(oA1, oA2)
 
 
     #Generate interpolation function for each approximation
-    interp1 = gen_interpol(oA1)
-    interp2 = gen_interpol(oA2)
+    #NOTE: Sort overapproximation to ensure that the interpolation is sound
+    interp1 = gen_interpol(sort(oA1))
+    interp2 = gen_interpol(sort(oA2))
 
     #Loop through both approximations and interpolate to ensure that the bounds are over the same set of points (and that the points are evenly spaced)
 
