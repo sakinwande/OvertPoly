@@ -483,7 +483,7 @@ function multi_step_symreach(symQuery::OvertPQuery)
     Method to solve the concrete reachability problem using MIP for multiple time steps.
     """
     input_set = symQuery.problem.domain
-    reachSets = []
+    reachSets = [input_set]
     totTime = copy(symQuery.ntime)
     t1 = Dates.now()
     for i = 1:totTime
@@ -494,6 +494,42 @@ function multi_step_symreach(symQuery::OvertPQuery)
     t2 = Dates.now()
     println("Time for symbolic reachability is ", t2-t1)
     return reachSets
+end
+
+function multi_symbolic_reach(concEvery, query)
+    totalReachSets = [domain]
+    symReachSets = []
+    totalsteps = copy(query.ntime)
+    numConc = ceil(totalsteps/concEvery)
+    totalBoundSets = []
+    # tStart = Dates.now()
+    cumSteps = 0
+    query.ntime = concEvery
+    for i = 1:numConc
+
+        if i == 1
+            newDomain = domain
+        else
+            newDomain = symReachSets[end]
+        end
+        concQuery = deepcopy(query)
+        concQuery.problem.domain = newDomain
+        if cumSteps + concQuery.ntime > totalsteps
+            concQuery.ntime = totalsteps - cumSteps
+        end
+        reachSets, boundSets = multi_step_concreach(concQuery)
+        push!(totalBoundSets, boundSets...)
+        
+        symQuery = deepcopy(query)
+        symQuery.problem.bounds = boundSets
+        if cumSteps + symQuery.ntime > totalsteps
+            symQuery.ntime = totalsteps - cumSteps
+        end
+        symReachSets = multi_step_symreach(symQuery)
+        cumSteps += symQuery.ntime
+        push!(totalReachSets, symReachSets[2:end]...)
+    end
+    return totalReachSets, totalBoundSets
 end
 
 #####################Debugging Symbolic Reach##########################

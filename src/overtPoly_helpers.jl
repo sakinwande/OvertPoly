@@ -5,6 +5,7 @@ using Interpolations
 using OVERT: bound, find_variables, to_pairs 
 using Plots; plotly()
 global NPLOTS = 0
+using CSV
 
 function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-4, npoint=2, rel_error_tol=5e-3, plotflag=false)
     """
@@ -852,7 +853,7 @@ function simulateTraj(query, ntraj)
     set = query.problem.domain
     totalSteps = query.ntime
     dt = query.dt
-    for i = 1:ntraj
+    for i = 1:ntraj-1
         #Sample a random point from the domain
         x0 = sample_hyperrectangle(set)
         for j = 1:totalSteps
@@ -871,6 +872,17 @@ function plotBounds(boundSets, expr)
     surfDim = (size(yS)[1], size(xS)[1])
 
     plotSurf(expr, sort(LBs), sort(UBs), surfDim, xS, yS, true)
+end
+
+function compute_coraSet(minFile, maxFile, time_ind)
+    coraMins = CSV.File(minFile)
+    coraMaxs = CSV.File(maxFile)
+
+    coraLows = [coraMins[time_ind]...]
+    coraHighs = [coraMaxs[time_ind]...]
+
+    coraSet = Hyperrectangle(low=coraLows, high=coraHighs)
+    return coraSet
 end
 
 # ####Debug 
