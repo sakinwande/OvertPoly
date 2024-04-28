@@ -480,7 +480,7 @@ end
 
 function multi_step_symreach(symQuery::OvertPQuery)
     """
-    Method to solve the concrete reachability problem using MIP for multiple time steps.
+    Method to compute symbolic reachable sets for multiple time steps using concrete (or symbolic) bounds
     """
     input_set = symQuery.problem.domain
     reachSets = [input_set]
@@ -496,7 +496,10 @@ function multi_step_symreach(symQuery::OvertPQuery)
     return reachSets
 end
 
-function multi_symbolic_reach(concEvery, query)
+function multi_step_hybreach(concEvery, query)
+    """
+    Method to compute hybrid reachable sets by using concrete reach sets as a base and then using symbolic reach sets to refine the reachable set
+    """
     totalReachSets = [domain]
     symReachSets = []
     totalsteps = copy(query.ntime)
@@ -531,6 +534,39 @@ function multi_symbolic_reach(concEvery, query)
     end
     return totalReachSets, totalBoundSets
 end
+
+function straight_shot_reach(totalReachSets, query)
+    """
+    Method to compute symbolic reachable sets given a set of initial (concrete or symbolic) reachable sets
+    """
+    symBoundSets = Any[]
+    for set in totalReachSets
+        itQuery = deepcopy(query)
+        itQuery.problem.domain = set
+        itBound = itQuery.problem.bound_func(itQuery.problem)
+        push!(symBoundSets, itBound)
+    end
+
+
+    query.problem.bounds = symBoundSets
+    reach_set = symReach(query)
+    return reach_set
+end
+
+function multi_shot_reach(query)
+    reachSets = [query.problem.domain]
+    timeHorizon = copy(query.ntime)
+
+    for i = 1:timeHorizon
+        #Compute the straight shot reach set up to the current time step
+        queryCopy = deepcopy(query)
+        queryCopy.ntime = i
+        reach_set = straight_shot_reach(reachSets, queryCopy)
+        push!(reachSets, reach_set)
+    end
+    return reachSets
+end
+
 
 #####################Debugging Symbolic Reach##########################
 # function encode_sym_dynamics!(symQuery)
