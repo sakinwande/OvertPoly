@@ -9,9 +9,9 @@ using Dates
 using Logging
 
 Logging.disable_logging(Logging.Warn)
-coraMinFile = "/home/sam/Research/Code/OvertPoly/matData/min_lotkaVolterra_Cora_100.txt"
-coraMaxFile = "/home/sam/Research/Code/OvertPoly/matData/max_lotkaVolterra_Cora_100.txt"
-coraSet = compute_coraSet(coraMinFile, coraMaxFile, 250)
+coraMinFile = "matData/min_lotkaVolterra_Cora_100.txt"
+coraMaxFile = "matData/max_lotkaVolterra_Cora_100.txt"
+
 
 #Define update rule for Lotka-Volterra
 function lotka_volterra_update_rule(input_vars, 
@@ -22,7 +22,7 @@ function lotka_volterra_update_rule(input_vars,
     return integration_map
 end
 
-function bound_lv(LotkaVolterra, ϵ=0.001, Nᵢ=2, plotFlag=false)
+function bound_lv(LotkaVolterra, ϵ=1e-10, Nᵢ=2, plotFlag=false)
     """
     Method to compute bounds for the Lotka Volterra Problem
 
@@ -270,10 +270,10 @@ query = OvertPQuery(
 # plot(reachSets, title="Comparing_LV_Concrete_and_Symbolic_$(nsteps)", fillcolor=:blue)
 # plot!(symReachSets, fillcolor=:red)
 
-
+totTime = 455
 
 symQuery1 = deepcopy(query)
-symQuery1.ntime = 250
+symQuery1.ntime = totTime
 numSteps = symQuery1.ntime
 
 concEvery = 50
@@ -282,9 +282,6 @@ totalReachSets, totalBoundSets = multi_symbolic_reach(concEvery, symQuery1)
 tEnd = Dates.now()
 println("Time to compute hybrid symbolic reachability: ", tEnd - tStart)
 plot(totalReachSets, title="Hybrid_Symbolic_LV_$(numSteps)", fillcolor=:blue)
-
-totalReachSets
-
 
 #######################Trying out straight shot reachability####################
 function straight_shot_reach(totalReachSets, query)
@@ -303,7 +300,7 @@ function straight_shot_reach(totalReachSets, query)
 end
 
 symQuery2 = deepcopy(query)
-symQuery2.ntime = 251
+symQuery2.ntime = totTime
 
 simTraj = simulateTraj(symQuery2,1000)
 xVals = [x[1] for x in simTraj]
@@ -315,15 +312,15 @@ tEnd = Dates.now()
 println("Time to compute straight shot symbolic reachability: ", tEnd - tStart)
 
 
-plot(totalReachSets[symQuery2.ntime], title="Comparing Hybrid and Straight Shot")
+plot(totalReachSets[symQuery2.ntime], title="Hyb_V_Straight_V_CORA_$(numSteps)")
 plot!(reach_set, label="Straight_Shot_Sym_Reach_Set")
 scatter!(xVals, yVals, label="Simulated Trajectory")
 
-# coraSet = Hyperrectangle(low=coraLows, high=coraHighs)
+coraSet = compute_coraSet(coraMinFile, coraMaxFile, totTime)
 plot!(coraSet, label="Cora Reach Set")
 
-c = area(coraSet)
-a = area(reach_set)
 
-c/a
+overtArea = area(reach_set)
+coraArea = area(coraSet)
 
+overtArea/coraAreaj
