@@ -7,7 +7,7 @@ using Plots; plotly()
 global NPLOTS = 0
 using CSV
 
-function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-4, npoint=2, rel_error_tol=5e-3, plotflag=false)
+function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-8, npoint=2, rel_error_tol=5e-3, plotflag=false)
     """
     Method to bound a univariate function
 
@@ -47,10 +47,13 @@ function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-4, npoint=2, rel_error_t
 
     if isa(Symbolics.value(f), Number)
         #In this case, the expression is just a constant
-        throw(ArgumentError("Bounds not implemented for constant expressions"))
+        #throw(ArgumentError("Bounds not implemented for constant expressions"))
+        #TEST: Return a constant bound
+        UBPoints = [(lb, func(lb) + ϵ), (ub, func(ub) + ϵ)]
+        LBPoints = [(lb, func(lb) - ϵ), (ub, func(ub) - ϵ)]
     elseif isa(Symbolics.value(df), Number)
         #In this case, the expression is linear
-        ϵₗ = 0.001 #small parameter to control linear conservativeness
+        ϵₗ = 0.00001 #small parameter to control linear conservativeness
         UBPoints = [(lb, func(lb) + ϵₗ), (ub, func(ub) + ϵₗ)]
         LBPoints = [(lb, func(lb) - ϵₗ), (ub, func(ub) - ϵₗ)]
     elseif isa(Symbolics.value(d2f), Number)
@@ -114,7 +117,7 @@ function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-4, npoint=2, rel_error_t
         plotRes2d(baseExpr, func, lb, ub, LBPoints, UBPoints, varBase, true)
     end
     
-    return UBPoints, LBPoints
+    return LBPoints, UBPoints
 end
 
 function parse_and_reduce(expr::Expr)

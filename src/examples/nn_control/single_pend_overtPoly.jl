@@ -1,9 +1,9 @@
-include("overtPoly_helpers.jl")
-include("nn_mip_encoding.jl")
-include("overtPoly_to_mip.jl")
-include("overt_to_pwa.jl")
-include("problems.jl")
-include("reachability.jl")
+include("../../overtPoly_helpers.jl")
+include("../../nn_mip_encoding.jl")
+include("../../overtPoly_to_mip.jl")
+include("../../overt_to_pwa.jl")
+include("../../problems.jl")
+include("../../reachability.jl")
 using LazySets
 using Dates
 
@@ -12,27 +12,35 @@ pend_mass, pend_len, grav_const, friction = 0.5, 0.5, 1., 0.0
 controller_type = "small" # pass from command line, e.g. "small"
 controller = "Networks/nnet/single_pendulum_$(controller_type)_controller.nnet"
 expr = [:($(grav_const/pend_len) * sin(x1) + $(1/(pend_mass*pend_len^2)) * u1 - $(friction/(pend_mass*pend_len^2)) * x2)]
-firstDec = parse_and_reduce(expr)
-secDec = parse_and_reduce(firstDec[2])
-control_coef = 8.0
-firstDec[2] = secDec
-dec_expr = firstDec
+control_coef = 1/(pend_mass*pend_len^2)
 
+
+domain = Hyperrectangle(low=[1., 0.], high=[1.2, 0.2])
+domain = Hyperrectangle(low=[0., -0.1], high=[1, 0.1])
+numSteps = 20
+dt = 0.05
 
 function single_pend_update_rule(input_vars,
-    control_vars,
     overt_output_vars)
-    ddth = overt_output_vars[1]
+    ddth = overt_output_vars[1][1]
     integration_map = Dict(input_vars[1] => input_vars[2], input_vars[2] => ddth)
     return integration_map
 end
 
-function bound_pend(SinglePendulum)
+function single_pend_dynamics(x, u, dt)
+    """
+    Dynamics of the single pendulum for a single time step
+    """
+    dx1 = x[2]
+    dx2 = (grav_const/pend_len) * sin(x[1]) + (1/(pend_mass*pend_len^2)) * u - (friction/(pend_mass*pend_len^2)) * x[2]
+    
+    xNew = [x[1] + dx1*dt, x[2] + dx2*dt]
+    return xNew
+end
+
+function bound_pend(SinglePendulum; plotFlag=false)
     #Define the true dynamics
     # single_pend_θ_doubledot = :($(grav_const/pend_len) * sin(x1) + $(1/(pend_mass*pend_len^2)) * u1 - $(friction/(pend_mass*pend_len^2)) * x2)
-    
-    #get decomposed dynamics 
-    baseParsed = SinglePendulum.dec_expr
 
     #get input bounds 
     lbs, ubs = extrema(SinglePendulum.domain)
@@ -40,115 +48,117 @@ function bound_pend(SinglePendulum)
     #Bound f(x1)
     lb1 = lbs[1]
     ub1 = ubs[1]
-    v2Func = baseParsed[2][2]
-    v2f = Symbolics.build_function(v2Func, find_variables(v2Func)..., expression=Val{false})
-    v2UB, v2LB = bound_univariate(v2Func, lb1, ub1, plotflag = false) 
+    bF1sub1 = :($(grav_const/pend_len) * sin(x1))
+    bF1s1LB, bF1s1UB = bound_univariate(bF1sub1, lb1, ub1, plotflag = true) 
+
+    #TEST: Compute length of pre interpolation bounds 
+    size(bF1s1LB)[1]
+    size(bF1s1UB)[1]
 
     #Bound f(x2)
     lb2 = lbs[2]
     ub2 = ubs[2]
-    v22Func = baseParsed[3]
-    v22f = Symbolics.build_function(v22Func, find_variables(v22Func)..., expression=Val{false})
-    v22UB = [(lb2, v22f(lb2)), (ub2, v22f(ub2))]
-    v22LB = [(lb2, v22f(lb2)), (ub2, v22f(ub2))]
+    bF1sub2 = :($((friction)/((pend_mass)*(pend_len)^2)) * x2)
+    bF1s2LB, bF1s2UB = bound_univariate(bF1sub2, lb2, ub2, plotflag = true)
+
+    #TEST: Compute length of pre interpolation bounds
+    size(bF1s2LB)[1]
+    size(bF1s2UB)[1]
 
     #For future use, interpolate to ensure UB and LB for each is over the same set of points 
-    nv2LB, nv2UB = interpol(v2LB, v2UB)
-    nv22LB, nv22UB = interpol(v22LB, v22UB)
-    # nv3LB, nv3UB = interpol(v3LB, v3UB)
+    bF1s1LB, bF1s1UB = interpol(bF1s1LB, bF1s1UB)
+    bF1s2LB, bF1s2UB = interpol(bF1s2LB, bF1s2UB)
 
-    #Log transformation not required because f(x,u) = f(x) + f(u) already
+    #TEST: Compute length of post interpolation bounds
+    size(bF1s1LB)[1]
+    size(bF1s1UB)[1]
 
-    xS = Any[tup[1] for tup in nv2LB]
-    yS = Any[tup[1] for tup in nv22LB]
-    # uS = Any[tup[1] for tup in nv3LB]
+    #Add a dimension to prepare for Minkowski sum
+    bF1s1LB_l = addDim(bF1s1LB, 2)
+    bF1s1UB_l = addDim(bF1s1UB, 2)
 
-    #Add y axis to f(x) overapprox
-    lv2LBl = addDim(nv2LB, 2)
-    lv2UBl = addDim(nv2UB, 2)
+    bF1s2LB_l = addDim(bF1s2LB, 1)
+    bF1s2UB_l = addDim(bF1s2UB, 1)
 
-    #Add x axis to f(y) overapprox
-    lv22LBl = addDim(nv22LB, 1)
-    lv22UBl = addDim(nv22UB, 1)
+    #Combine to get f(x1) + f(x2)
+    bF1LB = MinkSum(bF1s1LB_l, bF1s2LB_l)
+    bF1UB = MinkSum(bF1s1UB_l, bF1s2UB_l)
 
-    #Obtain f(x,y) overapprox
-    lv2LB = MinkSum(lv2LBl, lv22LBl)
-    lv2UB = MinkSum(lv2UBl, lv22UBl)
 
+    bF1LB[5][3] > bF1UB[5][3]
+
+    bF1LB[5][3] - bF1UB[5][3]
     #Try to plot
-    surfDim = (size(yS)[1],size(xS)[1])
-    saveFlag = true
-    exp2Plot = :($(grav_const/pend_len) * sin(x1) - $(friction/(pend_mass*pend_len^2)) * x2)
-    plotSurf(exp2Plot, lv2LB, lv2UB, surfDim, xS, yS, true)
-    bounds = [lv2LB, lv2UB]
+    if plotFlag
+        xS = Any[tup[1] for tup in bF1s1LB]
+        yS = Any[tup[1] for tup in bF1s2LB]
+        surfDim = (size(yS)[1],size(xS)[1])
+        exp2Plot = :($(grav_const/pend_len) * sin(x1) - $(friction/(pend_mass*pend_len^2)) * x2)
+        plotSurf(exp2Plot, bF1LB, bF1UB, surfDim, xS, yS, true)
+    end
+    bounds = [[bF1LB, bF1UB]]
     return bounds
 end
 
-
 SinglePendulum = OvertPProblem(
     expr, # dynamics
-    dec_expr, #decomposed form of the dynamics
+    nothing, #decomposed form of the dynamics. Done manually
     control_coef, # control coefficient
-    Hyperrectangle(low=[1., 0.], high=[1.2, 0.2]), # domain
+    domain, # domain
     [:dθ], #List of variables that have OVERT bounds
 	nothing, #undefined bounds to start
-	single_pend_update_rule
+	single_pend_update_rule,
+    single_pend_dynamics,
+    bound_pend
 )
 
 query = OvertPQuery(
 	SinglePendulum,    # problem
-    bound_pend,        # bound function
 	controller,        # network file
 	Id(),              # last layer activation layer Id()=linear, or ReLU()=relu
 	"MIP",             # query solver, "MIP" or "ReluPlex"
-	25,                # ntime
-	0.1,               # dt
+	numSteps,                # ntime
+	dt,               # dt
 	2,                # N_overt
     nothing,         # var_dict
-    nothing         # mod_dict
+    nothing,         # mod_dict
+    2                # case
 )
 
 #Use concrete reachability to trace out the trajectory
-reachSets, boundSets = multi_step_concreach(query)
+query1 = deepcopy(query)
+@time reachSets, boundSets = multi_step_concreach(query1)
 
-#Define new problem with symbolic dynamics
-symPendulum = OvertPProblem(
-    expr, # dynamics
-    dec_expr, #decomposed form of the dynamics
-    control_coef, # control coefficient
-    Hyperrectangle(low=[1., 0.], high=[1.2, 0.2]), # domain
-	boundSets, #undefined bounds to start
-	single_pend_update_rule
-)
+plot(reachSets, title="Single Pendulum Concrete Reachability")
 
-#Define new symbolic query
-symQuery = OvertPQuery(
-    symPendulum,    # problem
-    controller,        # network file
-    Id(),              # last layer activation layer Id()=linear, or ReLU()=relu
-    "MIP",             # query solver, "MIP" or "ReluPlex"
-    10,                # ntime
-    0.1,               # dt
-    2,                # N_overt
-    nothing         # var_dict
-)
+#Use concrete sets to compute symbolic reach set at time step 10
+symQuery1 = deepcopy(query)
+symQuery1.problem.bounds = boundSets
+symQuery1.ntime = 
 
+#############Testing Single Step Hybrid Symbolic Reachability############
+@time reach_set = symReach(symQuery1, reachSets)
+plot(reachSets[11], title="Comparing Concrete and Hyb Reach_$(symQuery1.ntime)", label="Concrete Reach Set")
+plot!(reach_set, label="Hyb Reach Set")
 
+#############Testing Multi Step Hybrid Symbolic Reachability############
+symQuery2 = deepcopy(query)
+symQuery2.problem.bounds = boundSets
+symQuery2.ntime = 15
 
-sym_mip = encode_sym_dynamics(symQuery)
-sym_mip = encode_sym_control(sym_mip, symQuery, reachSets)
-sym_mip = encode_time(sym_mip, symQuery)
+concEvery = 10
+@time totalReachSets, totalBoundSets  = multi_step_hybreach(concEvery,symQuery2)
+length(totalReachSets)
+plot(totalReachSets, title="Single Pendulum Hybrid Reachability", fillcolor=:blue)
+#############Trying out multi step straight shot reachability############
+symQuery3 = deepcopy(query)
+symQuery3.ntime = 10
+@time reachSetsSS = multi_shot_reach(symQuery3)
 
-#Solve the symbolic MIP
-@time reach_solve(sym_mip, symQuery, symQuery.ntime)
-set = 
+plot!(reachSetsSS[end], label="Straight Shot Reach Set")
+plot!(reachSets, title="Single Pendulum Straight Shot Reachability", fillcolor=:red)
 
 ############Testing Area############
-# network = read_nnet(controller, last_layer_activation=Id())
-# input_set = Hyperrectangle(low=[1., 0.], high=[1.2, 0.2]) # domain
-
-# #This gives element-wise bounds 
-# bounds = get_bounds(network, input_set)
 
 boundsC = [
     Hyperrectangle(low=[1., 0.], high=[1.20000005, 0.20000000]), 

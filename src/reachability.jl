@@ -53,8 +53,8 @@ function reach_solve(query, t_idx::Union{Nothing,Int64}=nothing)
     This version of reach_solve generalizes to multiple functions
     """
     stateVar = query.problem.varList
-    trueInp = Any[]
-    trueOut = Any[]
+    trueInp = []
+    trueOut = []
     stateVarTimed = Any[]
     
     #Compute true input and output variables 
@@ -79,7 +79,7 @@ function reach_solve(query, t_idx::Union{Nothing,Int64}=nothing)
         else
             #Case 2: Mix of single and multiple functions
             #Here, stateVar != varList. States are (x, dx, y, dy, etc)
-            push!(trueInp, input_vars[i:i+1])
+            push!(trueInp, input_vars[i:i+1]...)
             i += 1 #increment by 1 to account for the fact that we are skipping over the derivative
             push!(trueOut, output_vars)
         end
@@ -103,7 +103,7 @@ function reach_solve(query, t_idx::Union{Nothing,Int64}=nothing)
         mipModel = query.mod_dict[sym]
         for v in input_vars 
             if v in trueInp
-                dv = integration_map[v][1]
+                dv = integration_map[v]
                 next_v = v + query.dt*dv
                 push!(timestep_nplus1_vars, next_v)
                 @objective(mipModel, Min, next_v)
@@ -203,16 +203,21 @@ function encode_sym_dynamics!(symQuery)
 
         #Now ensure all overapproximation objects are defined over the same set of points 
         uLBVec, uUBVec = Any[], Any[]
-        for vec in LBVec
-            #Generate vector with the universal set of points 
-            uVec, _ = interpol(vec, luOA)
-            push!(uLBVec, uVec)
-        end
+        if length(LBVec) > 1
+            for vec in LBVec
+                #Generate vector with the universal set of points 
+                uVec, _ = interpol(vec, luOA)
+                push!(uLBVec, uVec)
+            end
 
-        for vec in UBVec
-            #Generate vector with the universal set of points 
-            uVec, _ = interpol(vec, uuOA)
-            push!(uUBVec, uVec)
+            for vec in UBVec
+                #Generate vector with the universal set of points 
+                uVec, _ = interpol(vec, uuOA)
+                push!(uUBVec, uVec)
+            end
+        else
+            uLBVec = LBVec
+            uUBVec = UBVec
         end
 
         #Generate universal triangulation 
@@ -347,7 +352,7 @@ function encode_sym_control(symQuery, reachSets)
         sym_mip = symQuery.mod_dict[:sym]
         #Select x and u for the appropriate time step
         input_set = reachSets[i]
-        time_curr = Meta.parse("$t_$(i)")
+        time_curr = Meta.parse("t_$(i)")
         x_curr = symQuery.var_dict[time_curr][1]
         u_curr = symQuery.var_dict[time_curr][2]
 
@@ -395,7 +400,7 @@ function encode_time(symQuery::OvertPQuery)
         #Iterate through each input variable, find the variable that controls its evolution, then link the input variable of the next time step to the output variable of the current time step
         for k = 1:length(x_now)
             v = x_now[k]
-            dv = integration_map[v][1]
+            dv = integration_map[v]
             next_v = x_next[k]
             @constraint(sym_mip, next_v == v + symQuery.dt*dv)
         end
@@ -403,7 +408,7 @@ function encode_time(symQuery::OvertPQuery)
     end
 end
 
-function symReach(symQuery::OvertPQuery)
+function symReach(symQuery::OvertPQuery, reachSets)
     """
     Method to solve the concrete reachability problem using MIP for multiple time steps.
     """
@@ -417,7 +422,7 @@ function symReach(symQuery::OvertPQuery)
     #Encode the controller if it exists
     #TODO: Fix this 
     if !isnothing(symQuery.network_file)
-        encode_sym_control(symQuery)
+        encode_sym_control(symQuery, reachSets)
     end
 
     #Link the time steps
@@ -459,7 +464,7 @@ function sym_reach_solve(query, t_idx::Union{Nothing,Int64}=nothing)
     mipModel = query.mod_dict[:sym]
 
     for v in trueInp 
-        dv = integration_map[v][1]
+        dv = integration_map[v]
         next_v = v + query.dt*dv
         push!(timestep_nplus1_vars, next_v)
         @objective(mipModel, Min, next_v)
@@ -488,7 +493,7 @@ function multi_step_symreach(symQuery::OvertPQuery)
     t1 = Dates.now()
     for i = 1:totTime
         symQuery.ntime = i
-        reachSet = symReach(symQuery);
+        reachSet = symReach(symQuery, reachSets);
         push!(reachSets, reachSet)
     end
     t2 = Dates.now()
@@ -549,7 +554,7 @@ function straight_shot_reach(totalReachSets, query)
 
 
     query.problem.bounds = symBoundSets
-    reach_set = symReach(query)
+    reach_set = symReach(query, totalReachSets)
     return reach_set
 end
 
