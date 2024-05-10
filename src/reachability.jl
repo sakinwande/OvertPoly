@@ -408,7 +408,7 @@ function encode_time(symQuery::OvertPQuery)
     end
 end
 
-function symReach(symQuery::OvertPQuery, reachSets)
+function symReach(symQuery::OvertPQuery, reachSets=nothing)
     """
     Method to solve the concrete reachability problem using MIP for multiple time steps.
     """

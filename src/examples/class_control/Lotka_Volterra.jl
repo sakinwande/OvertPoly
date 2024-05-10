@@ -16,13 +16,13 @@ coraMaxFile = "matData/max_lotkaVolterra_Cora_100.txt"
 #Define update rule for Lotka-Volterra
 function lotka_volterra_update_rule(input_vars, 
     overt_output_vars)
-    dx = overt_output_vars[1]
-    dy = overt_output_vars[2]
+    dx = overt_output_vars[1][1]
+    dy = overt_output_vars[2][1]
     integration_map = Dict(input_vars[1] => dx, input_vars[2] => dy)
     return integration_map
 end
 
-function bound_lv(LotkaVolterra, ϵ=1e-10, Nᵢ=2, plotFlag=false)
+function bound_lv(LotkaVolterra, ϵ=1e-10, Nᵢ=6, plotFlag=false)
     """
     Method to compute bounds for the Lotka Volterra Problem
 
@@ -189,7 +189,7 @@ yExpr = :(x*y - y)
 expr = [xExpr, yExpr]
 
 nsteps = 50
-totTime = 10
+totTime = 100
 dt = 0.008
 
 ϵ = 0.02
@@ -224,11 +224,17 @@ query = OvertPQuery(
 
 #############Testing multi-step concrete reachability############
 #perform multi-step concrete reachability
-reachSets, boundSets = multi_step_concreach(query)
+cquery = deepcopy(query)
+simTraj = simulateTraj(cquery,1000)
+xVals = [x[1] for x in simTraj]
+yVals = [x[2] for x in simTraj]
+reachSets, boundSets = multi_step_concreach(cquery);
 
 # Plot the results and compare to simulated trajectories 
 plot(reachSets[end], title="Lotka_Volterra_Concrete_$(nsteps)", label="Concrete Reach Set")
 scatter!(xVals, yVals, label="Simulated Trajectory") 
+
+plot(reachSets[1:2])
 
 #############Testing Single Step Symbolic Reachability############
 
@@ -239,10 +245,10 @@ reach_set = symReach(symQuery)
 plot!(reach_set, label="Sym Reach Set")
 # plot!(reachSets[end], label="Conc Reach Set")
 
-symReachSets = multi_step_symreach(symQuery)
+# symReachSets = multi_step_symreach(symQuery)
 
-plot(reachSets, title="Comparing_LV_Concrete_and_Symbolic_$(nsteps)", fillcolor=:blue)
-plot!(symReachSets, fillcolor=:red)
+# plot(reachSets, title="Comparing_LV_Concrete_and_Symbolic_$(nsteps)", fillcolor=:blue)
+# plot!(symReachSets, fillcolor=:red)
 
 ###############Comparing multi_step_hybreach##############
 
@@ -252,7 +258,7 @@ numSteps = symQuery1.ntime
 
 concEvery = 50
 tStart = Dates.now()
-totalReachSets, totalBoundSets = multi_symbolic_reach(concEvery, symQuery1)
+totalReachSets, totalBoundSets = multi_step_hybreach(concEvery, symQuery1)
 tEnd = Dates.now()
 println("Time to compute hybrid symbolic reachability: ", tEnd - tStart)
 plot(totalReachSets, title="Hybrid_Symbolic_LV_$(numSteps)", fillcolor=:blue)
@@ -271,15 +277,17 @@ tEnd = Dates.now()
 println("Time to compute straight shot symbolic reachability: ", tEnd - tStart)
 
 
-plot(totalReachSets[symQuery2.ntime], title="Hyb_V_Straight_V_CORA_$(numSteps)")
+plot(totalReachSets[symQuery2.ntime+1], title="Hyb_V_Straight_V_CORA_$(numSteps)")
 plot!(reach_set, label="Straight_Shot_Sym_Reach_Set")
 scatter!(xVals, yVals, label="Simulated Trajectory")
 
 coraSet = compute_coraSet(coraMinFile, coraMaxFile, totTime)
 plot!(coraSet, label="Cora Reach Set")
 
+
+area(reach_set)/area(coraSet)
 ###########Trying out multi step straight shot reachability####################
-totTime = 455
+totTime = 10
 symQuery3 = deepcopy(query)
 symQuery3.ntime = totTime
 

@@ -16,7 +16,7 @@ control_coef = 1/(pend_mass*pend_len^2)
 
 
 domain = Hyperrectangle(low=[1., 0.], high=[1.2, 0.2])
-domain = Hyperrectangle(low=[0., -0.1], high=[1, 0.1])
+# domain = Hyperrectangle(low=[0., -0.1], high=[1, 0.1])
 numSteps = 20
 dt = 0.05
 
@@ -127,18 +127,18 @@ query = OvertPQuery(
 
 #Use concrete reachability to trace out the trajectory
 query1 = deepcopy(query)
-@time reachSets, boundSets = multi_step_concreach(query1)
+@time reachSets, boundSets = multi_step_concreach(query1);
 
 plot(reachSets, title="Single Pendulum Concrete Reachability")
 
 #Use concrete sets to compute symbolic reach set at time step 10
 symQuery1 = deepcopy(query)
 symQuery1.problem.bounds = boundSets
-symQuery1.ntime = 
+symQuery1.ntime = 20
 
 #############Testing Single Step Hybrid Symbolic Reachability############
 @time reach_set = symReach(symQuery1, reachSets)
-plot(reachSets[11], title="Comparing Concrete and Hyb Reach_$(symQuery1.ntime)", label="Concrete Reach Set")
+plot(reachSets[21], title="Comparing Concrete and Hyb Reach_$(symQuery1.ntime)", label="Concrete Reach Set")
 plot!(reach_set, label="Hyb Reach Set")
 
 #############Testing Multi Step Hybrid Symbolic Reachability############
