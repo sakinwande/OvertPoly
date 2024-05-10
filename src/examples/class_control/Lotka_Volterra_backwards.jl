@@ -263,7 +263,7 @@ function breach_solve(bquery, t_idx::Union{Nothing,Int64}=nothing)
         end
         #Case 1: Multiple functions
         #Here, stateVar = varList. States are (x, y, z, etc). Simply loop over var list and find the appropriate symbol to match to the input and output variables
-        if query.case == 1
+        if bquery.case == 1
             push!(trueInp, input_vars[i])
             push!(trueOut, output_vars)
         else
@@ -329,7 +329,7 @@ function back_concreach!(bquery, btarget)
     btarget: Hyperrectangle of the target set
     """
     #Bound using input domain 
-    bquery.problem.bounds = bquery.problem.bound_func(bquery.problem,true)
+    bquery.problem.bounds = bquery.problem.bound_func(bquery.problem,false)
     bquery.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
     bquery.mod_dict = Dict{Symbol,JuMP.Model}()
     encode_dynamics!(bquery)
@@ -345,7 +345,7 @@ function back_concreach!(bquery, btarget)
     reachSet = breach_solve(bquery)
     return reachSet, bquery.problem.bounds
 end
-function breach_refine(bquery, btarget, stopRatio = 1.1)
+function breach_refine_outer(bquery, btarget, stopRatio = 1.1)
     """
     Refine a single step backwards reachable set by iteratively solving the MIP and updating the domain. Stop when the ratio of the area of the old breach set to the new breach set is less than the stopRatio
 
@@ -366,16 +366,17 @@ function breach_refine(bquery, btarget, stopRatio = 1.1)
     breakFlag = 0
     tStart = Dates.now()
     while bloat
-        bquery = deepcopy(query)
-        bquery.problem.domain = breachSets
+        bbquery = deepcopy(bquery)
+        bbquery.problem.domain = breachSets
         oldBreach = deepcopy(breachSets)
         push!(oldBreachList, oldBreach)
-        breachSets, bboundSets = back_concreach!(bquery, btarget)
+        breachSets, bboundSets = back_concreach!(bbquery, btarget)
         if area(oldBreach)/area(breachSets) < stopRatio
             bloat = false
         end
         breakFlag += 1
-        if breakFlag > 15
+        if breakFlag > 100
+            print("Did not converge")
             break
         end
     end
@@ -383,33 +384,108 @@ function breach_refine(bquery, btarget, stopRatio = 1.1)
     println("Time to compute final breach set: $(tStop - tStart)")
     return breachSets, oldBreachList, bboundSets
 end
-function multi_step_breach(bquery, btarget)
+function breach_refine_inner(bquery, btarget, redRate)
+    initBreachSet, _, _ = breach_refine_outer(bquery, btarget)
+
+    #Create new candidate inner approximation 
+    newCenter = deepcopy(initBreachSet.center)
+    newRadius = deepcopy(initBreachSet.radius * redRate)
+    
+    #Define new inner approximation 
+    newBreach = Hyperrectangle(newCenter, newRadius)
+    
+    #Test the inner approximation by computing the FRS starting from the inner approximation. If it's an inner approximation, the FRS will be contained in the target set 
+    inner_query = deepcopy(bquery)
+    inner_query.ntime = 1
+    inner_query.problem.domain = newBreach 
+    
+    candReach, _ = concreach!(inner_query)
+
+    breakCounter = 0
+
+    while !(candReach ⊂ btarget)
+        #Create new candidate inner approximation 
+        newCenter = deepcopy(newBreach.center)
+        newRadius = deepcopy(newBreach.radius * redRate)
+        
+        #Define new inner approximation 
+        newBreach = Hyperrectangle(newCenter, newRadius)
+        
+        #Test the inner approximation by computing the FRS starting from the inner approximation. If it's an inner approximation, the FRS will be contained in the target set 
+        inner_query = deepcopy(bquery)
+        inner_query.ntime = 1
+        inner_query.problem.domain = newBreach 
+        
+        candReach, _ = concreach!(inner_query)
+        breakCounter += 1
+
+        if breakCounter > 20
+            print("Could not compute a maximal set")
+            break
+        end
+    end
+    return newBreach
+end
+
+
+btarget = reachSets[end]
+trueBreach = reachSets[1]
+bquery_outer = deepcopy(query)
+breachSet_outer, oldBreachSets, bboundSets = breach_refine_outer(bquery_outer, btarget)
+
+bquery_inner = deepcopy(query)
+breachSet_inner = breach_refine_inner(bquery_inner, btarget, 0.9)
+#breachSets, bboundSets = multi_step_breach(bquery, btarget)
+plot(trueBreach, label="true back reach set", legend=:bottomright, title="Backwards Reachable Set For Lotka_Volterra")
+plot!(breachSet_outer, label="Minimal back reach set")
+plot!(breachSet_inner, label="Maximal back reach set")
+trueBreach ⊂ breachSet
+
+
+bquery = deepcopy(query)
+
+function multi_step_breach(bquery, btarget, outerFlag=true)
     """
     Compute the multi-step backwards reachable set for a given query and target set
     """
     tStart = Dates.now()
-    bquery.problem.domain = btarget
     reachSets = []
     boundSets = []
-    for i = 1:bquery.ntime
-        println("Computing backwards reachable set for time step $i")
-        breachSet, oldBreachSets, bboundSets = breach_refine(bquery, btarget)
-        push!(reachSets, breachSet)
-        push!(boundSets, bboundSets)
-        btarget = reachSets[end]
+    i =1
+    mquery = deepcopy(bquery)
+    if outerFlag
+        for i = 1:bquery.ntime
+            println("Computing backwards reachable set for time step $i")
+            breachSet, oldBreachSets, bboundSets = breach_refine_outer(mquery, btarget)
+            push!(reachSets, breachSet)
+            push!(boundSets, bboundSets)
+            btarget = reachSets[end]
+            mquery = deepcopy(bquery)
+        end
+    else
+        for i = 1:bquery.ntime
+            println("Computing backwards reachable set for time step $i")
+            breachSet = breach_refine_inner(mquery, btarget, 0.9)
+            push!(reachSets, breachSet)
+            btarget = reachSets[end]
+            mquery = deepcopy(bquery)
+        end
     end
     tStop = Dates.now()
     println("Time to compute multi-step backwards reachable set: $(tStop - tStart)")
     return reachSets, boundSets
 end
 
-btarget = reachSets[5]
-bquery = deepcopy(query)
-# breachSet, oldBreachSets, bboundSets = breach_refine(bquery, btarget)
-breachSets, bboundSets = multi_step_breach(bquery, btarget)
-plot(breachSets[1:2])
-plot!(reachSets[1], label="true back reach set", legend=:bottomright, title="Backwards Reachable Set For Lotka_Volterra")
+breachSets, boundSets = multi_step_breach(bquery, btarget, false)
 
-# testSet = [set for set in breachSets]
-# plot(testSet)
-# plot!(reachSets, fillcolor=red)
+plot([set for set in breachSets][5], fillcolor=:blue, title="Inner BRS vs True BRS for Lotka_Volterra", label="Outer BRS", legend=:bottomright)
+plot!([set for set in breachSets][2:end], fillcolor=:blue)
+trueSet = deepcopy(reachSets[1:5])
+trueSet = reverse(trueSet)
+plot!(trueSet[5], fillcolor=:red, label="True BRS")
+plot!(trueSet[2:end], fillcolor=:red)
+
+"""
+TODO: Implement Minkowski difference (instead of constant scaling)
+TODO: Implement optimization routine to find scaling factor 
+"""
