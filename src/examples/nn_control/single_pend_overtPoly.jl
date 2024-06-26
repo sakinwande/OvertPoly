@@ -9,8 +9,7 @@ using Dates
 
 #Define problem parameters
 pend_mass, pend_len, grav_const, friction = 0.5, 0.5, 1., 0.0
-controller_type = "small" # pass from command line, e.g. "small"
-controller = "Networks/nnet/single_pendulum_$(controller_type)_controller.nnet"
+controller = "Networks/ARCH-COMP-2023/nnet/controllerSinglePendulum.nnet"
 expr = [:($(grav_const/pend_len) * sin(x1) + $(1/(pend_mass*pend_len^2)) * u1 - $(friction/(pend_mass*pend_len^2)) * x2)]
 control_coef = 1/(pend_mass*pend_len^2)
 
@@ -49,7 +48,7 @@ function bound_pend(SinglePendulum; plotFlag=false)
     lb1 = lbs[1]
     ub1 = ubs[1]
     bF1sub1 = :($(grav_const/pend_len) * sin(x1))
-    bF1s1LB, bF1s1UB = bound_univariate(bF1sub1, lb1, ub1, plotflag = true) 
+    bF1s1LB, bF1s1UB = bound_univariate(bF1sub1, lb1, ub1, plotflag = false) 
 
     #TEST: Compute length of pre interpolation bounds 
     size(bF1s1LB)[1]
@@ -59,7 +58,7 @@ function bound_pend(SinglePendulum; plotFlag=false)
     lb2 = lbs[2]
     ub2 = ubs[2]
     bF1sub2 = :($((friction)/((pend_mass)*(pend_len)^2)) * x2)
-    bF1s2LB, bF1s2UB = bound_univariate(bF1sub2, lb2, ub2, plotflag = true)
+    bF1s2LB, bF1s2UB = bound_univariate(bF1sub2, lb2, ub2, plotflag = false)
 
     #TEST: Compute length of pre interpolation bounds
     size(bF1s2LB)[1]
@@ -127,6 +126,7 @@ query = OvertPQuery(
 
 #Use concrete reachability to trace out the trajectory
 query1 = deepcopy(query)
+query1.ntime = 10
 @time reachSets, boundSets = multi_step_concreach(query1);
 
 plot(reachSets, title="Single Pendulum Concrete Reachability")
@@ -134,11 +134,11 @@ plot(reachSets, title="Single Pendulum Concrete Reachability")
 #Use concrete sets to compute symbolic reach set at time step 10
 symQuery1 = deepcopy(query)
 symQuery1.problem.bounds = boundSets
-symQuery1.ntime = 20
+symQuery1.ntime = 10
 
 #############Testing Single Step Hybrid Symbolic Reachability############
 @time reach_set = symReach(symQuery1, reachSets)
-plot(reachSets[21], title="Comparing Concrete and Hyb Reach_$(symQuery1.ntime)", label="Concrete Reach Set")
+plot(reachSets[end], title="Comparing Concrete and Hyb Reach_$(symQuery1.ntime)", label="Concrete Reach Set", legend = :bottomright)
 plot!(reach_set, label="Hyb Reach Set")
 
 #############Testing Multi Step Hybrid Symbolic Reachability############

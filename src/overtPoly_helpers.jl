@@ -7,7 +7,7 @@ using Plots; plotly()
 global NPLOTS = 0
 using CSV
 
-function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-8, npoint=2, rel_error_tol=5e-3, plotflag=false)
+function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-12, npoint=2, rel_error_tol=5e-3, plotflag=false)
     """
     Method to bound a univariate function
 
@@ -300,7 +300,7 @@ function plotRes2d(baseExpr,fun, lb, ub, LBpoints, UBpoints, varBase,saveFlag=fa
     end
 end
 
-function MinkSum(vec1, vec2)
+function MinkSum(vec1, vec2, roundFlag=false)
     """
     Returns the Minkowski sum of vectors of tuples. The vectors can have arbitrary length but tuples must have the same length
 
@@ -311,7 +311,14 @@ function MinkSum(vec1, vec2)
     minkResult = Any[]
     for tup in vec1
         for tup2 in vec2
-            push!(minkResult, Tuple(tup[i] + tup2[i] for i in eachindex(tup)))
+            if roundFlag
+                push!(minkResult, Tuple(round.(tup[i] + tup2[i], digits=8) for i in eachindex(tup)))
+            else
+                push!(minkResult, Tuple(tup[i] + tup2[i] for i in eachindex(tup)))
+            end
+
+
+
         end
     end
 
@@ -355,15 +362,27 @@ function plotSurf(baseFunc, lbVec, ubVec, surfDim, xS, yS, saveFlag=false)
 
 end
 
-function addDim(vec, dim)
+function addDim(vec, dim, zeroVal = 1e-12)
     """
     Add a dimension to each tuple in a vector of tuples. This is equivalent to lifting a n-d polytope to a dimention nd+1
 
     Equiv to a cartesian product with the zero vector in the new dimension
     """
     newVec = Any[]
+    tupSize = max(length(vec[1]), dim)
+    #Initialize the tuple vector with zeros 
     for tup in vec
-        newTup = Tuple(if i < dim tup[i] elseif i == dim 0.0 else tup[i-1] end for i in 1:length(tup)+1)
+        tupVec = tupVec = zeroVal*ones(tupSize+1)
+        for i in 1:tupSize
+            if i < dim && i < length(tup)
+                tupVec[i] = tup[i]
+            elseif i > dim && i < length(tup) +1
+                tupVec[i] = tup[i-1]
+            end
+            #Set the final values of each tuple to be the same 
+            tupVec[end] = tup[end]
+        end
+        newTup = tuple(tupVec...)
         push!(newVec, newTup)
     end
     return newVec
@@ -888,148 +907,55 @@ function compute_coraSet(minFile, maxFile, time_ind)
     return coraSet
 end
 
-# ####Debug 
-# #Reduce to addition chunks
-# expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y)
-# lb, ub = -pi, pi
-# baseParsed = parse_and_reduce(expr)
+function lift_OA(emptyList, currList, boundLB, boundUB, lbs, ubs)
+    """
+    Method to lift an overapproximation to a higher dimension
+    by adding (constant) bounds for unused variables into the overapproximation 
 
-# #We know that each LB, UB combination is over the same set of points. So we don't have to perform 4 interpolations
-# LB1, UB1 = boundMV1(baseParsed[2], lb, ub)
-# LB2, UB2 = boundMV1(baseParsed[3], lb, ub)
+    emptyList: List of unused variables. Modified in place. Must be sorted
+    currList: List of used variables. Modified in place
+    boundLB: Lower bounds for the overapproximation
+    boundUB: Upper bounds for the overapproximation
+    query: OvertPQuery object
 
+    returns: lifted bounds
+    """
+    # lbs, ubs = extrema(query.domain)
+    boundLB_l = copy(boundLB)
+    boundUB_l = copy(boundUB)
+    plotFlag = false
+    for i in copy(emptyList)
+        #Find bounds for unused variable
+        lbEmptyVar = lbs[i]
+        ubEmptyVar = ubs[i]
+        #Constant function to bound
+        emptyEq = :(0*x)
+        emptyLB, emptyUB = bound_univariate(emptyEq, lbEmptyVar, ubEmptyVar, plotflag = plotFlag)
+        #Add corresponding dimension to the lifted bounds
+        boundLB_l = addDim(boundLB_l, i)
+        boundUB_l = addDim(boundUB_l, i)
 
-# ##############################Debug Interpol########################
-# # oA1 = LB1
-# # oA2 = LB2
+        emptyLB_l = copy(emptyLB)
+        emptyUB_l = copy(emptyUB)
+        
+        for idx in currList 
+            emptyLB_l = addDim(emptyLB_l, idx)
+            emptyUB_l = addDim(emptyUB_l, idx)
+        end
+        #Add the empty variable to the bounds 
+        boundLB_l = unique(MinkSum(boundLB_l, emptyLB_l))
+        boundUB_l = unique(MinkSum(boundUB_l, emptyUB_l))
 
-# # oAComb = sort(vcat(oA1, oA2))
-# # oAVecs = [round.(collect(tup[1:end-1]), digits=5) for tup in oAComb]
-# # oAMat = copy(reduce(hcat,oAVecs)')
-# # oAMatR = reverse(oAMat, dims=2)
-# # oACol = [unique(col[:]) for col in eachcol(oAMat)]
-# # newInps = Iterators.product(oACol...)
+        push!(currList, i)
+        popfirst!(emptyList)
+        #Sorting in place because we need to add indices in order
+        sort!(currList)
+    end
 
-
-# # #Generate interpolation function for each approximation
-# # interp1 = gen_interpol(oA1)
-# # interp2 = gen_interpol(oA2)
-
-# # #Loop through both approximations and interpolate to ensure that the bounds are over the same set of points (and that the points are evenly spaced)
-
-# # newOA1 = Any[]
-# # newOA2 = Any[]
-# # for tup in newInps
-# #     tup1 = (tup..., interp1(tup...))
-# #     tup2 = (tup..., interp2(tup...))
-# #     push!(newOA1, tup1)
-# #     push!(newOA2, tup2)
-# # end
-# ###################################################################
-
-# #This interpolation is not sound. Fix now 
-# nLB1, nLB2 = interpol(LB1, LB2)
-# nUB1, nUB2 = interpol(UB1, UB2)
-
-
-# #Interpolation results are sorted.
-# nLB1 = sort(nLB1)
-# nUB1 = sort(nUB1)
-
-# LBVec = [collect(tup) for tup in nLB1]
-# UBVec = [collect(tup) for tup in nUB1]
-
-# LBMat = copy(reduce(hcat,LBVec)')
-# UBMat = copy(reduce(hcat,UBVec)')
-# #Extract shape of surface
-# #reverse
-# LBMatR = reverse(LBMat, dims=2)
-# #Surfdim expects the form (y,x). This is the source of the bug
-# surfDim = Tuple(length(unique(col)) for col in eachcol(LBMatR[:,2:end]))
-
-# print(surfDim)
-# xS, yS = [unique(col) for col in eachcol(LBMat[:,1:end-1])] #xS and yS are sorted
-
-# plotSurf(baseParsed[2], lb, ub, nLB1, nUB1, surfDim, xS, yS, xS, yS, true)
-
-# nLB2 = sort(nLB2)
-# nUB2 = sort(nUB2)
-# plotSurf(baseParsed[3], lb, ub, nLB2, nUB2, surfDim, xS, yS, xS, yS, true)
-# #Add separate chunks 
-
-# LB3, UB3 = sound_IA(nLB1, nUB1, nLB2, nUB2, baseParsed[1])
+    return boundLB_l, boundUB_l
+end
 
 
+############Debug Add Dim############3
 
 
-# ###Testing and Debugging bound_multiariate
-# expr=:(cos(x)cos(y)x*y^2 + sin(x)cos(y)y)
-# lb, ub = -pi, pi
-    
-# LB, UB = bound_multivariate(expr, lb, ub)
-
-# #Plot this 
-# plotSurf(expr, lb, ub, LB, UB, surfDim, xS, yS, xS, yS, true)
-
-# lb = 1.0
-# ub = 1.2
-
-# ϵ=1e-4
-# npoint=2
-# rel_error_tol=5e-3
-
-# expr = :(0*x)
-# expr = :(2sin(x))
-
-# varBase = find_variables(expr)[1]
-
-# #Define differentiation variable
-# @variables xₚ
-
-# #Define derivative
-# D = Differential(xₚ)
-# #Define second derivative
-# D2 = Differential(xₚ)^2
-
-# strExpr = string(expr)
-# strExpr = replace(strExpr, string(varBase) => "xₚ")
-# standExpr = Meta.parse(strExpr) #Standardized expression with xₚ as the variable
-
-# symExpr = Symbolics.parse_expr_to_symbolic(standExpr, Main)
-
-# fun = Symbolics.build_function(expr, varBase, expression=Val{false})
-# df = expand_derivatives(D(eval(symExpr)))
-# dfunc = Symbolics.build_function(df, :xₚ; expression=Val{false})
-
-# #Compute second derivative
-# d2f = expand_derivatives(D2(symExpr))
-#d2f is an expression. Convert to a Julia function so IntervalRootFinding can use it
-#NB: expression=Val{false} returns a runtime gen function to avoid world age issues. This way we avoid evaluating expressions 
-# d2func = Symbolics.build_function(d2f, :xₚ; expression = Val{false})
-
-
-# try 
-#     #Linear case 
-#     if d2f == 0
-#         UBpoints = [(lb, fun(lb)), (ub, fun(ub))] 
-#         LBpoints = [(lb, fun(lb)), (ub, fun(ub))]
-#     end
-# catch
-#     #Nonlinear case 
-#     d2func = Symbolics.build_function(d2f, :xₚ; expression = Val{false})
-
-#     #Then find the roots over the given interval using the function
-#     rootVals = IntervalRootFinding.roots(d2func, IntervalArithmetic.Interval(lb, ub))
-#     #TODO: This is not sound, make sound
-#     rootsGuess = [mid.([root.interval for root in rootVals])]
-#     d2f_zeros = sort(rootsGuess[1])
-
-
-#     convex = nothing 
-
-#     UB = bound(fun, lb, ub, npoint; rel_error_tol=rel_error_tol, conc_method="continuous", lowerbound=false, df = dfunc,d2f = d2func, d2f_zeros=d2f_zeros, convex=nothing, plot=true)
-#     UBpoints = unique(sort(to_pairs(UB), by = x -> x[1]))
-
-#     LB = bound(fun, lb, ub, npoint; rel_error_tol=rel_error_tol, conc_method="continuous", lowerbound=true, df = dfunc,d2f = d2func, d2f_zeros=d2f_zeros, convex=nothing, plot=true)
-#     LBpoints = unique(sort(to_pairs(LB), by = x -> x[1]))
-# end

@@ -3,7 +3,7 @@ include("overt_to_pwa.jl")
 using PiecewiseLinearOpt, JuMP, Gurobi, MathOptInterface
 # ENV["GRB_LICENSE_FILE"] = "/barrett/scratch/akinwande/gurobi.lic"
 
-function ccEncoding(xS, yLB, yUB, Tri, query,sym)
+function ccEncoding(xS, yLB, yUB, Tri, query,sym, ind)
     """
     Method to encode a piecewise affine function as a mixed integer program following the convex combination method as defined in Gessler et. al. 2012
         (https://www.dl.behinehyab.com/Ebooks/IP/IP011_655874_www.behinehyab.com.pdf#page=308)
@@ -15,6 +15,7 @@ function ccEncoding(xS, yLB, yUB, Tri, query,sym)
         yLB: List of lower bounds of the function at the vertices of the triangulation
         yUB: List of upper bounds of the function at the vertices of the triangulation
         Tri: List of simplices of the triangulation
+        ind: index of the model in the problem varList
     """
 
     optimizer = JuMP.optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0)
@@ -24,6 +25,11 @@ function ccEncoding(xS, yLB, yUB, Tri, query,sym)
     m = size(xS, 1) #Number of vertices
     d = size(xS[1], 1) #Dimension of the space
     n = size(Tri, 1) #Number of simplices
+    dU = query.problem.control_dim #Dimension of the control
+
+    # uCoef = zeros(1, du) #Control coefficients. Only nonzero if control coefficients apply to the function value
+    uCoef = query.problem.control_coef[ind]
+    uCoef = reshape(uCoef, 1, dU)
 
     model = Model(optimizer)
     set_silent(model)
@@ -67,14 +73,14 @@ function ccEncoding(xS, yLB, yUB, Tri, query,sym)
     #the vertices are defined as a vector 
     x = @variable(model, [1:d], base_name = "$x_sym")
     # query.var_dict[x_sym] = x
-    y = @variable(model, [1], base_name = "$y_sym")
+    y = @variable(model, [1:1], base_name = "$y_sym")
     # query.var_dict[y_sym] = y
-    yₗ = @variable(model, [1], base_name = "$yₗ_sym")
+    yₗ = @variable(model, [1:1], base_name = "$yₗ_sym")
     # query.var_dict[yₗ_sym] = yₗ
-    yᵤ = @variable(model, [1], base_name = "$yᵤ_sym")
+    yᵤ = @variable(model, [1:1], base_name = "$yᵤ_sym")
     # query.var_dict[yᵤ_sym] = yᵤ
-    #TODO: Change size of control variable as needed
-    u = @variable(model, [1], base_name = "$u_sym")
+    #TODO: Change size of control variable as needed. Currently set to equal size of state variable
+    u = @variable(model, [1:dU], base_name = "$u_sym")
     # query.var_dict[u_sym] = u
 
     #Define the generic vertex as a convex combination of its neighbors 
@@ -85,8 +91,8 @@ function ccEncoding(xS, yLB, yUB, Tri, query,sym)
     #NOTE: Control is changed here. Very bad 
     @constraint(model, yₗ[1] == sum(λ[i]*yLB[i] for i in 1:m))
     @constraint(model, yᵤ[1] == sum(λ[i]*yUB[i] for i in 1:m))
-    @constraint(model, yₗ[1] + query.problem.control_coef*u[1] <= y[1])
-    @constraint(model, y[1] <= yᵤ[1] + query.problem.control_coef*u[1])
+    @constraint(model, yₗ[1] .+ uCoef*u .<= y[1]) #Vector valued lower bound contraint
+    @constraint(model, y[1] .<= yᵤ[1] .+ uCoef*u) #Vector valued upper bound constraint
 
     #Add model inputs and outputs to variable dictionary
     query.var_dict[sym] = [x, y, u]

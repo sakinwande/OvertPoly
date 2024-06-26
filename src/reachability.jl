@@ -12,7 +12,7 @@ function encode_dynamics!(query::OvertPQuery)
     Method to encode the dynamics as a MIP (using the Gessing et al. method)
     """
     i = 0
-    #For each model with an overt approximation, encode the dynamics in a MIP model, and add to the corresponding dictionary
+    #For each model with an overt approximation, encode the dynamics in a MIP model, and add to the corresponding dictionaryl
     for sym in query.problem.varList
         i += 1
         LB, UB = query.problem.bounds[i]
@@ -21,7 +21,7 @@ function encode_dynamics!(query::OvertPQuery)
         xS = [(tup[1:end-1]) for tup in LB]
         yUB = [tup[end] for tup in UB]
         yLB = [tup[end] for tup in LB]
-        query.mod_dict[sym] = ccEncoding(xS, yLB, yUB, Tri, query,sym)
+        query.mod_dict[sym] = ccEncoding(xS, yLB, yUB, Tri, query,sym,i)
     end
 end
 
@@ -34,15 +34,20 @@ function encode_control!(query::OvertPQuery)
     """
     input_set = query.problem.domain   ###For controller MIP encoding, need model, network address, input set, input variable names, output variable names
     network_file = query.network_file
-
+    i=1
     for sym in query.problem.varList
-        mipModel = query.mod_dict[sym]
-        #Get dictionary of MIP variables 
-        input_vars = query.var_dict[sym][1]
-        control_vars = query.var_dict[sym][3]
-        output_vars = query.var_dict[sym][2]
+        if maximum(query.problem.control_coef[i]) > 0 #Check if any control coefficients are nonzero before trying to encode control
+            mipModel = query.mod_dict[sym]
+            #Get dictionary of MIP variables 
+            input_vars = query.var_dict[sym][1]
+            control_vars = query.var_dict[sym][3][1]
+            output_vars = query.var_dict[sym][2]
 
-        controller_bound = add_controller_constraints!(mipModel, network_file, input_set, input_vars, control_vars)
+            #Get the inputs expected by the controller
+            con_inp_vars, con_inp_set, con_vars = query1.problem.control_func(mipModel, input_vars, control_vars, output_vars, input_set)
+            controller_bound = add_controller_constraints!(mipModel, network_file, con_inp_set, con_inp_vars, con_vars)
+        end
+        i += 1
     end
 end
 
@@ -73,14 +78,21 @@ function reach_solve(query, t_idx::Union{Nothing,Int64}=nothing)
         end
         #Case 1: Multiple functions
         #Here, stateVar = varList. States are (x, y, z, etc). Simply loop over var list and find the appropriate symbol to match to the input and output variables
+        #TODO: To this more cleverly
         if query.case == 1
             push!(trueInp, input_vars[i])
             push!(trueOut, output_vars)
-        else
+        elseif query.case == 2
             #Case 2: Mix of single and multiple functions
             #Here, stateVar != varList. States are (x, dx, y, dy, etc)
             push!(trueInp, input_vars[i:i+1]...)
             i += 1 #increment by 1 to account for the fact that we are skipping over the derivative
+            push!(trueOut, output_vars)
+        elseif query.case == 3
+            #Case 3: Mix of single and multiple functions
+            #Here, stateVar != varList. States are (x, dx, ddx, y, dy, ddy etc)
+            push!(trueInp, input_vars[i:i+2]...)
+            i += 2 #increment by 1 to account for the fact that we are skipping over the derivative
             push!(trueOut, output_vars)
         end
     end

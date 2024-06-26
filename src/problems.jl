@@ -9,12 +9,14 @@ mutable struct OvertPProblem
 	expr
 	dec_expr
 	control_coef
+	control_dim
     domain::Hyperrectangle
 	varList #List of variables that have OVERT bounds
     bounds #List of bounds in the same order as varList
     update_rule
 	dynamics::Function 
 	bound_func::Function
+	control_func::Function
 end
 
 ##Can include input vars and control vars 

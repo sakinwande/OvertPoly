@@ -939,3 +939,17 @@ function symReach(symQuery::OvertPQuery)
     println("Time for symbolic reach is ", t2-t1)
     return reachSet
 end
+
+function addDim(vec, dim, zeroVal = 1e-12)
+    """
+    Add a dimension to each tuple in a vector of tuples. This is equivalent to lifting a n-d polytope to a dimention nd+1
+
+    Equiv to a cartesian product with the zero vector in the new dimension
+    """
+    newVec = Any[]
+    for tup in vec
+        newTup = Tuple(if i < dim tup[i] elseif i == dim zeroVal else tup[i-1] end for i in 1:length(tup)+1)
+        push!(newVec, newTup)
+    end
+    return newVec
+end
