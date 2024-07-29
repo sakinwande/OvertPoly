@@ -53,7 +53,7 @@ function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-12, npoint=2, rel_error_
         LBPoints = [(lb, func(lb) - ϵ), (ub, func(ub) - ϵ)]
     elseif isa(Symbolics.value(df), Number)
         #In this case, the expression is linear
-        ϵₗ = 0.00001 #small parameter to control linear conservativeness
+        ϵₗ = ϵ #small parameter to control linear conservativeness
         UBPoints = [(lb, func(lb) + ϵₗ), (ub, func(ub) + ϵₗ)]
         LBPoints = [(lb, func(lb) - ϵₗ), (ub, func(ub) - ϵₗ)]
     elseif isa(Symbolics.value(d2f), Number)
@@ -70,8 +70,11 @@ function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-12, npoint=2, rel_error_
             UB = bound(func, lb, ub, npoint; rel_error_tol=rel_error_tol,conc_method="continuous", lowerbound=false, df = dFunc, d2f = d2Func, d2f_zeros=nothing, convex=false, plot=true)
             LB = bound(func, lb, ub, npoint; rel_error_tol=rel_error_tol,conc_method="continuous", lowerbound=true, df = dFunc, d2f = d2Func, d2f_zeros=nothing, convex=false, plot=true)
 
-            UBPoints = unique(sort(to_pairs(UB), by = x->x[1]))
-            LBPoints = unique(sort(to_pairs(LB), by = x->x[1]))
+            # UBPoints = unique(sort(to_pairs(UB), by = x->x[1]))
+            # LBPoints = unique(sort(to_pairs(LB), by = x->x[1]))
+
+            UBPoints = sort(to_pairs(UB), by = x->x[1])
+            LBPoints = sort(to_pairs(LB), by = x->x[1])
         end
     else
         #Mixed convexity case 
@@ -769,7 +772,7 @@ function gen_interpol(oA)
 
 end
 
-function interpol(oA1, oA2)
+function interpol(oA1, oA2, digits=5)
     """
     When it is not catching international criminals, this method interpolates two overt approximations to ensure that they are over the same set of points
     """
@@ -778,7 +781,7 @@ function interpol(oA1, oA2)
     #Unsound flag, this is removing symmetric points. Basically, 
     oAComb = sort(vcat(oA1, oA2))
     #NOTE: This is where the precision of the input domain is set. 
-    oAVecs = [round.(collect(tup[1:end-1]), digits=5) for tup in oAComb]
+    oAVecs = [round.(collect(tup[1:end-1]), digits=digits) for tup in oAComb]
     oAMat = copy(reduce(hcat,oAVecs)')
     oAMatR = reverse(oAMat, dims=2)
     oACol = [unique(col[:]) for col in eachcol(oAMat)]

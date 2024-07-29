@@ -5,154 +5,110 @@ include("overt_to_pwa.jl")
 include("problems.jl")
 using LazySets
 using Random
-
+using Plasmo
 
 function encode_dynamics!(query::OvertPQuery)
-    """
-    Method to encode the dynamics as a MIP (using the Gessing et al. method)
-    """
-    i = 0
-    #For each model with an overt approximation, encode the dynamics in a MIP model, and add to the corresponding dictionaryl
+    #create an optigraph to store the model
+    graph = OptiGraph()
+    #create a vector of models for the dynamics 
+    dynNodes = @optinode(graph, nodes[1:length(query.problem.varList)])
+    ind = 0
+    #Iterate through elements of varList and add appropriate variables to the appropriate model 
     for sym in query.problem.varList
-        i += 1
-        LB, UB = query.problem.bounds[i]
+        ind += 1
+        LB, UB = query.problem.bounds[ind]
         Tri = OA2PWA(LB)
-        #These are the vertices of the triangulation
         xS = [(tup[1:end-1]) for tup in LB]
         yUB = [tup[end] for tup in UB]
         yLB = [tup[end] for tup in LB]
-        query.mod_dict[sym] = ccEncoding(xS, yLB, yUB, Tri, query,sym,i)
+
+        ccEncoding!(xS, yLB, yUB, Tri, query, query.problem.varList[ind], ind, dynNodes[ind])
     end
+
+    #Reuse mod dict to store graph, dynNodes, and neural network 
+    query.mod_dict[:graph] = graph
+    query.mod_dict[:f] = dynNodes
 end
-
-function encode_control!(query::OvertPQuery)
-    """
-    Method to encode the controller as a MIP (using the Tjeng et al. method)
-    Modifies the MIP model in place
-
-    TODO: Fix to generalize to multiple control inputs and vector valued dynamics
-    """
-    input_set = query.problem.domain   ###For controller MIP encoding, need model, network address, input set, input variable names, output variable names
+###Create new Encode Control Function###
+function encode_control!(query)
+    input_set = query.problem.control_func(query.problem.domain)
     network_file = query.network_file
-    i=1
-    for sym in query.problem.varList
-        if maximum(query.problem.control_coef[i]) > 0 #Check if any control coefficients are nonzero before trying to encode control
-            mipModel = query.mod_dict[sym]
-            #Get dictionary of MIP variables 
-            input_vars = query.var_dict[sym][1]
-            control_vars = query.var_dict[sym][3][1]
-            output_vars = query.var_dict[sym][2]
-
-            #Get the inputs expected by the controller
-            con_inp_vars, con_inp_set, con_vars = query1.problem.control_func(mipModel, input_vars, control_vars, output_vars, input_set)
-            controller_bound = add_controller_constraints!(mipModel, network_file, con_inp_set, con_inp_vars, con_vars)
-        end
-        i += 1
-    end
+    netModel = @optinode(query.mod_dict[:graph])
+    neurons = add_controller_constraints!(netModel, network_file, input_set, Id())
+    query.mod_dict[:u] = netModel
+    return neurons
 end
 
-function reach_solve(query, t_idx::Union{Nothing,Int64}=nothing)
-    """
-    Solve contrete reachability problem using MIP. Given a MIP encoding a pwl overapproximation of the dynamics, as well as MIP for the controlller, find the overapproximation of the reachable set
-
-    This version of reach_solve generalizes to multiple functions
-    """
-    stateVar = query.problem.varList
-    trueInp = []
-    trueOut = []
-    stateVarTimed = Any[]
-    
-    #Compute true input and output variables 
-    i = 0
-    for sym in stateVar
-        i += 1
-        if !isnothing(t_idx)
-            #Account for symbolic case where dynamics are timed
-            sym_timed = Meta.parse("$(sym)_$t_idx")
-            input_vars = query.var_dict[sym_timed][1]
-            output_vars = query.var_dict[sym_timed][2]
-            push!(stateVarTimed, sym_timed)
-        else   
-            input_vars = query.var_dict[sym][1]
-            output_vars = query.var_dict[sym][2]
-        end
-        #Case 1: Multiple functions
-        #Here, stateVar = varList. States are (x, y, z, etc). Simply loop over var list and find the appropriate symbol to match to the input and output variables
-        #TODO: To this more cleverly
-        if query.case == 1
-            push!(trueInp, input_vars[i])
-            push!(trueOut, output_vars)
-        elseif query.case == 2
-            #Case 2: Mix of single and multiple functions
-            #Here, stateVar != varList. States are (x, dx, y, dy, etc)
-            push!(trueInp, input_vars[i:i+1]...)
-            i += 1 #increment by 1 to account for the fact that we are skipping over the derivative
-            push!(trueOut, output_vars)
-        elseif query.case == 3
-            #Case 3: Mix of single and multiple functions
-            #Here, stateVar != varList. States are (x, dx, ddx, y, dy, ddy etc)
-            push!(trueInp, input_vars[i:i+2]...)
-            i += 2 #increment by 1 to account for the fact that we are skipping over the derivative
-            push!(trueOut, output_vars)
-        end
-    end
-
-    integration_map = query.problem.update_rule(trueInp, trueOut)
-    
-    timestep_nplus1_vars = GenericAffExpr{Float64,VariableRef}[]
+function conc_reach_solve(query)
+    max_query = deepcopy(query)
+    min_query = deepcopy(query)
     lows = Array{Float64}(undef, 0)
     highs = Array{Float64}(undef, 0)
-
-    #Loop over symbols with OVERT approximations to compute reach steps
-    for sym in stateVar
-        #Account for symbolic case with timed dynamics
-        if !isnothing(t_idx)
-            symTimed = Meta.parse("$(sym)_$t_idx")
-            input_vars = query.var_dict[symTimed][1]
-        else
-            input_vars = query.var_dict[sym][1]
-        end
-        mipModel = query.mod_dict[sym]
-        for v in input_vars 
-            if v in trueInp
-                dv = integration_map[v]
-                next_v = v + query.dt*dv
-                push!(timestep_nplus1_vars, next_v)
-                @objective(mipModel, Min, next_v)
-                JuMP.optimize!(mipModel)
-                @assert termination_status(mipModel) == MOI.OPTIMAL
-                objective_bound(mipModel)
-                push!(lows, objective_bound(mipModel))
-                @objective(mipModel, Max, next_v)
-                JuMP.optimize!(mipModel)
-                @assert termination_status(mipModel) == MOI.OPTIMAL
-                objective_bound(mipModel)
-                push!(highs, objective_bound(mipModel))
-            end
-        end
+    min_dynModel = min_query.mod_dict[:f]
+    minGraph = min_query.mod_dict[:graph]
+    i = 0
+    #Compute lower bounds
+    for sym in min_query.problem.varList 
+        i += 1
+        model = min_dynModel[i]
+        v = min_query.var_dict[sym][end][1]
+        dv = min_query.var_dict[sym][2][1]
+        @variable(model, next_v)
+        @constraint(model, next_v == v + query.dt*dv)
+        @objective(model, Min, next_v)
     end
-    #NOTE: Hyperrectangle can plot in higher dimensions as well
-    reacheable_set = Hyperrectangle(low=lows, high=highs)
-    return reacheable_set
+
+    set_optimizer(minGraph, Gurobi.Optimizer)
+    optimize!(minGraph)
+    @assert termination_status(minGraph) == MOI.OPTIMAL
+    i = 0
+    for _ in query.problem.varList
+        i += 1
+        push!(lows, value(min_dynModel[i][:next_v]))
+    end
+
+    #Compute upper bounds
+    max_dynModel = max_query.mod_dict[:f]
+    maxGraph = max_query.mod_dict[:graph]
+    i = 0
+    for sym in query.problem.varList 
+        i += 1
+        model = max_dynModel[i]
+        v = max_query.var_dict[sym][end][1]
+        dv = max_query.var_dict[sym][2][1]
+        @variable(model, next_v)
+        @constraint(model, next_v == v + max_query.dt*dv)
+        @objective(model, Max, next_v)
+    end
+
+    set_optimizer(maxGraph, Gurobi.Optimizer)
+    optimize!(maxGraph)
+    i = 0
+    for _ in query.problem.varList
+        i += 1
+        push!(highs, value(max_dynModel[i][:next_v]))
+    end
+    reach_set = Hyperrectangle(low=lows, high=highs)
+    return reach_set 
 end
 
 function concreach!(query::OvertPQuery)
-    """
-    Method to solve the concrete reachability problem using MIP.
-    Modifies the query object in place (specifically the bounds generated by OVERT)
-    """
     query.problem.bounds = query.problem.bound_func(query.problem)
     query.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
-    query.mod_dict = Dict{Symbol,JuMP.Model}()
+    query.mod_dict = Dict{Symbol,Any}()
+
     encode_dynamics!(query)
 
-    #Encode the controller if it exists
+    #Encode the network and link the control to the dynamics
     if !isnothing(query.network_file)
-        encode_control!(query)
+        neurons = encode_control!(query)
     end
 
-    reachSet =  reach_solve(query)
-    return reachSet, query.problem.bounds
+    dyn_con_link! = query.problem.link_func
+    dyn_con_link!(query, neurons)
+
+    reach_set = conc_reach_solve(query)
+    return reach_set, query.problem.bounds
 end
 
 function multi_step_concreach(query::OvertPQuery)
@@ -163,15 +119,15 @@ function multi_step_concreach(query::OvertPQuery)
     reachSets = [input_set]
     boundSets = []
     
-    t1 = Dates.now()
+    #t1 = Dates.now()
     for i = 1:query.ntime
         reachSet, boundSet = concreach!(query)
         push!(reachSets, reachSet)
         push!(boundSets, boundSet)
         query.problem.domain = reachSet
     end
-    t2 = Dates.now()
-    println("Time for concrete reachability is ", t2-t1)
+    # t2 = Dates.now()
+    # println("Time for concrete reachability is ", t2-t1)
     return reachSets, boundSets
 end
 
@@ -584,7 +540,8 @@ function multi_shot_reach(query)
     return reachSets
 end
 
-
+ f(x1, x2) = 2x1 + 1x2
+ f(x1, x2, x3) = 2x1 + 1x2 + 0x3
 ###############Implementing Backwards Reachability####################
 function breach_solve(bquery, t_idx::Union{Nothing,Int64}=nothing)
     """

@@ -953,3 +953,157 @@ function addDim(vec, dim, zeroVal = 1e-12)
     end
     return newVec
 end
+
+function acc_control(model, input_vars, control_vars, output_vars, input_set, ϵ=1e-12)
+    """
+    Control function for the ACC benchmark.
+    
+    Inputs:
+        model: MIP model, either concrete or symbolic
+        input_vars: Input variables to the nonlinear dynamics (and hence input variables to the MIP model). Note that this could be different from the input variables needed by the network 
+        control_vars: Control variables provided in variable order.  
+        output_vars: Output variables of the network
+        input_set: Input set for the states at the current time step
+
+    Outputs:
+        con_inp_vars: Input variables to the network in the order expected by the network
+        con_inp_set: Input set for the network
+        net_con_vars: Control variables expected by the network
+    Takes as input the MIP model, input variables to the nonlinear dynamics (and hence input variables to the MIP model), and the control variables in 
+    """
+
+    #First define the control inputs expected by the network 
+    vSet = @variable(model, [1:1], base_name = "v_set")
+    tGap = @variable(model, [1:1], base_name = "tGap")
+    dRel = @variable(model, [1:1], base_name = "dRel")
+    vRel = @variable(model, [1:1], base_name = "vRel")
+
+    #Constraint these to be constants/params. Should these be set as constants? 
+    #TODO: Review if these are best posed as constants 
+    @constraint(model, vSet .== 30.0)
+    @constraint(model, tGap .== 1.40)
+    @constraint(model, dRel .== input_vars[1] - input_vars[4])
+    @constraint(model, vRel .== input_vars[2] - input_vars[5])
+
+    con_inp_vars = [vSet[1], tGap[1], input_vars[5], dRel[1], vRel[1]]
+    
+    #Next, provide network order control variables to the network
+    con_net_vars = [control_vars]
+
+    #Finally, provide input range for the network
+    #TODO: Review if this difference should be interval subtraction or set difference. Big difference here 
+    LBs, UBs = extrema(input_set)
+    
+    dRel_LB = LBs[1] - UBs[4]
+    dRel_UB = UBs[1] - LBs[4]
+
+    vRel_LB = LBs[2] - UBs[5]
+    vRel_UB = UBs[2] - LBs[5]
+
+    con_inp_set = Hyperrectangle(low=[30.0-ϵ, 1.40-ϵ, LBs[5], dRel_LB, vRel_LB], high=[30.0+ϵ, 1.40+ϵ, UBs[5], dRel_UB, vRel_UB])
+    return con_inp_vars, con_inp_set, con_net_vars
+end
+
+function reach_solve(query, t_idx::Union{Nothing,Int64}=nothing)
+    """
+    Solve contrete reachability problem using MIP. Given a MIP encoding a pwl overapproximation of the dynamics, as well as MIP for the controlller, find the overapproximation of the reachable set
+
+    This version of reach_solve generalizes to multiple functions
+    """
+    stateVar = query.problem.varList
+    trueInp = []
+    trueOut = []
+    stateVarTimed = Any[]
+    
+    #Compute true input and output variables 
+    i = 0
+    for sym in stateVar
+        i += 1
+        if !isnothing(t_idx)
+            #Account for symbolic case where dynamics are timed
+            sym_timed = Meta.parse("$(sym)_$t_idx")
+            input_vars = query.var_dict[sym_timed][1]
+            output_vars = query.var_dict[sym_timed][2]
+            push!(stateVarTimed, sym_timed)
+        else   
+            input_vars = query.var_dict[sym][1]
+            output_vars = query.var_dict[sym][2]
+        end
+        #Case 1: Multiple functions
+        #Here, stateVar = varList. States are (x, y, z, etc). Simply loop over var list and find the appropriate symbol to match to the input and output variables
+        #TODO: To this more cleverly
+        if query.case == 1
+            push!(trueInp, input_vars[i])
+            push!(trueOut, output_vars)
+        elseif query.case == 2
+            #Case 2: Mix of single and multiple functions
+            #Here, stateVar != varList. States are (x, dx, y, dy, etc)
+            push!(trueInp, input_vars[i:i+1]...)
+            i += 1 #increment by 1 to account for the fact that we are skipping over the derivative
+            push!(trueOut, output_vars)
+        elseif query.case == 3
+            #Case 3: Mix of single and multiple functions
+            #Here, stateVar != varList. States are (x, dx, ddx, y, dy, ddy etc)
+            push!(trueInp, input_vars[i:i+2]...)
+            i += 2 #increment by 1 to account for the fact that we are skipping over the derivative
+            push!(trueOut, output_vars)
+        end
+    end
+
+    integration_map = query.problem.update_rule(trueInp, trueOut)
+    
+    timestep_nplus1_vars = GenericAffExpr{Float64,VariableRef}[]
+    lows = Array{Float64}(undef, 0)
+    highs = Array{Float64}(undef, 0)
+
+    #Loop over symbols with OVERT approximations to compute reach steps
+    for sym in stateVar
+        #Account for symbolic case with timed dynamics
+        if !isnothing(t_idx)
+            symTimed = Meta.parse("$(sym)_$t_idx")
+            input_vars = query.var_dict[symTimed][1]
+        else
+            input_vars = query.var_dict[sym][1]
+        end
+        mipModel = query.mod_dict[sym]
+        for v in input_vars 
+            if v in trueInp
+                dv = integration_map[v]
+                next_v = v + query.dt*dv
+                push!(timestep_nplus1_vars, next_v)
+                @objective(mipModel, Min, next_v)
+                JuMP.optimize!(mipModel)
+                @assert termination_status(mipModel) == MOI.OPTIMAL
+                objective_bound(mipModel)
+                push!(lows, objective_bound(mipModel))
+                @objective(mipModel, Max, next_v)
+                JuMP.optimize!(mipModel)
+                @assert termination_status(mipModel) == MOI.OPTIMAL
+                objective_bound(mipModel)
+                push!(highs, objective_bound(mipModel))
+            end
+        end
+    end
+    #NOTE: Hyperrectangle can plot in higher dimensions as well
+    reacheable_set = Hyperrectangle(low=lows, high=highs)
+    return reacheable_set
+end
+
+function concreach!(query::OvertPQuery)
+    """
+    Method to solve the concrete reachability problem using MIP.
+    Modifies the query object in place (specifically the bounds generated by OVERT)
+    """
+    query.problem.bounds = query.problem.bound_func(query.problem)
+    query.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
+    query.mod_dict = Dict{Symbol,JuMP.Model}()
+    encode_dynamics!(query)
+
+    #Encode the controller if it exists
+    if !isnothing(query.network_file)
+        encode_control!(query)
+    end
+
+    reachSet =  reach_solve(query)
+    return reachSet, query.problem.bounds
+end

@@ -9,14 +9,13 @@ mutable struct OvertPProblem
 	expr
 	dec_expr
 	control_coef
-	control_dim
     domain::Hyperrectangle
 	varList #List of variables that have OVERT bounds
     bounds #List of bounds in the same order as varList
-    update_rule
 	dynamics::Function 
 	bound_func::Function
 	control_func::Function
+	link_func::Function
 end
 
 ##Can include input vars and control vars 
@@ -33,6 +32,6 @@ mutable struct OvertPQuery
 	dt::Float64
 	N_overt::Int64
 	var_dict::Union{Nothing,Dict{Symbol,Vector{AbstractVector{VariableRef}}}} #holds [x, y, u]
-	mod_dict::Union{Nothing,Dict{Symbol,JuMP.Model}}
+	mod_dict::Union{Nothing,Dict{Symbol,Any}}
 	case #Determines if variables are case 1(x, y, z etc) or case 2 (x, dx, y, dy, etc)
 end

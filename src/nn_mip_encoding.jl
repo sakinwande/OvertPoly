@@ -7,10 +7,12 @@ include("nv/network.jl")
 include("nv/constraints.jl")
 include("nv/util.jl")
 
-function add_controller_constraints!(model, network_nnet_address, input_set, input_vars, output_vars; last_layer_activation=Id())
+function add_controller_constraints!(netModel, network_nnet_address, input_set,last_layer_activation=Id())
     """
     Encode controller as MIP. Directly taken from OVERTVerify
     """
+    #Isolate MIP model
+    model = netModel.model
     #Read network file 
     network = read_nnet(network_nnet_address, last_layer_activation=last_layer_activation)
     #Initialize neurons (adds variables)
@@ -22,10 +24,7 @@ function add_controller_constraints!(model, network_nnet_address, input_set, inp
     #Add NN MIP model to the given model
     #This is defined in the constraints.jl file. Appears to be the Tjeng paper encoding
     encode_network!(model, network, neurons, deltas, bounds, BoundedMixedIntegerLP())
-    #Relate the NN variables to the dynamics variables
-    @constraint(model, input_vars .== neurons[1])  # set inputvars
-    @constraint(model, output_vars .== neurons[end])  # set outputvars
-    return bounds[end]
+    return neurons
 end
 
 
