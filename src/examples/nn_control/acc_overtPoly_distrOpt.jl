@@ -3,7 +3,7 @@ include("../../nn_mip_encoding.jl")
 include("../../overtPoly_to_mip.jl")
 include("../../overt_to_pwa.jl")
 include("../../problems.jl")
-include("../../reachability.jl")
+include("../../distr_reachability.jl")
 using LazySets
 using Dates
 using Plasmo
@@ -95,7 +95,7 @@ end
 #Some issues with starting at zero, start with eps
 ϵ = 1e-8
 domain = Hyperrectangle(low=[90,32,-ϵ,10,30,-ϵ], high=[110,32.2,ϵ,11,30.2,ϵ])
-numSteps = 55
+numSteps = 50
 dt = 0.1
 ########Define Bound ACC Dynamics#######
 function bound_acc(ACC; plotFlag = false)
@@ -312,6 +312,8 @@ query = OvertPQuery(
 #########################
 
 @time reachsets, boundsets = multi_step_concreach(query);
+
+reachsets[2]
 
 dRel = Any[]
 for reachset in reachsets
