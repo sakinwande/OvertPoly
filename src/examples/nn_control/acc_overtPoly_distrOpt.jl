@@ -232,12 +232,8 @@ end
 
 #####Problem Specific Function#######
 ###Function to link control and relevant dynamics
-function acc_dyn_con_link!(query, neurons)
-    graph = query.mod_dict[:graph]
-    dynModel = query.mod_dict[:f]
-    netModel = query.mod_dict[:u]
+function acc_dyn_con_link!(query, neurons, graph, dynModel, netModel)
 
-    input_set = query.problem.domain
     #Defining ACC network required inputs. First two inputs are constants 
     @constraint(netModel, neurons[1][1] == vSet)
     @constraint(netModel, neurons[1][2] == tGap) 

@@ -350,10 +350,10 @@ function plotSurf(baseFunc, lbVec, ubVec, surfDim, xS, yS, saveFlag=false)
     xC = collect(range(minimum(xS), maximum(xS), length=100))
     yC = collect(range(minimum(yS), maximum(yS), length=100))
 
-    lbMat = reshape([p[3] for p in lbVec], surfDim)
-    ubMat = reshape([p[3] for p in ubVec], surfDim)
+    lbMat = reshape([p[3] for p in sort(lbVec)], surfDim)
+    ubMat = reshape([p[3] for p in sort(ubVec)], surfDim)
 
-    sPlot = plot(xC, yC, fun1, st=:surface, camera=(-30,30), color="black", label="function", opacity = 1.0)
+    sPlot = plot(xC, yC, fun1, st=:surface, camera=(-30,30), color="black", label="function", showscale = false, opacity = 1.0)
     plot!(sPlot, [p[1] for p in xS], [p[1] for p in yS], lbMat, st=:surface, color="orange", label="lower bound", showscale=false, opacity=1.0)
     plot!(sPlot, [p[1] for p in xS], [p[1] for p in yS], ubMat, st=:surface, color="blue", label="upper bound", showscale=false,opacity=1.0)
 
@@ -548,43 +548,43 @@ function boundMV1(expr, lb, ub)
 end 
 
 function boundMV2(expr, lb, ub)
-    #Reduce to addition chunks
-    baseParsed = parse_and_reduce(expr)
+    # #Reduce to addition chunks
+    # baseParsed = parse_and_reduce(expr)
 
-    #Divvy up into chunks. Technically, if it's multiplication or division, we can just distribute and not worry about chunks
-    baseFunc1 = baseParsed[2]
-    baseFunc2 = baseParsed[3]
+    # #Divvy up into chunks. Technically, if it's multiplication or division, we can just distribute and not worry about chunks
+    # baseFunc1 = baseParsed[2]
+    # baseFunc2 = baseParsed[3]
 
     #Collect like terms/reduce to univariate chunks 
-    parsed1 = parse_and_reduce(baseFunc1)
+    # parsed1 = parse_and_reduce(baseFunc1)
 
-    v2Func = parsed1[2]
+    v2Func = :(cos(x)*x)
     #Make expression into Julia function 
     v2f = Symbolics.build_function(v2Func, find_variables(v2Func)..., expression=Val{false})
     #Get approximation tuples over the interval
-    v2UB, v2LB = bound_univariate(v2Func, lb, ub, plotflag = true) 
+    v2UB, v2LB = interpol(bound_univariate(v2Func, lb, ub, ϵ=1e-3, npoint = 1, plotflag = true)...) 
 
     #Repeat for second chunk 
-    v3Func = parsed1[3]
+    v3Func = :(cos(y)*y^2)
     v3f = Symbolics.build_function(v3Func, find_variables(v3Func)..., expression=Val{false})
-    v3UB, v3LB = bound_univariate(v3Func, lb, ub, plotflag = true)
+    v3UB, v3LB = interpol(bound_univariate(v3Func, lb, ub, ϵ=1e-3, npoint=1, plotflag = true)...)
 
-    #Check bounds
-    sum([v2f(tup[1]) < tup[2] for tup in v2LB])
-    sum([v2f(tup[1]) > tup[2] for tup in v2UB])
+    # #Check bounds
+    # sum([v2f(tup[1]) < tup[2] for tup in v2LB])
+    # sum([v2f(tup[1]) > tup[2] for tup in v2UB])
 
-    sum([v3f(tup[1]) < tup[2] for tup in v3LB])
-    sum([v3f(tup[1]) > tup[2] for tup in v3UB])
+    # sum([v3f(tup[1]) < tup[2] for tup in v3LB])
+    # sum([v3f(tup[1]) > tup[2] for tup in v3UB])
 
-    #For future use, interpolate to ensure UB and LB for each is over the same set of points 
-    nv2LB, nv2UB = v2LB, v2UB
-    nv3LB, nv3UB = v3LB, v3UB
+    # #For future use, interpolate to ensure UB and LB for each is over the same set of points 
+    # nv2LB, nv2UB = v2LB, v2UB
+    # nv3LB, nv3UB = v3LB, v3UB
 
-    #Check bounds. As expected, interpolation does not break anything new 
-    sum([v2f(tup[1]) < tup[2] for tup in nv2LB])
-    sum([v2f(tup[1]) > tup[2] for tup in nv2UB])
-    sum([v3f(tup[1]) < tup[2] for tup in nv3LB])
-    sum([v3f(tup[1]) > tup[2] for tup in nv3UB])
+    # #Check bounds. As expected, interpolation does not break anything new 
+    # sum([v2f(tup[1]) < tup[2] for tup in nv2LB])
+    # sum([v2f(tup[1]) > tup[2] for tup in nv2UB])
+    # sum([v3f(tup[1]) < tup[2] for tup in nv3LB])
+    # sum([v3f(tup[1]) > tup[2] for tup in nv3UB])
 
 
     #Find lower bounds to shift each chunk 
@@ -644,7 +644,7 @@ function boundMV2(expr, lb, ub)
     #Check upper bound 
     sum([combF(tup[1], tup[2]) > tup[3] for tup in lv4UB])
 
-    plotSurf(combFun, lb, ub, lv4LB, lv4UB, surfDim, lbXs, lbYs, ubXs, ubYs, true)
+    # plotSurf(combFun, lb, ub, lv4LB, lv4UB, surfDim, lbXs, lbYs, ubXs, ubYs, true)
 
 
 
@@ -665,7 +665,7 @@ function boundMV2(expr, lb, ub)
     sum([combF2(tup[1], tup[2]) > tup[3] for tup in v4UB])
 
     #Exp maintains overapproximation
-    plotSurf(combFun2, lb, ub, v4LB, v4UB, surfDim, lbXs, lbYs, ubXs, ubYs, true)
+    # plotSurf(combFun2, lb, ub, v4LB, v4UB, surfDim, lbXs, lbYs, ubXs, ubYs, true)
 
     #Shift to account for overapprox
     v5LB = Any[(tup[1:end-1]..., tup[end] -2*abs(v3l)*v2f(tup[1]) -2*abs(v2l)*v3f(tup[2])- 4*abs(v2l)*abs(v3l)) for tup in v4LB]
@@ -673,7 +673,7 @@ function boundMV2(expr, lb, ub)
 
 
     #Check bounds
-    combFun3 = :(cos(x)cos(y)x*y^2)
+    combFun3 = :(cos(x)*x*cos(y)*y^2)
     combF3 = Symbolics.build_function(combFun3, find_variables(combFun3)..., expression=Val{false})
 
     #Check lower bound
@@ -686,7 +686,7 @@ function boundMV2(expr, lb, ub)
 
     println(maximum([combF3(tup[1], tup[2]) - tup[3] for tup in v5UB]))
     #Plot the overapproximation
-    plotSurf(baseFunc1, lb, ub, v5LB, v5UB, surfDim, lbXs, lbYs, ubXs, ubYs,true)
+    plotSurf(combFun3, v5LB, v5UB, surfDim, lbXs, lbYs,true)
 
     return v5LB, v5UB
 
@@ -919,7 +919,7 @@ function lift_OA(emptyList, currList, boundLB, boundUB, lbs, ubs)
     currList: List of used variables. Modified in place
     boundLB: Lower bounds for the overapproximation
     boundUB: Upper bounds for the overapproximation
-    query: OvertPQuery object
+    lbs, ubs: Lower and upper bounds for the domain of the specific function 
 
     returns: lifted bounds
     """

@@ -12,7 +12,7 @@ using Plasmo
 #NOTE: Now we know, it's the large network :|
 #NOTE: Focus on spec. 1 since it seems to be the one relevant to ReLU net
 control_coef = [[0],[0],[0],[1]]
-controller = "Networks/ARCH-COMP-2023/nnet/tora_big_controller.nnet"
+controller = "Networks/ARCH-COMP-2023/nnet/controllerTORA.nnet"
 exprList = [:(1*x2), :(-x1 + 0.1*sin(x3)), :(1*x4), :(1*u)]
 
 ##Define TORA Dynamics#####
@@ -37,8 +37,8 @@ function tora_control(input_set)
 end
 domain = Hyperrectangle(low=[0.6, -0.7, -0.4, 0.5], high = [0.7, -0.6, -0.3, 0.6])
 #TODO: Decide on step size needed to make discrete time reachability reasonable
-numSteps = 20
-dt = 0.05
+numSteps = 100
+dt = 0.01
 
 
 ####Define Bound TORA########
@@ -105,13 +105,7 @@ function bound_tora(TORA; plotFlag=false)
 end
 
 ####Next Define function to link control and relevant dynamics###
-function tora_dyn_con_link!(query, neurons)
-    graph = query.mod_dict[:graph]
-    dynModel = query.mod_dict[:f]
-    netModel = query.mod_dict[:u]
-
-    input_set = query.problem.domain
-
+function tora_dyn_con_link!(query, neurons, graph, dynModel, netModel)
     #Define variables that are inputs to the network model 
     @variable(netModel, x1)
     @variable(netModel, x2)
@@ -133,6 +127,7 @@ function tora_dyn_con_link!(query, neurons)
     #Link network output to x4
     @variable(netModel, u)
     #Normalizing output of the network as well
+    #NOTE: This was the source of our error. Chelsea already normalized the output in the NNET file.
     @constraint(netModel, u == neurons[end][1] - 10)
     @linkconstraint(graph, netModel[:u] == dynModel[4][:u])
 
@@ -182,7 +177,7 @@ query = OvertPQuery(
 #Test multi-step concrete reachability
 @time reachsets, boundsets = multi_step_concreach(query);
 
-reachsets[20]
+reachsets[end]
 
 ##################Debugging concreach for tora########################
     query.problem.bounds = query.problem.bound_func(query.problem)
