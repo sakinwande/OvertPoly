@@ -15,7 +15,7 @@ expr = [:($(grav_const/pend_len) * sin(x1) + $(1/(pend_mass*pend_len^2)) * u1 - 
 control_coef = [[0], [1/(pend_mass*pend_len^2)]]
 
 
-numSteps = 5
+numSteps = 20
 domain = Hyperrectangle(low=[1., 0.], high=[1.2, 0.2])
 # domain = Hyperrectangle(low=[0., -0.1], high=[1, 0.1])
 dt = 0.05
@@ -33,7 +33,7 @@ function single_pend_dynamics(x, u, dt)
 end
 
 #NOTE Debugging the bounds for the single pendulum
-function bound_pend(SinglePendulum; plotFlag=true)
+function bound_pend(SinglePendulum; plotFlag=false)
     #Define the true dynamics
     # single_pend_θ_doubledot = :($(grav_const/pend_len) * sin(x1) + $(1/(pend_mass*pend_len^2)) * u1 - $(friction/(pend_mass*pend_len^2)) * x2)
 
@@ -49,7 +49,7 @@ function bound_pend(SinglePendulum; plotFlag=true)
     #Bound f(x2)
     lb2 = lbs[2]
     ub2 = ubs[2]
-    bF1sub2 = :($((friction)/((pend_mass)*(pend_len)^2)) * x2)
+    bF1sub2 = :($((friction)/((pend_mass)*(pend_len)^2)) *-x2)
     bF1s2LB, bF1s2UB = interpol(bound_univariate(bF1sub2, lb2, ub2, plotflag = plotFlag)...)
 
     #Add a dimension to prepare for Minkowski sum
@@ -127,7 +127,7 @@ function single_pend_dyn_con_link!(query, neurons, graph, dynModel, netModel,t_i
     end 
 end
 
-SinglePendulum = OvertPProblem(
+SinglePendulum = DistrOvertProblem(
     expr, # dynamics
     nothing, #decomposed form of the dynamics. Done manually
     control_coef, # control coefficient
@@ -140,7 +140,7 @@ SinglePendulum = OvertPProblem(
     single_pend_dyn_con_link!
 )
 
-query = OvertPQuery(
+query = DistrOvertQuery(
 	SinglePendulum,    # problem
 	controller,        # network file
 	Id(),              # last layer activation layer Id()=linear, or ReLU()=relu
@@ -153,9 +153,24 @@ query = OvertPQuery(
     2                # case
 )
 
-symQuery = deepcopy(query)
-@time reachsets, boundsets = multi_step_concreach(query);
 
+#Use concrete reachability to trace out the trajectory
+query1 = deepcopy(query)
+query1.ntime = 1
+#@time reachSets, boundSets = multi_step_concreach(query1);
+
+extrema(reachSets[2])
+
+
+
+
+#########TEST: Debugging Distributed Reachability######
+#########TEST: Preamble ###########
+
+
+
+#################################################
+symQuery = deepcopy(query)
 symQuery.problem.bounds = boundsets
 reachSets = reachsets
 

@@ -27,6 +27,28 @@ function add_controller_constraints!(netModel, network_nnet_address, input_set,l
     return neurons
 end
 
+function add_controller_constraints!(model, network_nnet_address, input_set, input_vars, output_vars; last_layer_activation=Id())
+    """
+    Encode controller as MIP. Directly taken from OVERTVerify
+    """
+    #Read network file 
+    network = read_nnet(network_nnet_address, last_layer_activation=last_layer_activation)
+    #Initialize neurons (adds variables)
+    neurons = init_neurons(model, network)
+    #Initialize deltas (adds binary variables)
+    deltas = init_deltas(model, network)
+    #Use Taylor Johnson paper (https://arxiv.org/abs/1708.03322) to get bounds  
+    bounds = get_bounds(network, input_set)
+    #Add NN MIP model to the given model
+    #This is defined in the constraints.jl file. Appears to be the Tjeng paper encoding
+    encode_network!(model, network, neurons, deltas, bounds, BoundedMixedIntegerLP())
+    #Relate the NN variables to the dynamics variables
+    @constraint(model, input_vars .== neurons[1])  # set inputvars
+    @constraint(model, output_vars .== neurons[end])  # set outputvars
+    return bounds[end]
+end
+
+
 
 function init_variables(model::Model, layers::Vector{Layer}; binary = false, include_input = false)
     # TODO: only neurons get offset array

@@ -47,7 +47,7 @@ function bound_pend(SinglePendulum; plotFlag=false)
     #Bound f(x2)
     lb2 = lbs[2]
     ub2 = ubs[2]
-    bF1sub2 = :($((friction)/((pend_mass)*(pend_len)^2)) * x2)
+    bF1sub2 = :($((friction)/((pend_mass)*(pend_len)^2)) * -x2)
     bF1s2LB, bF1s2UB = bound_univariate(bF1sub2, lb2, ub2, plotflag = false)
 
     #For future use, interpolate to ensure UB and LB for each is over the same set of points 
@@ -85,19 +85,34 @@ function bound_pend(SinglePendulum; plotFlag=false)
     return bounds
 end
 
-SinglePendulum = OvertPProblem(
+function single_pend_control(model, input_vars, control_vars, output_vars, input_set)
+    con_inp_set = input_set
+    con_net_vars = [control_vars]
+    con_inp_vars = input_vars
+    return con_inp_vars, con_inp_set, con_net_vars
+end
+
+function single_pend_update_rule(input_vars, overt_output_vars)
+    ddth = overt_output_vars[1][1]
+    integration_map = Dict(input_vars[1] => input_vars[2], input_vars[2] => ddth)
+    return integration_map
+end
+
+SinglePendulum = RegOvertProblem(
     expr, # dynamics
     nothing, #decomposed form of the dynamics. Done manually
     control_coef, # control coefficient
+    1, # control dimension
     domain, # domain
     [:dθ], #List of variables that have OVERT bounds
 	nothing, #undefined bounds to start
 	single_pend_update_rule,
     single_pend_dynamics,
-    bound_pend
+    bound_pend,
+    single_pend_control
 )
 
-query = OvertPQuery(
+query = RegOvertQuery(
 	SinglePendulum,    # problem
 	controller,        # network file
 	Id(),              # last layer activation layer Id()=linear, or ReLU()=relu
@@ -115,7 +130,9 @@ query1 = deepcopy(query)
 query1.ntime = 10
 @time reachSets, boundSets = multi_step_concreach(query1);
 
-plot(reachSets, title="Single Pendulum Concrete Reachability")
+#plot(reachSets, title="Single Pendulum Concrete Reachability")
+
+extrema(reachSets[2])
 
 #Use concrete sets to compute symbolic reach set at time step 10
 symQuery1 = deepcopy(query)

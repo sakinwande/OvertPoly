@@ -3,7 +3,7 @@ include("../../nn_mip_encoding.jl")
 include("../../overtPoly_to_mip.jl")
 include("../../overt_to_pwa.jl")
 include("../../problems.jl")
-include("../../reachability.jl")
+include("../../distr_reachability.jl")
 using LazySets
 using Dates
 using Plasmo
@@ -232,12 +232,12 @@ end
 
 #####Problem Specific Function#######
 ###Function to link control and relevant dynamics
-function acc_dyn_con_link!(query, neurons)
-    graph = query.mod_dict[:graph]
-    dynModel = query.mod_dict[:f]
-    netModel = query.mod_dict[:u]
+function acc_dyn_con_link!(query, neurons, graph, dynModel, netModel, t_ind=nothing)
+    # graph = query.mod_dict[:graph]
+    # dynModel = query.mod_dict[:f]
+    # netModel = query.mod_dict[:u]
 
-    input_set = query.problem.domain
+    # input_set = query.problem.domain
     #Defining ACC network required inputs. First two inputs are constants 
     @constraint(netModel, neurons[1][1] == vSet)
     @constraint(netModel, neurons[1][2] == tGap) 
@@ -270,6 +270,11 @@ function acc_dyn_con_link!(query, neurons)
     #Iterate through dynModel and identify pertinent input variable for each
     i = 0 
     for sym in query.problem.varList
+        if !isnothing(t_ind)
+            sym_t = Meta.parse("$(sym)_$(t_ind)")
+        else
+            sym_t = sym
+        end
         i += 1
         #For acceleration, the pertinent variable is the last element of the state vector (which is acceleration). For others it's the first
         if sym == :x3 || sym == :x6
@@ -278,7 +283,7 @@ function acc_dyn_con_link!(query, neurons)
             pertVar = dynModel[i][:x][1]
         end
         #Add pertinent variable to var dict 
-        push!(query.var_dict[sym], [pertVar])
+        push!(query.var_dict[sym_t], [pertVar])
     end
 
 end

@@ -7,7 +7,7 @@ using LazySets
 using Random
 using Plasmo
 
-function encode_dynamics!(query::OvertPQuery)
+function encode_dynamics!(query::DistrOvertQuery)
     #create an optigraph to store the model
     graph = OptiGraph()
     #create a vector of models for the dynamics 
@@ -30,7 +30,7 @@ function encode_dynamics!(query::OvertPQuery)
     query.mod_dict[:f] = dynNodes
 end
 ###Create new Encode Control Function###
-function encode_control!(query)
+function encode_control!(query::DistrOvertQuery)
     input_set = query.problem.control_func(query.problem.domain)
     network_file = query.network_file
     netModel = @optinode(query.mod_dict[:graph])
@@ -44,6 +44,8 @@ function conc_reach_solve(query)
     min_query = deepcopy(query)
     lows = Array{Float64}(undef, 0)
     highs = Array{Float64}(undef, 0)
+
+    ###Minimization Step########
     min_dynModel = min_query.mod_dict[:f]
     minGraph = min_query.mod_dict[:graph]
     i = 0
@@ -92,7 +94,7 @@ function conc_reach_solve(query)
     return reach_set 
 end
 
-function concreach!(query::OvertPQuery)
+function concreach!(query::DistrOvertQuery)
     query.problem.bounds = query.problem.bound_func(query.problem)
     query.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
     query.mod_dict = Dict{Symbol,Any}()
@@ -114,7 +116,7 @@ function concreach!(query::OvertPQuery)
     return reach_set, query.problem.bounds
 end
 
-function multi_step_concreach(query::OvertPQuery)
+function multi_step_concreach(query::DistrOvertQuery)
     """
     Method to solve the concrete reachability problem using MIP for multiple time steps.
     """
