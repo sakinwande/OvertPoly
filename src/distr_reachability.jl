@@ -22,7 +22,7 @@ function encode_dynamics!(query::DistrOvertQuery)
         yUB = [tup[end] for tup in UB]
         yLB = [tup[end] for tup in LB]
 
-        ccEncoding!(xS, yLB, yUB, Tri, query, query.problem.varList[ind], ind, dynNodes[ind])
+        dynNodes[ind] = ccEncoding!(xS, yLB, yUB, Tri, query, query.problem.varList[ind], ind, dynNodes[ind])
     end
 
     #Reuse mod dict to store graph, dynNodes, and neural network 
@@ -33,9 +33,10 @@ end
 function encode_control!(query::DistrOvertQuery)
     input_set = query.problem.control_func(query.problem.domain)
     network_file = query.network_file
-    netModel = @optinode(query.mod_dict[:graph])
-    neurons = add_controller_constraints!(netModel, network_file, input_set, Id())
-    query.mod_dict[:u] = netModel
+    #NOTE: Changed NetModel to be an graph instead of a node
+    netNode = @optinode(query.mod_dict[:graph])
+    neurons = add_controller_constraints!(netNode, network_file, input_set, Id())
+    query.mod_dict[:u] = netNode
     return neurons
 end
 

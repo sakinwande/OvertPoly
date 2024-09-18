@@ -11,8 +11,8 @@ using Dates
 pend_mass, pend_len, grav_const, friction = 0.5, 0.5, 1., 0.0
 controller = "Networks/ARCH-COMP-2023/nnet/controllerSinglePendulum.nnet"
 expr = [:($(grav_const/pend_len) * sin(x1) + $(1/(pend_mass*pend_len^2)) * u1 - $(friction/(pend_mass*pend_len^2)) * x2)]
-control_coef = 1/(pend_mass*pend_len^2)
-
+control_coef = [1/(pend_mass*pend_len^2)]
+# control_coef = 0.0
 
 domain = Hyperrectangle(low=[1., 0.], high=[1.2, 0.2])
 # domain = Hyperrectangle(low=[0., -0.1], high=[1, 0.1])
@@ -127,7 +127,7 @@ query = RegOvertQuery(
 
 #Use concrete reachability to trace out the trajectory
 query1 = deepcopy(query)
-query1.ntime = 10
+query1.ntime = 1
 @time reachSets, boundSets = multi_step_concreach(query1);
 
 #plot(reachSets, title="Single Pendulum Concrete Reachability")

@@ -35,6 +35,7 @@ function encode_control!(query::RegOvertQuery)
     input_set = query.problem.domain   ###For controller MIP encoding, need model, network address, input set, input variable names, output variable names
     network_file = query.network_file
     i=1
+    controller_bound = []
     for sym in query.problem.varList
         if maximum(query.problem.control_coef[i]) > 0 #Check if any control coefficients are nonzero before trying to encode control
             mipModel = query.mod_dict[sym]
@@ -44,11 +45,14 @@ function encode_control!(query::RegOvertQuery)
             output_vars = query.var_dict[sym][2]
 
             #Get the inputs expected by the controller
-            con_inp_vars, con_inp_set, con_vars = query1.problem.control_func(mipModel, input_vars, control_vars, output_vars, input_set)
-            controller_bound = add_controller_constraints!(mipModel, network_file, con_inp_set, con_inp_vars, con_vars)
+            con_inp_vars, con_inp_set, con_vars = query.problem.control_func(mipModel, input_vars, control_vars, output_vars, input_set)
+            cb = add_controller_constraints!(mipModel, network_file, con_inp_set, con_inp_vars, con_vars)
+            # print("We in here")
+            # push!(controller_bound, cb)
         end
         i += 1
     end
+    # return controller_bound
 end
 
 function reach_solve(query, t_idx::Union{Nothing,Int64}=nothing)
@@ -122,12 +126,12 @@ function reach_solve(query, t_idx::Union{Nothing,Int64}=nothing)
                 JuMP.optimize!(mipModel)
                 @assert termination_status(mipModel) == MOI.OPTIMAL
                 objective_bound(mipModel)
-                push!(lows, objective_bound(mipModel))
+                push!(lows, objective_value(mipModel))
                 @objective(mipModel, Max, next_v)
                 JuMP.optimize!(mipModel)
                 @assert termination_status(mipModel) == MOI.OPTIMAL
                 objective_bound(mipModel)
-                push!(highs, objective_bound(mipModel))
+                push!(highs, objective_value(mipModel))
             end
         end
     end

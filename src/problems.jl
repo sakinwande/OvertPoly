@@ -1,5 +1,6 @@
 using LazySets
 using JuMP
+using Plasmo
 
 export
 	DistrOvertProblem,
