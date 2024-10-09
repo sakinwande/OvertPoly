@@ -43,7 +43,7 @@ function add_controller_constraints!(model, network_nnet_address, input_set, inp
     #This is defined in the constraints.jl file. Appears to be the Tjeng paper encoding
     encode_network!(model, network, neurons, deltas, bounds, BoundedMixedIntegerLP())
     #Relate the NN variables to the dynamics variables
-    @constraint(model, input_vars .== neurons[1])  # set inputvars
+    @constraint(model, neurons[1] .== input_vars)  # set inputvars
     @constraint(model, output_vars .== neurons[end])  # set outputvars
     return bounds[end]
 end

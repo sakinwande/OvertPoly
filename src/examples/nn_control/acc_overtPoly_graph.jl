@@ -17,6 +17,7 @@ controller = "Networks/ARCH-COMP-2023/nnet/controllerACC.nnet"
 
 vSet = 30.0
 tGap = 1.40
+dDefault = 10
 ######Define ACC Dynamics#######
 function acc_dynamics(x, u)
     """
@@ -97,6 +98,7 @@ end
 domain = Hyperrectangle(low=[90,32,-ϵ,10,30,-ϵ], high=[110,32.2,ϵ,11,30.2,ϵ])
 numSteps = 50
 dt = 0.1
+
 ########Define Bound ACC Dynamics#######
 function bound_acc(ACC; plotFlag = false)
     lbs, ubs = extrema(ACC.domain)
@@ -210,20 +212,20 @@ function bound_acc(ACC; plotFlag = false)
     ubs_p_ego_empty = ubs[4]
     pEgoLB, pEgoUB = lift_OA(emptyList, currList, pEgoLB_u, pEgoUB_u, lbs_p_ego_empty, ubs_p_ego_empty)
     
-    # if plotFlag
-    #     xS_L = unique(Any[tup[1] for tup in leadSub1LB])
-    #     yS_L = unique(Any[tup[1] for tup in leadSub2LB])
-    #     xS_E = unique(Any[tup[1] for tup in egoSub1LB])
-    #     yS_E = unique(Any[tup[1] for tup in egoSub2LB])
+    if plotFlag
+        xS_L = unique(Any[tup[1] for tup in aleadSub1LB])
+        yS_L = unique(Any[tup[1] for tup in aleadSub2LB])
+        xS_E = unique(Any[tup[1] for tup in aegoSub1LB])
+        yS_E = unique(Any[tup[1] for tup in aegoSub2LB])
 
-    #     surfDim_L = (size(yS_L)[1], size(xS_L)[1])
-    #     surfDim_E = (size(yS_E)[1], size(xS_E)[1])
+        surfDim_L = (size(yS_L)[1], size(xS_L)[1])
+        surfDim_E = (size(yS_E)[1], size(xS_E)[1])
 
-    #     leadExpr = exprList[1]
-    #     egoExpr = exprList[2]
-    #     plotSurf(leadExpr, leadLB, leadUB, surfDim_L, xS_L, yS_L, plotFlag)
-    #     plotSurf(egoExpr, egoLB, egoUB, surfDim_E, xS_E, yS_E, plotFlag)
-    # end
+        leadExpr = exprList[1]
+        egoExpr = exprList[2]
+        plotSurf(leadExpr, aleadLB, aleadUB, surfDim_L, xS_L, yS_L, plotFlag)
+        plotSurf(egoExpr, aegoLB, aegoUB, surfDim_E, xS_E, yS_E, plotFlag)
+    end
 
     #Return bounds in variable order 
     bounds = [[pLeadLB, pLeadUB], [vLeadLB, vLeadUB], [aleadLB, aleadUB], [pEgoLB, pEgoUB], [vEgoLB, vEgoUB], [aegoLB, aegoUB]]
@@ -242,7 +244,8 @@ function acc_dyn_con_link!(query, neurons, graph, dynModel, netModel)
     #First, define vEgo variable in the neural network model
     @variable(netModel, vEgo)
     #Next, link vEgo to the velocity of the ego vehicle in the dynamics model
-    @linkconstraint(graph, netModel[:vEgo] == dynModel[5][:x][1])
+    #NOTE: We are now using the ego acceleration vEgo
+    @linkconstraint(graph, netModel[:vEgo] == dynModel[6][:x][1])
     #Finally, link the vEgo variable to the neural network input
     @constraint(netModel, neurons[1][3] == vEgo)
 
@@ -250,6 +253,7 @@ function acc_dyn_con_link!(query, neurons, graph, dynModel, netModel)
     @variable(netModel, dRel)
     #In words, the dRel variable in netnode is the difference between xLead (used as input for the first dynamics model) and xEgo (used as input for the fourth dynamics model)
     @linkconstraint(graph, netModel[:dRel] == dynModel[1][:x][1] - dynModel[4][:x][1])
+    @constraint(netModel, neurons[1][4] == dRel)
 
 
     #Define vRel for ACC 
@@ -279,7 +283,7 @@ function acc_dyn_con_link!(query, neurons, graph, dynModel, netModel)
 
 end
 ##############################################
-ACC = OvertPProblem(
+ACC = GraphPolyProblem(
     exprList, # list of dynamics expressions
     nothing,  # decomposed form of dynamics. Done manually
     control_coef, # control coefficients
@@ -291,7 +295,7 @@ ACC = OvertPProblem(
     acc_control, #Control function for ACC benchmark
     acc_dyn_con_link! #link function for ACC benchmark
 )
-query = OvertPQuery(
+query = GraphPolyQuery(
     ACC, #Problem definition
     controller, #Path to controller network file
     Id(), #Last layer activation
@@ -304,18 +308,44 @@ query = OvertPQuery(
     3, #case (x, dx, ddx)
 )
 
-#TEST:Testing new reachability script#####
+#TEST:MOI backend experimentation
 #########################
+query1 = deepcopy(query)
+@time reachsets, boundsets = multi_step_concreach(query1);
 
-@time reachsets, boundsets = multi_step_concreach(query);
-
-reachsets[2]
-
+#Verifying the property
+tstart = Dates.now()
 dRel = Any[]
+dSafe = Any[]
 for reachset in reachsets
     reachInts = extrema(reachset)
     dRel_min = minimum([reachInts[1][1] - reachInts[1][4], reachInts[1][1] - reachInts[2][4], reachInts[2][1] - reachInts[1][4], reachInts[2][1] - reachInts[2][4]])
     dRel_max = maximum([reachInts[1][1] - reachInts[1][4], reachInts[1][1] - reachInts[2][4], reachInts[2][1] - reachInts[1][4], reachInts[2][1] - reachInts[2][4]])
+    dSafe_min = dDefault + tGap*reachInts[1][5]
+    dSafe_max = dDefault + tGap*reachInts[2][5]
+    # vRel_min = minimum([reachInts[1][2] - reachInts[1][5], reachInts[1][2] - reachInts[2][5], reachInts[2][2] - reachInts[1][5], reachInts[2][2] - reachInts[2][5]])
+    # vRel_max = maximum([reachInts[1][2] - reachInts[1][5], reachInts[1][2] - reachInts[2][5], reachInts[2][2] - reachInts[1][5], reachInts[2][2] - reachInts[2][5]])
+    # dRel_hyp = Hyperrectangle(low=[dRel_min, vRel_min], high=[dRel_max, vRel_max])
     dRel_hyp = Hyperrectangle(low=[dRel_min], high=[dRel_max])
+    dSafe_hyp = Hyperrectangle(low=[dSafe_min], high=[dSafe_max])
     push!(dRel, dRel_hyp)
+    push!(dSafe, dSafe_hyp)
 end
+
+(extrema(dRel[end])[2] - extrema(dRel[end])[1])[1]
+
+tstart = Dates.now()
+veriFlag = true
+
+for i = 1:51
+    if !isdisjoint(dRel[i], dSafe[i])
+        veriFlag = false
+        println("Property violated at time $i")
+        break
+    end
+    if i == 51
+        println("Property verified")
+    end
+end
+tend = Dates.now()
+println("Verification time: $(tend-tstart)")

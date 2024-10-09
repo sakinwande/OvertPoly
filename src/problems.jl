@@ -3,10 +3,10 @@ using JuMP
 using Plasmo
 
 export
-	DistrOvertProblem,
-    DistrOvertQuery,
-	RegOvertProblem,
-	RegOvertQuery
+	GraphPolyProblem,
+    FlatPolyProblem,
+	GraphPolyQuery,
+	FlatPolyQuery
 
 # mutable struct OvertPProblem
 # 	expr
@@ -40,7 +40,7 @@ export
 # end
 
 #Struct for distributed problems
-mutable struct DistrOvertProblem
+mutable struct GraphPolyProblem
 	expr
 	dec_expr
 	control_coef
@@ -53,8 +53,8 @@ mutable struct DistrOvertProblem
 	link_func::Function
 end
 
-mutable struct DistrOvertQuery
-	problem::DistrOvertProblem
+mutable struct GraphPolyQuery
+	problem::GraphPolyProblem
 	network_file::Union{Nothing,String}
 	last_layer_activation ##::ActivationFunction
 	solver::String
@@ -68,7 +68,7 @@ end
 
 
 #Struct for regular problems 
-mutable struct RegOvertProblem
+mutable struct FlatPolyProblem
 	expr
 	dec_expr
 	control_coef
@@ -82,8 +82,8 @@ mutable struct RegOvertProblem
 	control_func::Function
 end
 
-mutable struct RegOvertQuery
-	problem::RegOvertProblem
+mutable struct FlatPolyQuery
+	problem::FlatPolyProblem
 	network_file::Union{Nothing,String}
 	last_layer_activation ##::ActivationFunction
 	solver::String

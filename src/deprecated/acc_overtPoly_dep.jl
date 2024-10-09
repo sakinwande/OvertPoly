@@ -40,25 +40,25 @@ function acc_dynamics(x, u)
     return xNew
 end
 
-# function acc_update_rule(input_vars, overt_output_vars)
-#     """
-#     Update rule for the ACC benchmark. 
+function acc_update_rule(input_vars, overt_output_vars)
+    """
+    Update rule for the ACC benchmark. 
 
-#     Args:
-#         input_vars: dictionary containing the input variables
-#         overt_output_vars: dictionary containing the output variables from the overt model
-#     """
-#     integration_map = Dict(
-#         input_vars[1] => input_vars[2],
-#         input_vars[2] => input_vars[3],
-#         input_vars[3] => overt_output_vars[1][1],
-#         input_vars[4] => input_vars[5],
-#         input_vars[5] => input_vars[6],
-#         input_vars[6] => overt_output_vars[2][1]
-#     )
+    Args:
+        input_vars: dictionary containing the input variables
+        overt_output_vars: dictionary containing the output variables from the overt model
+    """
+    integration_map = Dict(
+        input_vars[1] => input_vars[2],
+        input_vars[2] => input_vars[3],
+        input_vars[3] => overt_output_vars[1][1],
+        input_vars[4] => input_vars[5],
+        input_vars[5] => input_vars[6],
+        input_vars[6] => overt_output_vars[2][1]
+    )
 
-#     return integration_map
-# end
+    return integration_map
+end
 
 function acc_control(input_set, ϵ=1e-12)
     """
@@ -232,75 +232,76 @@ end
 
 #####Problem Specific Function#######
 ###Function to link control and relevant dynamics
-function acc_dyn_con_link!(query, neurons, graph, dynModel, netModel, t_ind=nothing)
-    # graph = query.mod_dict[:graph]
-    # dynModel = query.mod_dict[:f]
-    # netModel = query.mod_dict[:u]
+# function acc_dyn_con_link!(query, neurons, graph, dynModel, netModel, t_ind=nothing)
+#     # graph = query.mod_dict[:graph]
+#     # dynModel = query.mod_dict[:f]
+#     # netModel = query.mod_dict[:u]
 
-    # input_set = query.problem.domain
-    #Defining ACC network required inputs. First two inputs are constants 
-    @constraint(netModel, neurons[1][1] == vSet)
-    @constraint(netModel, neurons[1][2] == tGap) 
+#     # input_set = query.problem.domain
+#     #Defining ACC network required inputs. First two inputs are constants 
+#     @constraint(netModel, neurons[1][1] == vSet)
+#     @constraint(netModel, neurons[1][2] == tGap) 
 
-    #Define vEgo link using vEgo from the ego velocity model  
-    #First, define vEgo variable in the neural network model
-    @variable(netModel, vEgo)
-    #Next, link vEgo to the velocity of the ego vehicle in the dynamics model
-    @linkconstraint(graph, netModel[:vEgo] == dynModel[5][:x][1])
-    #Finally, link the vEgo variable to the neural network input
-    @constraint(netModel, neurons[1][3] == vEgo)
+#     #Define vEgo link using vEgo from the ego velocity model  
+#     #First, define vEgo variable in the neural network model
+#     @variable(netModel, vEgo)
+#     #Next, link vEgo to the velocity of the ego vehicle in the dynamics model
+#     @linkconstraint(graph, netModel[:vEgo] == dynModel[5][:x][1])
+#     #Finally, link the vEgo variable to the neural network input
+#     @constraint(netModel, neurons[1][3] == vEgo)
 
-    #Define dRel for ACC
-    @variable(netModel, dRel)
-    #In words, the dRel variable in netnode is the difference between xLead (used as input for the first dynamics model) and xEgo (used as input for the fourth dynamics model)
-    @linkconstraint(graph, netModel[:dRel] == dynModel[1][:x][1] - dynModel[4][:x][1])
+#     #Define dRel for ACC
+#     @variable(netModel, dRel)
+#     #In words, the dRel variable in netnode is the difference between xLead (used as input for the first dynamics model) and xEgo (used as input for the fourth dynamics model)
+#     @linkconstraint(graph, netModel[:dRel] == dynModel[1][:x][1] - dynModel[4][:x][1])
 
 
-    #Define vRel for ACC 
-    @variable(netModel, vRel)
-    #In words, the vRel variable in netnode is the difference between vLead  and vEgo
-    @linkconstraint(graph, netModel[:vRel] == dynModel[2][:x][1] - dynModel[5][:x][1])
-    @constraint(netModel, neurons[1][5] == vRel)
+#     #Define vRel for ACC 
+#     @variable(netModel, vRel)
+#     #In words, the vRel variable in netnode is the difference between vLead  and vEgo
+#     @linkconstraint(graph, netModel[:vRel] == dynModel[2][:x][1] - dynModel[5][:x][1])
+#     @constraint(netModel, neurons[1][5] == vRel)
 
-    ##Also link network output to ego acceleration
-    @variable(netModel, u)
-    @constraint(netModel, neurons[end][1] == u)
-    @linkconstraint(graph, netModel[:u] == dynModel[6][:u])
+#     ##Also link network output to ego acceleration
+#     @variable(netModel, u)
+#     @constraint(netModel, neurons[end][1] == u)
+#     @linkconstraint(graph, netModel[:u] == dynModel[6][:u])
 
-    #Iterate through dynModel and identify pertinent input variable for each
-    i = 0 
-    for sym in query.problem.varList
-        if !isnothing(t_ind)
-            sym_t = Meta.parse("$(sym)_$(t_ind)")
-        else
-            sym_t = sym
-        end
-        i += 1
-        #For acceleration, the pertinent variable is the last element of the state vector (which is acceleration). For others it's the first
-        if sym == :x3 || sym == :x6
-            pertVar = dynModel[i][:x][end]
-        else 
-            pertVar = dynModel[i][:x][1]
-        end
-        #Add pertinent variable to var dict 
-        push!(query.var_dict[sym_t], [pertVar])
-    end
+#     #Iterate through dynModel and identify pertinent input variable for each
+#     i = 0 
+#     for sym in query.problem.varList
+#         if !isnothing(t_ind)
+#             sym_t = Meta.parse("$(sym)_$(t_ind)")
+#         else
+#             sym_t = sym
+#         end
+#         i += 1
+#         #For acceleration, the pertinent variable is the last element of the state vector (which is acceleration). For others it's the first
+#         if sym == :x3 || sym == :x6
+#             pertVar = dynModel[i][:x][end]
+#         else 
+#             pertVar = dynModel[i][:x][1]
+#         end
+#         #Add pertinent variable to var dict 
+#         push!(query.var_dict[sym_t], [pertVar])
+#     end
 
-end
+# end
 ##############################################
-ACC = OvertPProblem(
+ACC = FlatPolyProblem(
     exprList, # list of dynamics expressions
     nothing,  # decomposed form of dynamics. Done manually
     control_coef, # control coefficients
+    1, #control dimension
     domain, # domain of the problem
     [:x1,:x2,:x3,:x4,:x5,:x6], # List of variables that have OVERT bounds 
     nothing, #Problem bounds. Undefined to start
+    acc_update_rule, #Update rule for ACC benchmark
     acc_dynamics, #Dynamics of the ACC benchmark
     bound_acc, #Function to bound ACC dynamics
-    acc_control, #Control function for ACC benchmark
-    acc_dyn_con_link! #link function for ACC benchmark
+    acc_control #Control function for ACC benchmark
 )
-query = OvertPQuery(
+query = FlatPolyQuery(
     ACC, #Problem definition
     controller, #Path to controller network file
     Id(), #Last layer activation
@@ -313,8 +314,11 @@ query = OvertPQuery(
     3, #case (x, dx, ddx)
 )
 
-#TEST:Testing new reachability script#####
-#########################
+
+query2 = deepcopy(query)
+query2.ntime = 1
+
+query2.problem.bounds = query2.problem.bound_func(query2.problem)
 
 @time reachsets, boundsets = multi_step_concreach(query);
 

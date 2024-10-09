@@ -87,7 +87,7 @@ end
 
 function single_pend_control(model, input_vars, control_vars, output_vars, input_set)
     con_inp_set = input_set
-    con_net_vars = [control_vars]
+    con_net_vars = control_vars
     con_inp_vars = input_vars
     return con_inp_vars, con_inp_set, con_net_vars
 end
@@ -98,7 +98,7 @@ function single_pend_update_rule(input_vars, overt_output_vars)
     return integration_map
 end
 
-SinglePendulum = RegOvertProblem(
+SinglePendulum = FlatPolyProblem(
     expr, # dynamics
     nothing, #decomposed form of the dynamics. Done manually
     control_coef, # control coefficient
@@ -112,7 +112,7 @@ SinglePendulum = RegOvertProblem(
     single_pend_control
 )
 
-query = RegOvertQuery(
+query = FlatPolyQuery(
 	SinglePendulum,    # problem
 	controller,        # network file
 	Id(),              # last layer activation layer Id()=linear, or ReLU()=relu
@@ -127,12 +127,23 @@ query = RegOvertQuery(
 
 #Use concrete reachability to trace out the trajectory
 query1 = deepcopy(query)
-query1.ntime = 1
 @time reachSets, boundSets = multi_step_concreach(query1);
+
+#Verify the property
+safe_hyp = Hyperrectangle(low=[0], high=[1])
+project(reachSets[10], [1]) ⊆ safe_hyp
+safeFlag = true
+for i=10:20
+    if !(project(reachSets[i], [1]) ⊆ safe_hyp)
+        print("Property violated at time step: ", i)
+        safeFlag = false
+        break
+    end
+end
+extrema(project(reachSets[10], [1]))
 
 #plot(reachSets, title="Single Pendulum Concrete Reachability")
 
-extrema(reachSets[2])
 
 #Use concrete sets to compute symbolic reach set at time step 10
 symQuery1 = deepcopy(query)
@@ -141,22 +152,35 @@ symQuery1.ntime = 10
 
 #############Testing Single Step Hybrid Symbolic Reachability############
 @time reach_set = symReach(symQuery1, reachSets)
-plot(reachSets[end], title="Comparing Concrete and Hyb Reach_$(symQuery1.ntime)", label="Concrete Reach Set", legend = :bottomright)
-plot!(reach_set, label="Hyb Reach Set")
+#Verify the property
+project(reach_set, [1]) ⊆ safe_hyp
+extrema(project(reach_set, [1]))
+
+# plot(reachSets[20], title="Comparing Concrete and Hyb Reach_$(symQuery1.ntime)", label="Concrete Reach Set", legend = :bottomright)
+# plot!(reach_set, label="Hyb Reach Set")
 
 #############Testing Multi Step Hybrid Symbolic Reachability############
 symQuery2 = deepcopy(query)
 symQuery2.problem.bounds = boundSets
-symQuery2.ntime = 15
+symQuery2.ntime = 10
 
 concEvery = 10
 @time totalReachSets, totalBoundSets  = multi_step_hybreach(concEvery,symQuery2)
-length(totalReachSets)
-plot(totalReachSets, title="Single Pendulum Hybrid Reachability", fillcolor=:blue)
+
+#Verify the property
+project(totalReachSets[end], [1]) ⊆ safe_hyp
+extrema(project(totalReachSets[end], [1]))
+
+#length(totalReachSets)
+#plot(totalReachSets, title="Single Pendulum Hybrid Reachability", fillcolor=:blue)
 #############Trying out multi step straight shot reachability############
 symQuery3 = deepcopy(query)
 symQuery3.ntime = 10
 @time reachSetsSS = multi_shot_reach(symQuery3)
+
+#Verify the property
+project(reachSetsSS[end], [1]) ⊆ safe_hyp
+extrema(project(reachSetsSS[end], [1]))
 
 plot!(reachSetsSS[end], label="Straight Shot Reach Set")
 plot!(reachSets, title="Single Pendulum Straight Shot Reachability", fillcolor=:red)

@@ -7,7 +7,7 @@ using LazySets
 using Random
 using Plasmo
 
-function encode_dynamics!(query::DistrOvertQuery)
+function encode_dynamics!(query::GraphPolyQuery)
     #create an optigraph to store the model
     graph = OptiGraph()
     #create a vector of models for the dynamics 
@@ -30,7 +30,7 @@ function encode_dynamics!(query::DistrOvertQuery)
     query.mod_dict[:f] = dynNodes
 end
 ###Create new Encode Control Function###
-function encode_control!(query::DistrOvertQuery)
+function encode_control!(query::GraphPolyQuery)
     input_set = query.problem.control_func(query.problem.domain)
     network_file = query.network_file
     #NOTE: Changed NetModel to be an graph instead of a node
@@ -49,6 +49,7 @@ function conc_reach_solve(query)
     ###Minimization Step########
     min_dynModel = min_query.mod_dict[:f]
     minGraph = min_query.mod_dict[:graph]
+    min_netModel = min_query.mod_dict[:u]
     i = 0
     #Compute lower bounds
     for sym in min_query.problem.varList 
@@ -56,10 +57,11 @@ function conc_reach_solve(query)
         model = min_dynModel[i]
         v = min_query.var_dict[sym][end][1]
         dv = min_query.var_dict[sym][2][1]
-        @variable(model, next_v)
-        @constraint(model, next_v == v + query.dt*dv)
-        @objective(model, Min, next_v)
+        next_v_l = v + min_query.dt*dv
+        @objective(model, Min, next_v_l)
     end
+    #Optimize the netmodel as well 
+    @objective(min_netModel, Min, 0)
 
     set_optimizer(minGraph, Gurobi.Optimizer)
     optimize!(minGraph)
@@ -67,35 +69,38 @@ function conc_reach_solve(query)
     i = 0
     for _ in query.problem.varList
         i += 1
-        push!(lows, value(min_dynModel[i][:next_v]))
+        push!(lows, value(objective_function(min_dynModel[i])))
     end
 
     #Compute upper bounds
     max_dynModel = max_query.mod_dict[:f]
     maxGraph = max_query.mod_dict[:graph]
+    max_netModel = max_query.mod_dict[:u]
     i = 0
     for sym in query.problem.varList 
         i += 1
         model = max_dynModel[i]
         v = max_query.var_dict[sym][end][1]
         dv = max_query.var_dict[sym][2][1]
-        @variable(model, next_v)
-        @constraint(model, next_v == v + max_query.dt*dv)
-        @objective(model, Max, next_v)
+        next_v_u = v + max_query.dt*dv
+        @objective(model, Min, -next_v_u)
     end
+    #Optimize the netmodel as well
+    @objective(max_netModel, Min, 0)
 
     set_optimizer(maxGraph, Gurobi.Optimizer)
     optimize!(maxGraph)
     i = 0
+    #NOTE: We use negative value for the Maximization because Plasmo converts everything into a minimization problem, and that yields negative values 
     for _ in query.problem.varList
         i += 1
-        push!(highs, value(max_dynModel[i][:next_v]))
+        push!(highs, -value(objective_function(max_dynModel[i])))
     end
     reach_set = Hyperrectangle(low=lows, high=highs)
     return reach_set 
 end
 
-function concreach!(query::DistrOvertQuery)
+function concreach!(query::GraphPolyQuery)
     query.problem.bounds = query.problem.bound_func(query.problem)
     query.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
     query.mod_dict = Dict{Symbol,Any}()
@@ -117,7 +122,7 @@ function concreach!(query::DistrOvertQuery)
     return reach_set, query.problem.bounds
 end
 
-function multi_step_concreach(query::DistrOvertQuery)
+function multi_step_concreach(query::GraphPolyQuery)
     """
     Method to solve the concrete reachability problem using MIP for multiple time steps.
     """

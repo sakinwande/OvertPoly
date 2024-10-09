@@ -37,8 +37,8 @@ function tora_control(input_set)
 end
 domain = Hyperrectangle(low=[0.6, -0.7, -0.4, 0.5], high = [0.7, -0.6, -0.3, 0.6])
 #TODO: Decide on step size needed to make discrete time reachability reasonable
-numSteps = 100
-dt = 0.01
+numSteps = 20
+dt = 0.1
 
 
 ####Define Bound TORA########
@@ -119,9 +119,9 @@ function tora_dyn_con_link!(query, neurons, graph, dynModel, netModel)
     @constraint(netModel, neurons[1][4] == x4)
 
     #Link network inputs to appropriate dynamics models 
-    @linkconstraint(graph, netModel[:x1] == dynModel[1][:x][1])
+    @linkconstraint(graph, netModel[:x1] == dynModel[2][:x][1])
     @linkconstraint(graph, netModel[:x2] == dynModel[2][:x][2])
-    @linkconstraint(graph, netModel[:x3] == dynModel[3][:x][1])
+    @linkconstraint(graph, netModel[:x3] == dynModel[2][:x][3])
     @linkconstraint(graph, netModel[:x4] == dynModel[4][:x][1])
 
     #Link network output to x4
@@ -145,7 +145,7 @@ function tora_dyn_con_link!(query, neurons, graph, dynModel, netModel)
     end
 end
 
-TORA = OvertPProblem(
+TORA = GraphPolyProblem(
     exprList, #dynamics
     nothing, #no decomposed dynamics 
     control_coef, #control coefficients
@@ -158,7 +158,7 @@ TORA = OvertPProblem(
     tora_dyn_con_link!
 )
 
-query = OvertPQuery(
+query = GraphPolyQuery(
     TORA, #problem 
     controller, #path to network file 
     Id(), #last layer activation 

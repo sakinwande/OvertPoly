@@ -7,9 +7,10 @@ include("../../reachability.jl")
 using LazySets
 using Dates
 
+#TODO: Evaluates to infeasible 
 ac_lead = -2.0
 mu = 0.0001
-control_coef = [[0],[2]]
+control_coef = [[0],[0]]
 exprList = [:(- $mu*x2^2 + -2*x3 + 2*$ac_lead ), :(- $mu*x5^2 -2*x6)]
 controller = "Networks/ARCH-COMP-2023/nnet/controllerACC.nnet"
 
@@ -47,10 +48,10 @@ function acc_update_rule(input_vars, overt_output_vars)
     integration_map = Dict(
         input_vars[1] => input_vars[2],
         input_vars[2] => input_vars[3],
-        input_vars[3] => overt_output_vars[1][1],
+        input_vars[3] => overt_output_vars[1],
         input_vars[4] => input_vars[5],
         input_vars[5] => input_vars[6],
-        input_vars[6] => overt_output_vars[2][1]
+        input_vars[6] => overt_output_vars[2]
     )
 
     return integration_map
@@ -77,8 +78,11 @@ function acc_control(model, input_vars, control_vars, output_vars, input_set, ϵ
     #First define the control inputs expected by the network 
     vSet = @variable(model, [1:1], base_name = "v_set")
     tGap = @variable(model, [1:1], base_name = "tGap")
-    dRel = @variable(model, [1:1], base_name = "dRel")
-    vRel = @variable(model, [1:1], base_name = "vRel")
+    # dRel = @variable(model, [1:1], base_name = "dRel")
+    # vRel = @variable(model, [1:1], base_name = "vRel")
+    @variable(model, 89 <=dRel <= 100)
+    @variable(model, 1.8 <=vRel <= 2.2)
+    @variable(model, 30 <= vEgo <= 30.2)
 
     #Constraint these to be constants/params. Should these be set as constants? 
     #TODO: Review if these are best posed as constants 
@@ -87,10 +91,11 @@ function acc_control(model, input_vars, control_vars, output_vars, input_set, ϵ
     @constraint(model, dRel .== input_vars[1] - input_vars[4])
     @constraint(model, vRel .== input_vars[2] - input_vars[5])
 
-    con_inp_vars = [vSet[1], tGap[1], input_vars[5], dRel[1], vRel[1]]
+    #con_inp_vars = [vSet[1], tGap[1], input_vars[5], dRel[1], vRel[1]]
+    con_inp_vars = [30.0, 1.40, vEgo, dRel, vRel]
     
     #Next, provide network order control variables to the network
-    con_net_vars = [control_vars]
+    con_net_vars = control_vars[end]
 
     #Finally, provide input range for the network
     #TODO: Review if this difference should be interval subtraction or set difference. Big difference here 
@@ -109,31 +114,25 @@ end
 #Some issues with starting at zero, start with eps
 ϵ = 1e-8
 domain = Hyperrectangle(low=[90,32,-ϵ,10,30,-ϵ], high=[110,32.2,ϵ,11,30.2,ϵ])
-numSteps = 1
+numSteps = 50
 dt = 0.1
-plotFlag = false
-lbs, ubs = extrema(domain)
+
 ########Define Bound ACC Dynamics#######
 function bound_acc(ACC; plotFlag = false)
     lbs, ubs = extrema(ACC.domain)
-
-    #Bound lead function 
-    lbs_lead = [lbs[2], lbs[3]]
-    ubs_lead = [ubs[2], ubs[3]]
 
     #Bound first component of lead dynamics
     lbLead_sub1 = lbs[2]
     ubLead_sub1 = ubs[2]
     leadSub1 = :(2*$ac_lead - $mu*x2^2)
-    leadSub1LB, leadSub1UB = bound_univariate(leadSub1, lbLead_sub1, ubLead_sub1, plotflag = plotFlag)
+    leadSub1LB, leadSub1UB = interpol(bound_univariate(leadSub1, lbLead_sub1, ubLead_sub1, plotflag = plotFlag)...)
 
     #Bound second component of lead dynamics
-    #TODO: remove plotflag
     lbLead_sub2 = lbs[3]
     ubLead_sub2 = ubs[3]
     leadSub2 = :(-2*x3)
-    leadSub2LB, leadSub2UB = bound_univariate(leadSub2, lbLead_sub2, ubLead_sub2, plotflag = plotFlag)
-
+    leadSub2LB, leadSub2UB = interpol(bound_univariate(leadSub2, lbLead_sub2, ubLead_sub2, plotflag = plotFlag)..., 9)
+    
     #Add a dimension to prepare for Minkowski sum
     leadSub1LB_l = addDim(leadSub1LB, 2)
     leadSub1UB_l = addDim(leadSub1UB, 2)
@@ -159,14 +158,14 @@ function bound_acc(ACC; plotFlag = false)
     #Bound first component of ego dynamics
     lbEgo_sub1 = lbs_ego[1]
     ubEgo_sub1 = ubs_ego[1]
-    egoSub1 = :($mu*x5^2)
-    egoSub1LB, egoSub1UB = bound_univariate(egoSub1, lbEgo_sub1, ubEgo_sub1, plotflag = plotFlag)
+    egoSub1 = :(-$mu*x5^2)
+    egoSub1LB, egoSub1UB = interpol(bound_univariate(egoSub1, lbEgo_sub1, ubEgo_sub1, plotflag = plotFlag)...)
 
     #Bound second component of ego dynamics
     lbEgo_sub2 = lbs_ego[2]
     ubEgo_sub2 = ubs_ego[2]
     egoSub2 = :(-2*x6)
-    egoSub2LB, egoSub2UB = bound_univariate(egoSub2, lbEgo_sub2, ubEgo_sub2, plotflag = plotFlag)
+    egoSub2LB, egoSub2UB = interpol(bound_univariate(egoSub2, lbEgo_sub2, ubEgo_sub2, plotflag = plotFlag)..., 9)
 
     #Add a dimension to prepare for Minkowski sum
     egoSub1LB_l = addDim(egoSub1LB, 2)
@@ -205,7 +204,7 @@ function bound_acc(ACC; plotFlag = false)
     return bounds
 end
 
-ACC = OvertPProblem(
+ACC = FlatPolyProblem(
     exprList, # list of dynamics expressions
     nothing,  # decomposed form of dynamics. Done manually
     control_coef, # control coefficients
@@ -219,7 +218,7 @@ ACC = OvertPProblem(
     acc_control #Control function for ACC benchmark
 )
 
-query = OvertPQuery(
+query = FlatPolyQuery(
     ACC, #Problem definition
     controller, #Path to controller network file
     Id(), #Last layer activation
@@ -232,16 +231,131 @@ query = OvertPQuery(
     3, #case (x, dx, ddx)
 )
 
-#####Debugging Concreach again########
-query.problem.bounds = query.problem.bound_func(query.problem)
-query.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
-query.mod_dict = Dict{Symbol,JuMP.Model}()
-encode_dynamics!(query)
+###########TEST: Getting to the Backend###############
+query2 = deepcopy(query)
+query2.ntime = 1
 
-#Encode the controller if it exists
-if !isnothing(query.network_file)
-    encode_control!(query)
-end
+query2.problem.bounds = query2.problem.bound_func(query2.problem, plotFlag=false)
+query2.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
+query2.mod_dict = Dict{Symbol,JuMP.Model}()
 
-reachSet =  reach_solve(query)
-return reachSet, query.problem.bounds
+encode_dynamics!(query2)
+
+# #Encode the controller if it exists
+# if !isnothing(query2.network_file)
+#     encode_control!(query2)
+# end
+
+################################################
+#Debug encode control 
+    input_set = query2.problem.domain
+    network_file = query2.network_file
+    input_vars = []
+    control_vars = []
+    output_vars = []
+    for sym in query2.problem.varList
+        #Get dictionary of MIP variables 
+        push!(input_vars, query2.var_dict[sym][1]...)
+        push!(control_vars, query2.var_dict[sym][3][1]...)
+        push!(output_vars, query2.var_dict[sym][2]...)
+    end
+    input_vars
+    control_vars
+    output_vars
+    
+    mipModel = query2.mod_dict[query2.problem.varList[1]]
+    con_inp_vars, con_inp_set, con_vars = query2.problem.control_func(mipModel, input_vars, control_vars, output_vars, input_set)
+
+    con_inp_vars
+    con_inp_set
+    con_vars
+    #cb = add_controller_constraints!(mipModel, network_file, con_inp_set, con_inp_vars, con_vars) 
+
+    #Read network file 
+    network = read_nnet(network_file, last_layer_activation=Id())
+    #Initialize neurons (adds variables)
+    neurons = init_neurons(mipModel, network)
+    #Initialize deltas (adds binary variables)
+    deltas = init_deltas(mipModel, network)
+    #Use Taylor Johnson paper (https://arxiv.org/abs/1708.03322) to get bounds  
+    bounds = get_bounds(network, con_inp_set)
+    #Add NN MIP model to the given model
+    #This is defined in the constraints.jl file. Appears to be the Tjeng paper encoding
+    encode_network!(mipModel, network, neurons, deltas, bounds, BoundedMixedIntegerLP())
+    #Relate the NN variables to the dynamics variables
+    neurons[1]
+    neurons[end]
+    #@constraint(mipModel, neurons[1] == con_inp_vars)  # set inputvars
+    @constraint(mipModel, neurons[1][1:3] .== con_inp_vars[1:3])  # set inputvars
+    @constraint(mipModel, con_vars .== neurons[end])  # set outputvars
+    ####################################################
+
+reach_solve(query2)
+###################################
+t_idx = nothing
+########################################
+    stateVar = query2.problem.varList
+    trueInp = []
+    trueOut = []
+    stateVarTimed = Any[]
+    
+    #Compute true input and output variables 
+    for sym in stateVar
+        if !isnothing(t_idx)
+            #Account for symbolic case where dynamics are timed
+            sym_timed = Meta.parse("$(sym)_$t_idx")
+            input_vars = query2.var_dict[sym_timed][1]
+            output_vars = query2.var_dict[sym_timed][2]
+            push!(stateVarTimed, sym_timed)
+        else   
+            input_vars = query2.var_dict[sym][1]
+            output_vars = query2.var_dict[sym][2]
+        end
+
+        #TODO: To this more cleverly
+        #NOTE: Done, avoids the need for different cases
+        push!(trueInp, input_vars...)
+        push!(trueOut, output_vars...)
+    end
+    
+    integration_map = query2.problem.update_rule(trueInp, trueOut)
+    
+    timestep_nplus1_vars = GenericAffExpr{Float64,VariableRef}[]
+    lows = Array{Float64}(undef, 0)
+    highs = Array{Float64}(undef, 0)
+
+    #Loop over symbols with OVERT approximations to compute reach steps
+    sym = stateVar[2]
+    for sym in stateVar
+        #Account for symbolic case with timed dynamics
+        if !isnothing(t_idx)
+            symTimed = Meta.parse("$(sym)_$t_idx")
+            input_vars = query2.var_dict[symTimed][1]
+        else
+            input_vars = query2.var_dict[sym][1]
+        end
+        mipModel = query2.mod_dict[sym]
+        #TEST: remove
+        v = input_vars[3]
+        for v in input_vars 
+            if v in trueInp
+                dv = integration_map[v]
+                next_v = v + query2.dt*dv
+                push!(timestep_nplus1_vars, next_v)
+                @objective(mipModel, Min, next_v)
+                # @objective(mipModel, Max, dv)
+                JuMP.optimize!(mipModel)
+                termination_status(mipModel)
+                @assert termination_status(mipModel) == MOI.OPTIMAL
+                objective_bound(mipModel)
+                push!(lows, objective_value(mipModel))
+                @objective(mipModel, Max, next_v)
+                JuMP.optimize!(mipModel)
+                @assert termination_status(mipModel) == MOI.OPTIMAL
+                objective_bound(mipModel)
+                push!(highs, objective_value(mipModel))
+            end
+        end
+    end
+    #NOTE: Hyperrectangle can plot in higher dimensions as well
+    reacheable_set = Hyperrectangle(low=lows, high=highs)

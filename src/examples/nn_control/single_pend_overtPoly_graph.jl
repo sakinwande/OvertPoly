@@ -15,10 +15,10 @@ expr = [:($(grav_const/pend_len) * sin(x1) + $(1/(pend_mass*pend_len^2)) * u1 - 
 control_coef = [[0], [1/(pend_mass*pend_len^2)]]
 # control_coef = [[0], [0]]
 
-numSteps = 20
 domain = Hyperrectangle(low=[1., 0.], high=[1.2, 0.2])
 # domain = Hyperrectangle(low=[0., -0.1], high=[1, 0.1])
 dt = 0.05
+numSteps = 1/dt
 
 
 function single_pend_dynamics(x, u, dt)
@@ -92,17 +92,8 @@ function single_pend_control(input_set)
 end
 
 function single_pend_dyn_con_link!(query, neurons, graph, dynModel, netModel,t_ind=nothing)
-    #Define variables that are inputs to the network model 
-    # @variable(netModel, θ)
-    # @variable(netModel, dθ)
-    # #Specify inputs to the network 
-    # @constraint(netModel, θ == neurons[1][1])
-    # @constraint(netModel, dθ == neurons[1][2])
-    # #Link these variables to the appropriate models
-    # @linkconstraint(graph, netModel[:θ] == dynModel[1][:x][1])
-    # @linkconstraint(graph, netModel[:dθ] == dynModel[2][:x][2])
-
-    @linkconstraint(graph, dynModel[1][:x][1] == neurons[1][1])
+    #TEST: Only link node 2 to the controller node 
+    @linkconstraint(graph, dynModel[2][:x][1] == neurons[1][1])
     @linkconstraint(graph, dynModel[2][:x][2] == neurons[1][2])
 
     #Link network output to pendulum torque 
@@ -132,48 +123,7 @@ function single_pend_dyn_con_link!(query, neurons, graph, dynModel, netModel,t_i
     end 
 end
 
-function single_pend_dyn_con_linkalt!(query, neurons, graph, dynModel,t_ind=nothing)
-    #Define variables that are inputs to the network model 
-    # @variable(netModel, θ)
-    # @variable(netModel, dθ)
-    # #Specify inputs to the network 
-    # @constraint(netModel, θ == neurons[1][1])
-    # @constraint(netModel, dθ == neurons[1][2])
-    # #Link these variables to the appropriate models
-    # @linkconstraint(graph, netModel[:θ] == dynModel[1][:x][1])
-    # @linkconstraint(graph, netModel[:dθ] == dynModel[2][:x][2])
-
-    @constraint(graph, dynModel[2][:x][1] == neurons[1][1])
-    @constraint(graph, dynModel[2][:x][2] == neurons[1][2])
-
-    #Link network output to pendulum torque 
-    # @variable(netModel, u)
-    # @constraint(netModel, u == neurons[end][1])
-    # @linkconstraint(graph, netModel[:u] == dynModel[2][:u])
-    # @linkconstraint(graph, dynModel[2][:u] == netModel[:u])
-    @constraint(graph, dynModel[2][:u] == neurons[end][1])
-
-    #Iterate through dynModel and identify pertinent input variable for each 
-    i = 0
-    for sym in query.problem.varList
-        if !isnothing(t_ind)
-            sym_t = Meta.parse("$(sym)_$(t_ind)")
-        else
-            sym_t = sym
-        end
-        i += 1
-        #For acceleration, the pertinent variable is the last element of the state vector (which is acceleration). For others it's the first
-        if sym == :dθ 
-            pertVar = dynModel[i][:x][end]
-        else 
-            pertVar = dynModel[i][:x][1]
-        end
-        #Add pertinent variable to var dict 
-        push!(query.var_dict[sym_t], [pertVar])
-    end 
-end
-
-SinglePendulum = DistrOvertProblem(
+SinglePendulum = GraphPolyProblem(
     expr, # dynamics
     nothing, #decomposed form of the dynamics. Done manually
     control_coef, # control coefficient
@@ -186,7 +136,7 @@ SinglePendulum = DistrOvertProblem(
     single_pend_dyn_con_link!
 )
 
-query = DistrOvertQuery(
+query = GraphPolyQuery(
 	SinglePendulum,    # problem
 	controller,        # network file
 	Id(),              # last layer activation layer Id()=linear, or ReLU()=relu
@@ -202,117 +152,31 @@ query = DistrOvertQuery(
 
 #Use concrete reachability to trace out the trajectory
 query1 = deepcopy(query)
-query1.ntime = 10
-#@time reachSets, boundSets = multi_step_concreach(query1);
+query1.ntime = 20
+@time reachSets, boundSets = multi_step_concreach(query1);
 
+extrema(reachSets[11])[2][1] - extrema(reachSets[11])[1][1]
 
-#########TEST: Debugging Distributed Reachability######
-#########TEST: Preamble ###########
-query1.problem.bounds = query1.problem.bound_func(query1.problem)
-query1.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
-query1.mod_dict = Dict{Symbol,Any}()
-
-encode_dynamics!(query1)
-
-# #Encode the network and link the control to the dynamics
-# if !isnothing(query1.network_file)
-#     neurons = encode_control!(query1)
-# end
-
-#####################################
-#TEST: Try something new... encode control in dynamics directly 
-input_set = query1.problem.control_func(query1.problem.domain)
-network_file = query1.network_file
-neurons = add_controller_constraints!(query1.mod_dict[:f][2], network_file, input_set, Id())
-####################################
-
-
-dyn_con_link! = query1.problem.link_func
-graph = query1.mod_dict[:graph]
-dynModel = query1.mod_dict[:f]
-# netModel = query1.mod_dict[:u]
-# dyn_con_link!(query1, neurons, graph, dynModel, netModel)
-single_pend_dyn_con_linkalt!(query1, neurons, graph, dynModel)
-#####TEST: Debugging conc reach solve#######
-# function conc_reach_solve(query)
-    max_query = deepcopy(query1)
-    min_query = deepcopy(query1)
-    lows = Array{Float64}(undef, 0)
-    highs = Array{Float64}(undef, 0)
-
-    #####Prepping Models###############
-    min_dynModel = min_query.mod_dict[:f]
-    #min_netModel = min_query.mod_dict[:u]
-    minGraph = min_query.mod_dict[:graph]
-
-    max_dynModel = max_query.mod_dict[:f]
-    maxGraph = max_query.mod_dict[:graph]
-    #max_netModel = max_query.mod_dict[:u]
-
-    #Define Minimization Objective
-    i = 0
-    #Compute lower bounds
-    for sym in min_query.problem.varList 
-        i += 1
-        model = min_dynModel[i]
-        v = min_query.var_dict[sym][end][1]
-        dv = min_query.var_dict[sym][2][1]
-        next_v_l = v + min_query.dt*dv
-        # @variable(model, next_v)
-        # @constraint(model, next_v == next_v_l)
-        @objective(model, Min, next_v_l)
+#Verify the property
+safe_hyp = Hyperrectangle(low=[0], high=[1])
+project(reachSets[10], [1]) ⊆ safe_hyp
+safeFlag = true
+tstart = Dates.now()
+for i=10:20
+    if !(project(reachSets[i], [1]) ⊆ safe_hyp)
+        print("Property violated at time step: ", i)
+        safeFlag = false
+        break
     end
-    #TEST: Do we need to optimize the netmodel as well? 
-    #@objective(min_netModel, Min, min_netModel[:u])
+end
+tend = Dates.now()
+println("Time taken to verify property: ", tend-tstart)
+    
+project(reachSets[18], [1]) ⊆ safe_hyp
 
-    #Define Maximization Objective
-    i = 0
-    for sym in max_query.problem.varList 
-        i += 1
-        model = max_dynModel[i]
-        v = max_query.var_dict[sym][end][1]
-        dv = max_query.var_dict[sym][2][1]
-        next_v_u = v + max_query.dt*dv
-        # @variable(model, next_v)
-        # @constraint(model, next_v == next_v_u)
-        @objective(model, Max, next_v_u)
-    end
-    #TEST: Do we need to optimize the netmodel as well?
-    # @objective(max_netModel, Max, max_netModel[:u])
-
-    set_optimizer(minGraph, Gurobi.Optimizer)
-    set_optimizer(maxGraph, Gurobi.Optimizer)
-    
-    optimize!(minGraph)
-    optimize!(maxGraph)
-
-    @assert termination_status(minGraph) == MOI.OPTIMAL
-    @assert termination_status(maxGraph) == MOI.OPTIMAL
-    
-    i = 0
-    for _ in min_query.problem.varList
-        i += 1
-        push!(lows, value(objective_function(min_dynModel[i])))
-    end
-    
-    i = 0
-    #NOTE: We use negative value for the Maximization because Plasmo converts everything into a minimization problem, and that yields negative values 
-    #WARN: This may cause errors, watch carefully
-    for _ in max_query.problem.varList
-        i += 1
-        push!(highs, -value(objective_function(max_dynModel[i])))
-    end
-    
-    # value(objective_function(max_netModel))
-    reach_set = Hyperrectangle(low=lows, high=highs)
-    extrema(reach_set)
-#     return reach_set 
-# end
-#################################################
+######Testing the sym reach################
 symQuery = deepcopy(query)
-symQuery.problem.bounds = boundsets
-reachSets = reachsets
-
+symQuery.problem.bounds = boundSets
 
 #######Sketching out sym reach###################
 symQuery.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
@@ -372,9 +236,7 @@ function encode_sym_control!(symQuery)
     end
     return neurList
 end
-########################################
 neurList = encode_sym_control!(symQuery)
-
 
 #########Sketching out time encoding with dynamics/control link######
 function encode_time(symQuery, neurList)
@@ -389,40 +251,43 @@ function encode_time(symQuery, neurList)
 
     #Next link time steps
     symGraph = symQuery.mod_dict[:graph]
-    #######Enter time loop######
-    #TEST: Entering time loop manually
-    # t_ind = 1
     for t_ind = 1:symQuery.ntime-1
-        currDyn = symQuery.mod_dict[Meta.parse("f_$(t_ind)")]
-        nextDyn = symQuery.mod_dict[Meta.parse("f_$(t_ind+1)")]
         #Iterate through models and link pertinent variables 
-        x_ind = 1
-        #TEST: Entering the loop manually
-        # sym = symQuery.problem.varList[x_ind]
         for sym in symQuery.problem.varList
-            currModel = currDyn[x_ind]
             currSym = Meta.parse("$(sym)_$(t_ind)")
-            nextModel = nextDyn[x_ind]
             nextSym = Meta.parse("$(sym)_$(t_ind+1)")
 
             xNow = symQuery.var_dict[currSym][end][1] 
             yNow = symQuery.var_dict[currSym][2][1]
             xNext = symQuery.var_dict[nextSym][end][1]
 
+            #Define temporal self relation 
             @linkconstraint(symGraph, xNext == xNow + symQuery.dt*yNow)
-            x_ind += 1
+
+            # #Now define temporal neighbor relations 
+            # #TODO: Convert this to a function specific thing
+            # if sym == :θ
+            #     dxNow = symQuery.var_dict[currSym][1][2]
+            #     dxNext = symQuery.var_dict[nextSym][1][2]
+            #     neighSym = Meta.parse("dθ_$(t_ind)")
+            #     dyNow = symQuery.var_dict[neighSym][2][1]
+            #     @linkconstraint(symGraph, dxNext == dxNow + symQuery.dt*dyNow)
+            # else
+            #     dxNow = symQuery.var_dict[currSym][1][1]
+            #     dxNext = symQuery.var_dict[nextSym][1][1]
+            #     neighSym = Meta.parse("θ_$(t_ind)")
+            #     dyNow = symQuery.var_dict[neighSym][2][1]
+            #     @linkconstraint(symGraph, dxNext == dxNow + symQuery.dt*dyNow)
+            # end
         end
     end
 end
 
-###########################
 encode_time(symQuery, neurList)
-
-##############################
 #inputs to sym reach solve 
-t_sym = symQuery.ntime
+t_sym = 10
 #######Next define Sym Reach Solve###########
-function sym_reach_solve(symQuery, t_sym)
+function sym_reach_solve(symQuery::GraphPolyQuery, t_sym)
     #Ensure that the time step is within bounds
     @assert t_sym <= symQuery.ntime
     #Akin to conc_reach_solve
@@ -430,61 +295,49 @@ function sym_reach_solve(symQuery, t_sym)
     min_query = deepcopy(symQuery)
     lows = Array{Float64}(undef, 0)
     highs = Array{Float64}(undef, 0)
-    f_sym = Meta.parse("f_$(t_sym)")
-    min_dynModel = min_query.mod_dict[f_sym]
     minGraph = min_query.mod_dict[:graph]
     i = 0
 
     #Compute lower bounds
+    set_optimizer(minGraph, Gurobi.Optimizer)
+    #NOTE: Optimize each variable separately 
     for sym in min_query.problem.varList
         sym_t = Meta.parse("$(sym)_$(t_sym)") 
         i += 1
-        model = min_dynModel[i]
         v = min_query.var_dict[sym_t][end][1]
         dv = min_query.var_dict[sym_t][2][1]
-        @variable(model, next_v)
-        @constraint(model, next_v == v + query.dt*dv)
-        @objective(model, Min, next_v)
+        next_v_l = v + min_query.dt*dv
+        #NOTE: Set graph level objective directly
+        @objective(minGraph, Min, next_v_l)
+        optimize!(minGraph)
+        @assert termination_status(minGraph) == MOI.OPTIMAL
+        push!(lows, objective_value(minGraph))
     end
-
-    set_optimizer(minGraph, Gurobi.Optimizer)
-    optimize!(minGraph)
-    @assert termination_status(minGraph) == MOI.OPTIMAL
-    i = 0
-    for _ in symQuery.problem.varList
-        i += 1
-        push!(lows, value(min_dynModel[i][:next_v]))
-    end
-
 
     #Compute upper bounds
-    max_dynModel = max_query.mod_dict[f_sym]
     maxGraph = max_query.mod_dict[:graph]
-    i = 0
+    set_optimizer(maxGraph, Gurobi.Optimizer)
+    #NOTE: Optimize each variable separately
     for sym in query.problem.varList 
         sym_t = Meta.parse("$(sym)_$(t_sym)") 
-        i += 1
-        model = max_dynModel[i]
         v = max_query.var_dict[sym_t][end][1]
         dv = max_query.var_dict[sym_t][2][1]
-        @variable(model, next_v)
-        @constraint(model, next_v == v + max_query.dt*dv)
-        @objective(model, Max, next_v)
+        next_v_u = v + max_query.dt*dv
+        #NOTE: Set graph level objective directly
+        @objective(maxGraph, Min, -next_v_u)
+        optimize!(maxGraph)
+        push!(highs, -objective_value(maxGraph))
     end
 
-    set_optimizer(maxGraph, Gurobi.Optimizer)
-    optimize!(maxGraph)
-    i = 0
-    for _ in query.problem.varList
-        i += 1
-        push!(highs, value(max_dynModel[i][:next_v]))
-    end
     reach_set = Hyperrectangle(low=lows, high=highs)
     return reach_set
 end
 
+@time sym_set = sym_reach_solve(symQuery, t_sym)
+#plot(reachSets[end],title="Comparing Concrete and Hyb Reach_$(symQuery.ntime)", label="Concrete Reach Set", legend = :bottomright)
+#plot!(sym_set, label="Hyb Reach Set")
 
-@time sym_hyp = sym_reach_solve(symQuery, t_sym)
-
-plot(reachsets[end])
-plot!(sym_hyp)
+#Verify the property
+safe_hyp = Hyperrectangle(low=[0], high=[1])
+project(sym_set, [1]) ⊆ safe_hyp
+extrema(sym_set)

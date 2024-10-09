@@ -4,7 +4,7 @@ include("problems.jl")
 using JuMP, Gurobi, MathOptInterface
 # ENV["GRB_LICENSE_FILE"] = "/barrett/scratch/akinwande/gurobi.lic"
 
-function ccEncoding!(xS, yLB, yUB, Tri, query::DistrOvertQuery,sym, ind, model)
+function ccEncoding!(xS, yLB, yUB, Tri, query::GraphPolyQuery,sym, ind, model)
     """
     Method to encode a piecewise affine function as a mixed integer program following the convex combination method as defined in Gessler et. al. 2012
         (https://www.dl.behinehyab.com/Ebooks/IP/IP011_655874_www.behinehyab.com.pdf#page=308)
@@ -83,7 +83,7 @@ function ccEncoding!(xS, yLB, yUB, Tri, query::DistrOvertQuery,sym, ind, model)
 
 end
 
-function ccEncoding!(xS, yLB, yUB, Tri, query::RegOvertQuery,sym, ind)
+function ccEncoding!(xS, yLB, yUB, Tri, query::FlatPolyQuery,sym, ind)
     """
     Method to encode a piecewise affine function as a mixed integer program following the convex combination method as defined in Gessler et. al. 2012
         (https://www.dl.behinehyab.com/Ebooks/IP/IP011_655874_www.behinehyab.com.pdf#page=308)
@@ -98,8 +98,6 @@ function ccEncoding!(xS, yLB, yUB, Tri, query::RegOvertQuery,sym, ind)
         ind: index of the model in the problem varList
     """
 
-    optimizer = JuMP.optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0)
-
     #Following the convention from Gessler et. al. 
 
     m = size(xS, 1) #Number of vertices
@@ -110,9 +108,9 @@ function ccEncoding!(xS, yLB, yUB, Tri, query::RegOvertQuery,sym, ind)
     # uCoef = zeros(1, du) #Control coefficients. Only nonzero if control coefficients apply to the function value
     uCoef = query.problem.control_coef[ind]
     #uCoef = reshape(uCoef, 1, dU)
-
-    model = Model(optimizer)
-    set_silent(model)
+    
+    model = query.mod_dict[sym]
+    #set_silent(model)
 
     #Define convex coefficients as a MIP variable 
     #TODO Fix to be a float (not an int).Done 
