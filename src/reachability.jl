@@ -14,7 +14,34 @@ function encode_dynamics!(query::FlatPolyQuery)
     i = 0
     #For each model with an overt approximation, encode the dynamics in a MIP model, and add to the corresponding dictionaryl
     optimizer = JuMP.optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0)
-    model = Model(optimizer)
+    
+    if isnothing(query.mod_dict)
+        model = Model(optimizer)
+        print("Model dict not define in encode dynamics?")
+    else
+        if isempty(query.mod_dict)
+            model = Model(optimizer)
+            print("Model defined here")
+        else
+            model = query.mod_dict[query.problem.varList[1]]
+        end
+    end
+
+    #Define the bounds for input variables 
+    stateDim = dim(query.problem.domain)
+    stateBounds = extrema(query.problem.domain)
+    stateVec = @variable(model, [1:stateDim], base_name = "X")
+
+    #Constrain the input variables to be within the bounds of the domain
+    for (i,(l, u)) in enumerate(zip(stateBounds...))
+        @constraint(model, stateVec[i] <= u)
+        @constraint(model, stateVec[i] >= l)
+    end
+
+    #Add the input variables to the query variable dictionary
+    query.var_dict[:X] = [stateVec]
+
+    i = 0
     for sym in query.problem.varList
         i += 1
         LB, UB = query.problem.bounds[i]
@@ -41,11 +68,11 @@ function encode_control!(query::FlatPolyQuery)
     control_vars = []
     output_vars = []
     for sym in query.problem.varList
-        #Get dictionary of MIP variables 
-        push!(input_vars, query.var_dict[sym][1]...)
+        #Get dictionary of MIP variables
         push!(control_vars, query.var_dict[sym][3][1]...)
         push!(output_vars, query.var_dict[sym][2]...)
     end
+    input_vars = query.var_dict[:X][1]
     #Get the inputs expected by the controller
     mipModel = query.mod_dict[query.problem.varList[1]]
     con_inp_vars, con_inp_set, con_vars = query.problem.control_func(mipModel, input_vars, control_vars, output_vars, input_set)
@@ -61,62 +88,59 @@ function reach_solve(query, t_idx::Union{Nothing,Int64}=nothing)
     stateVar = query.problem.varList
     trueInp = []
     trueOut = []
-    stateVarTimed = Any[]
     
-    #Compute true input and output variables 
-    i = 1
-    for sym in stateVar
+    #Compute true input and output variables
+    for sym in stateVar 
         if !isnothing(t_idx)
             #Account for symbolic case where dynamics are timed
             sym_timed = Meta.parse("$(sym)_$t_idx")
-            input_vars = query2.var_dict[sym_timed][1]
-            output_vars = query2.var_dict[sym_timed][2]
-            push!(stateVarTimed, sym_timed)
+            in_timed = Meta.parse("X_$t_idx")
+            input_vars = query.var_dict[in_timed][1]
+            output_vars = query.var_dict[sym_timed][2]
         else   
-            input_vars = query2.var_dict[sym][1]
-            output_vars = query2.var_dict[sym][2]
+            input_vars = query.var_dict[:X][1]
+            output_vars = query.var_dict[sym][2]
         end
-
-        #TODO: To this more cleverly
-        #NOTE: Done, avoids the need for different cases
-        push!(trueInp, input_vars...)
         push!(trueOut, output_vars...)
     end
-
+    push!(trueInp, input_vars...)
+    
     integration_map = query.problem.update_rule(trueInp, trueOut)
     
     timestep_nplus1_vars = GenericAffExpr{Float64,VariableRef}[]
     lows = Array{Float64}(undef, 0)
     highs = Array{Float64}(undef, 0)
+    
+    #Account for symbolic case with timed dynamics
+    if !isnothing(t_idx)
+        symTimed = Meta.parse("X_$t_idx")
+        input_vars = query.var_dict[symTimed][1]
+    else
+        input_vars = query.var_dict[:X][1]
+    end
+    #NOTE: We use the same mip model for all symbols
+    mipModel = query.mod_dict[stateVar[1]]
 
-    #Loop over symbols with OVERT approximations to compute reach steps
-    for sym in stateVar
-        #Account for symbolic case with timed dynamics
-        if !isnothing(t_idx)
-            symTimed = Meta.parse("$(sym)_$t_idx")
-            input_vars = query.var_dict[symTimed][1]
-        else
-            input_vars = query.var_dict[sym][1]
-        end
-        mipModel = query.mod_dict[sym]
-        for v in input_vars 
-            if v in trueInp
-                dv = integration_map[v]
-                next_v = v + query.dt*dv
-                push!(timestep_nplus1_vars, next_v)
-                @objective(mipModel, Min, next_v)
-                JuMP.optimize!(mipModel)
-                @assert termination_status(mipModel) == MOI.OPTIMAL
-                objective_bound(mipModel)
-                push!(lows, objective_value(mipModel))
-                @objective(mipModel, Max, next_v)
-                JuMP.optimize!(mipModel)
-                @assert termination_status(mipModel) == MOI.OPTIMAL
-                objective_bound(mipModel)
-                push!(highs, objective_value(mipModel))
-            end
+    for v in input_vars 
+        if v in trueInp
+            dv = integration_map[v]
+            next_v = v + query.dt*dv
+            push!(timestep_nplus1_vars, next_v)
+            @objective(mipModel, Min, next_v)
+            # @objective(mipModel, Max, dv)
+            JuMP.optimize!(mipModel)
+            termination_status(mipModel)
+            @assert termination_status(mipModel) == MOI.OPTIMAL
+            #objective_bound(mipModel)
+            push!(lows, objective_bound(mipModel))
+            @objective(mipModel, Max, next_v)
+            JuMP.optimize!(mipModel)
+            @assert termination_status(mipModel) == MOI.OPTIMAL
+            objective_bound(mipModel)
+            push!(highs, objective_bound(mipModel))
         end
     end
+
     #NOTE: Hyperrectangle can plot in higher dimensions as well
     reacheable_set = Hyperrectangle(low=lows, high=highs)
     return reacheable_set
@@ -128,14 +152,22 @@ function concreach!(query::FlatPolyQuery)
     Modifies the query object in place (specifically the bounds generated by OVERT)
     """
     query.problem.bounds = query.problem.bound_func(query.problem)
-    query.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
-    query.mod_dict = Dict{Symbol,JuMP.Model}()
+    if isnothing(query.var_dict)
+        query.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
+    end
+    if isnothing(query.mod_dict)
+        query.mod_dict = Dict{Symbol,JuMP.Model}()
+    end
+    # query.mod_dict = Dict{Symbol,JuMP.Model}()
     encode_dynamics!(query)
 
     #Encode the controller if it exists
     if !isnothing(query.network_file)
         encode_control!(query)
     end
+
+    #Link bounded inputs to the cc encoding 
+    query.problem.link_func(query)
 
     reachSet =  reach_solve(query)
     return reachSet, query.problem.bounds
@@ -149,15 +181,15 @@ function multi_step_concreach(query::FlatPolyQuery)
     reachSets = [input_set]
     boundSets = []
     
-    t1 = Dates.now()
+    #t1 = Dates.now()
     for i = 1:query.ntime
         reachSet, boundSet = concreach!(query)
         push!(reachSets, reachSet)
         push!(boundSets, boundSet)
         query.problem.domain = reachSet
     end
-    t2 = Dates.now()
-    println("Time for concrete reachability is ", t2-t1)
+    #t2 = Dates.now()
+    #println("Time for concrete reachability is ", t2-t1)
     return reachSets, boundSets
 end
 
@@ -401,7 +433,7 @@ function encode_time(symQuery::FlatPolyQuery)
             v = x_now[k]
             dv = integration_map[v]
             next_v = x_next[k]
-            @constraint(sym_mip, next_v == v + symQuery.dt*dv)
+            @constraint(sym_mip, next_v .== v .+ symQuery.dt.*dv)
         end
 
     end
@@ -464,6 +496,9 @@ function sym_reach_solve(query::FlatPolyQuery, t_idx::Union{Nothing,Int64}=nothi
 
     for v in trueInp 
         dv = integration_map[v]
+        if typeof(dv) == Vector{VariableRef}
+            dv = dv[1]
+        end
         next_v = v + query.dt*dv
         push!(timestep_nplus1_vars, next_v)
         @objective(mipModel, Min, next_v)

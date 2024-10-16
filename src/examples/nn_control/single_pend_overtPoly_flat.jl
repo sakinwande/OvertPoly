@@ -93,11 +93,13 @@ function single_pend_control(model, input_vars, control_vars, output_vars, input
 end
 
 function single_pend_update_rule(input_vars, overt_output_vars)
-    ddth = overt_output_vars[1][1]
+    ddth = overt_output_vars[1]
     integration_map = Dict(input_vars[1] => input_vars[2], input_vars[2] => ddth)
     return integration_map
 end
 
+function single_pend_link(SinglePendulum)
+end
 SinglePendulum = FlatPolyProblem(
     expr, # dynamics
     nothing, #decomposed form of the dynamics. Done manually
@@ -109,7 +111,8 @@ SinglePendulum = FlatPolyProblem(
 	single_pend_update_rule,
     single_pend_dynamics,
     bound_pend,
-    single_pend_control
+    single_pend_control,
+    single_pend_link
 )
 
 query = FlatPolyQuery(
@@ -144,7 +147,7 @@ extrema(project(reachSets[10], [1]))
 
 #plot(reachSets, title="Single Pendulum Concrete Reachability")
 
-
+include("../../reachability.jl")
 #Use concrete sets to compute symbolic reach set at time step 10
 symQuery1 = deepcopy(query)
 symQuery1.problem.bounds = boundSets
@@ -152,6 +155,9 @@ symQuery1.ntime = 10
 
 #############Testing Single Step Hybrid Symbolic Reachability############
 @time reach_set = symReach(symQuery1, reachSets)
+
+extrema(reach_set)[1]
+extrema(reach_set)[2]
 #Verify the property
 project(reach_set, [1]) ⊆ safe_hyp
 extrema(project(reach_set, [1]))

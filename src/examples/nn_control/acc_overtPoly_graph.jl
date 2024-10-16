@@ -311,10 +311,32 @@ query = GraphPolyQuery(
 #TEST:MOI backend experimentation
 #########################
 query1 = deepcopy(query)
-@time reachsets, boundsets = multi_step_concreach(query1);
+query1.ntime = 50
+@time reachSets, boundSets = multi_step_concreach(query1);
 
+
+
+t = 50
+#Lead
+plot(project(reachSets[t], [1,2]), label="GraphReach")
+plot!(project(reachsets[t], [1,2]), label="FlatReach")
+#plot!(project(overtSet, [1,2]), label="OVERT")
+
+plot(project(reachSets[t], [2,3]), label="GraphReach")
+plot!(project(reachsets[t], [2,3]), label="FlatReach")
+#plot!(project(overtSet, [2,3]), label="OVERT")
+
+#Ego
+plot(project(reachSets[t], [4,5]), label="GraphReach")
+plot!(project(reachsets[t], [4,5]), label="FlatReach")
+#plot!(project(overtSet, [4,5]), label="OVERT")
+
+plot(project(reachSets[t], [5,6]), label="GraphReach")
+plot!(project(reachsets[t], [5,6]), label="FlatReach")
+#plot!(project(overtSet, [5,6]), label="OVERT")
 #Verifying the property
-tstart = Dates.now()
+
+
 dRel = Any[]
 dSafe = Any[]
 for reachset in reachsets

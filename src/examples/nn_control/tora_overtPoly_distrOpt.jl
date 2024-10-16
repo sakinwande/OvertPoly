@@ -38,7 +38,7 @@ end
 domain = Hyperrectangle(low=[0.6, -0.7, -0.4, 0.5], high = [0.7, -0.6, -0.3, 0.6])
 #TODO: Decide on step size needed to make discrete time reachability reasonable
 numSteps = 20
-dt = 0.1
+dt = 0.05
 
 
 ####Define Bound TORA########
@@ -98,6 +98,8 @@ function bound_tora(TORA; plotFlag=false)
 
     #Finally, bound dx4 (dx4 = u)
     #Here, since dx4 is directly a function of u, just use a constant 
+    κ = 1e-8
+    # x4Func = :($κ*x4)
     x4Func = :(0*x4)
     x4FuncLB, x4FuncUB = interpol(bound_univariate(x4Func, lb_x4, ub_x4, plotflag = plotFlag)...)
     bounds = [[x1FuncLB, x1FuncUB], [x2FuncLB, x2FuncUB], [x3FuncLB, x3FuncUB], [x4FuncLB, x4FuncUB]]
@@ -128,7 +130,7 @@ function tora_dyn_con_link!(query, neurons, graph, dynModel, netModel)
     @variable(netModel, u)
     #Normalizing output of the network as well
     #NOTE: This was the source of our error. Chelsea already normalized the output in the NNET file.
-    @constraint(netModel, u == neurons[end][1] - 10)
+    @constraint(netModel, u == neurons[end][1])
     @linkconstraint(graph, netModel[:u] == dynModel[4][:u])
 
     #Finally, identify pertinent input variable for each model
@@ -171,84 +173,63 @@ query = GraphPolyQuery(
     2 #case. Delete this param
 )
 
+
+
+#########Debug Bound TORA#############
+#####################
 #Test single step concrete reachability
-#@time reachset, boundset = concreach!(query);
+query1 = deepcopy(query)
+query1.ntime = 1
+@time reachset, boundset = concreach!(query1);
 
 #Test multi-step concrete reachability
-@time reachsets, boundsets = multi_step_concreach(query);
+query2 = deepcopy(query)
+query2.ntime = 20
+@time reachsets, boundsets = multi_step_concreach(query2);
 
-reachsets[end]
+overtSet = Hyperrectangle(low=[
+    -0.34415609789501067
+ -1.070147842066413
+ -0.020800937713150447
+  0.13458397572173186
+],
+high=[
+    -0.0723092674737037
+ -0.7876645636084808
+  0.2220092844249411
+  0.4163216175335922
+])
 
-##################Debugging concreach for tora########################
-    query.problem.bounds = query.problem.bound_func(query.problem)
-    query.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
-    query.mod_dict = Dict{Symbol,Any}()
 
-    encode_dynamics!(query)
+t = 20
+#Comparing to OVERT
+plot(project(reachsets[t+1], [1, 2]), lab="Reach Set", color="lightpink", lw=0.5)
+plot!(project(overtSet, [1, 2]), lab="OVERT Set", color="lightblue", lw=0.5)
 
-    #Encode the network and link the control to the dynamics
-    if !isnothing(query.network_file)
-        neurons = encode_control!(query)
+plot(project(reachsets[t+1], [3, 4]), lab="Reach Set", color="lightpink", lw=0.5)
+plot!(project(overtSet, [3, 4]), lab="OVERT Set", color="lightblue", lw=0.5)
+#checking the property 
+safeSet = Hyperrectangle(low=[-2, -2, -2, -2], high=[2, 2, 2, 2])
+
+
+overtSet
+reachsets[t+1]
+
+
+for (i, reachset) in enumerate(reachsets)
+    if !(LazySets.issubset(reachset, safeSet))
+        println("Property is violated at time $i")
     end
+end
 
-    dyn_con_link! = query.problem.link_func
-    dyn_con_link!(query, neurons)
+p = plot(project(safeSet, [1, 2]), lab="Safe Set", color="lightblue", lw=0.5)
+for reachset in reachsets
+    plot!(project(reachset, [1, 2]), color="lightpink", lw=0.5)
+end
+display(p)
 
-
-
-    ############Entering conc_reach_solve################
-    max_query = deepcopy(query)
-    min_query = deepcopy(query)
-    lows = Array{Float64}(undef, 0)
-    highs = Array{Float64}(undef, 0)
-    min_dynModel = min_query.mod_dict[:f]
-    minGraph = min_query.mod_dict[:graph]
-    i = 0
-    #Compute lower bounds
-    for sym in min_query.problem.varList 
-        i += 1
-        model = min_dynModel[i]
-        v = min_query.var_dict[sym][end][1]
-        dv = min_query.var_dict[sym][2][1]
-        @variable(model, next_v)
-        @constraint(model, next_v == v + query.dt*dv)
-        @objective(model, Min, next_v)
-    end
-
-    set_optimizer(minGraph, Gurobi.Optimizer)
-    optimize!(minGraph)
-    @assert termination_status(minGraph) == MOI.OPTIMAL
-    i = 0
-    for _ in query.problem.varList
-        i += 1
-        push!(lows, value(min_dynModel[i][:next_v]))
-    end
-
-    #Compute upper bounds
-    max_dynModel = max_query.mod_dict[:f]
-    maxGraph = max_query.mod_dict[:graph]
-    i = 0
-    for sym in query.problem.varList 
-        i += 1
-        model = max_dynModel[i]
-        v = max_query.var_dict[sym][end][1]
-        dv = max_query.var_dict[sym][2][1]
-        @variable(model, next_v)
-        @constraint(model, next_v == v + max_query.dt*dv)
-        @objective(model, Max, next_v)
-    end
-
-    set_optimizer(maxGraph, Gurobi.Optimizer)
-    optimize!(maxGraph)
-    i = 0
-    for _ in query.problem.varList
-        i += 1
-        push!(highs, value(max_dynModel[i][:next_v]))
-    end
-
-    lows
-    highs
-    reach_set = Hyperrectangle(low=lows, high=highs)
-#########################################
-# #So... conc reach solve is resulting in issues 
-# @time reachsets, boundsets = multi_step_concreach(query)
+q = plot(project(safeSet, [3, 4]), lab="Safe Set", color="lightblue", lw=0.5)
+for reachset in reachsets
+    plot!(project(reachset, [3, 4]), color="lightpink", lw=0.5)
+end
+display(q)

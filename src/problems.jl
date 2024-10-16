@@ -53,6 +53,23 @@ mutable struct GraphPolyProblem
 	link_func::Function
 end
 
+
+#Struct for regular problems 
+mutable struct FlatPolyProblem
+	expr
+	dec_expr
+	control_coef
+	control_dim
+    domain::Hyperrectangle
+	varList #List of variables that have OVERT bounds
+    bounds #List of bounds in the same order as varList
+	update_rule #graph problem doesn't have an update rule because connections are made in the graph
+	dynamics::Function 
+	bound_func::Function
+	control_func::Function
+	link_func::Function
+end
+
 mutable struct GraphPolyQuery
 	problem::GraphPolyProblem
 	network_file::Union{Nothing,String}
@@ -64,22 +81,6 @@ mutable struct GraphPolyQuery
 	var_dict::Union{Nothing,Dict{Symbol,Vector{AbstractVector{VariableRef}}}} #holds [x, y, u]
 	mod_dict::Union{Nothing,Dict{Symbol,Any}}
 	case #Determines if variables are case 1(x, y, z etc) or case 2 (x, dx, y, dy, etc)
-end
-
-
-#Struct for regular problems 
-mutable struct FlatPolyProblem
-	expr
-	dec_expr
-	control_coef
-	control_dim
-    domain::Hyperrectangle
-	varList #List of variables that have OVERT bounds
-    bounds #List of bounds in the same order as varList
-	update_rule
-	dynamics::Function 
-	bound_func::Function
-	control_func::Function
 end
 
 mutable struct FlatPolyQuery

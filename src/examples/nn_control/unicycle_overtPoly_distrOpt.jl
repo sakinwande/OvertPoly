@@ -33,8 +33,8 @@ function unicycle_control(input_set)
     return con_inp_set
 end
 
-dt = 0.1
-numSteps = 40
+dt = 0.2
+numSteps = 10
 w = 1e-4
 domain = Hyperrectangle(low=[9.5,-4.5,2.1,1.5], high = [9.55,-4.45,2.11,1.51])
 ########TEST: Debugging Bound Unicycle#########
@@ -270,8 +270,8 @@ function unicycle_dyn_con_link!(query, neurons, graph, dynModel, netModel, t_ind
 
     #Normalizing output of the network as well
     #NOTE: This was the source of our error. Chelsea already normalized the output in the NNET file.
-    @constraint(netModel, u1 == neurons[end][1] - 20)
-    @constraint(netModel, u2 == neurons[end][2] - 20)
+    @constraint(netModel, u1 == neurons[end][1])
+    @constraint(netModel, u2 == neurons[end][2])
 
     @linkconstraint(graph, netModel[:u1] == dynModel[4][:u])
     @linkconstraint(graph, netModel[:u2] == dynModel[3][:u])
@@ -291,7 +291,7 @@ function unicycle_dyn_con_link!(query, neurons, graph, dynModel, netModel, t_ind
 
 end
 
-Unicycle = OvertPProblem(
+Unicycle = GraphPolyProblem(
     exprList, #dynamics
     nothing, #no decomposed dynamics
     control_coef, #control coefficients
@@ -304,7 +304,7 @@ Unicycle = OvertPProblem(
     unicycle_dyn_con_link!
 )
 
-query = OvertPQuery(
+query = GraphPolyQuery(
     Unicycle, #problem
     controller, #path to network file
     Id(), #last layer activation 
@@ -317,10 +317,34 @@ query = OvertPQuery(
     2 #case. Delete this param
 )
 
-symQuery = deepcopy(query)
-#Next, test multi-step concrete reachability
-@time reachSets, boundSets = multi_step_concreach(query);
 
+#Next, test multi-step concrete reachability
+query1 = deepcopy(query)
+query1.ntime = 1
+@time reachSet, boundSet = concreach!(query1);
+
+#Next, test multi-step concrete reachability
+query2 = deepcopy(query)
+query2.ntime = 10
+@time reachSets, boundSets = multi_step_concreach(query2);
+
+#Test hybrid reachability
+depMat = [[1,0,1,1],[0,1,1,1], [0,0,1,0], [0,0,0,1]]
+t_sym = 10
+query3 = deepcopy(query)
+@time reach_set = hybreach(query3, depMat, t_sym)
+
+
+goalSet = Hyperrectangle(low = [-0.6, -0.2, -0.06, -0.3], high=[0.6, 0.2, 0.06, 0.3])
+
+plot(project(reachSets[end], [1,2]), lab="Reachable Set", color="lightblue", lw=0.5)
+plot!(project(goalSet, [1,2]), lab="Goal Set", color="red", lw=0.5)
+
+
+plot(project(reachSets[end], [3,4]))
+plot!(project(goalSet, [3,4]))
+
+symQuery = deepcopy(query)
 symQuery.problem.bounds = boundSets
 reachSets[end]
 

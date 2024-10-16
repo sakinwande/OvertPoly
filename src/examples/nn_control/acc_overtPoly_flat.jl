@@ -10,7 +10,7 @@ using Dates
 #TODO: Evaluates to infeasible 
 ac_lead = -2.0
 mu = 0.0001
-control_coef = [[0],[0]]
+control_coef = [[0],[2]]
 exprList = [:(- $mu*x2^2 + -2*x3 + 2*$ac_lead ), :(- $mu*x5^2 -2*x6)]
 controller = "Networks/ARCH-COMP-2023/nnet/controllerACC.nnet"
 
@@ -78,11 +78,11 @@ function acc_control(model, input_vars, control_vars, output_vars, input_set, ϵ
     #First define the control inputs expected by the network 
     vSet = @variable(model, [1:1], base_name = "v_set")
     tGap = @variable(model, [1:1], base_name = "tGap")
-    # dRel = @variable(model, [1:1], base_name = "dRel")
-    # vRel = @variable(model, [1:1], base_name = "vRel")
-    @variable(model, 89 <=dRel <= 100)
-    @variable(model, 1.8 <=vRel <= 2.2)
-    @variable(model, 30 <= vEgo <= 30.2)
+    dRel = @variable(model, [1:1], base_name = "dRel")
+    vRel = @variable(model, [1:1], base_name = "vRel")
+    # @variable(model, 89 <=dRel <= 100)
+    # @variable(model, 1.8 <=vRel <= 2.2)
+    # @variable(model, 30 <= vEgo <= 30.2)
 
     #Constraint these to be constants/params. Should these be set as constants? 
     #TODO: Review if these are best posed as constants 
@@ -91,8 +91,8 @@ function acc_control(model, input_vars, control_vars, output_vars, input_set, ϵ
     @constraint(model, dRel .== input_vars[1] - input_vars[4])
     @constraint(model, vRel .== input_vars[2] - input_vars[5])
 
-    #con_inp_vars = [vSet[1], tGap[1], input_vars[5], dRel[1], vRel[1]]
-    con_inp_vars = [30.0, 1.40, vEgo, dRel, vRel]
+    con_inp_vars = [vSet[1], tGap[1], input_vars[5], dRel[1], vRel[1]]
+    #con_inp_vars = [30.0, 1.40, vEgo, dRel, vRel]
     
     #Next, provide network order control variables to the network
     con_net_vars = control_vars[end]
@@ -110,7 +110,22 @@ function acc_control(model, input_vars, control_vars, output_vars, input_set, ϵ
     con_inp_set = Hyperrectangle(low=[30.0-ϵ, 1.40-ϵ, LBs[5], dRel_LB, vRel_LB], high=[30.0+ϵ, 1.40+ϵ, UBs[5], dRel_UB, vRel_UB])
     return con_inp_vars, con_inp_set, con_net_vars
 end
- 
+
+function acc_dyn_con_link!(query)
+    """
+    Method to link bounded input variables to the input set for CC encoding
+    """
+    #Define the model
+    model = query.mod_dict[:x3]
+    #second state variable (lead velocity) is the first input to f3
+    @constraint(model, query.var_dict[:X][1][2] == query.var_dict[:x3][1][1])
+    #third state variable (lead acceleration) is the second input to f3
+    @constraint(model, query.var_dict[:X][1][3] == query.var_dict[:x3][1][2])
+    #fifth state variable (ego velocity) is the first input to f6
+    @constraint(model, query.var_dict[:X][1][5] == query.var_dict[:x6][1][1])
+    #sixth state variable (ego acceleration) is the second input to f6
+    @constraint(model, query.var_dict[:X][1][6] == query.var_dict[:x6][1][2])
+end
 #Some issues with starting at zero, start with eps
 ϵ = 1e-8
 domain = Hyperrectangle(low=[90,32,-ϵ,10,30,-ϵ], high=[110,32.2,ϵ,11,30.2,ϵ])
@@ -200,7 +215,8 @@ function bound_acc(ACC; plotFlag = false)
         plotSurf(egoExpr, egoLB, egoUB, surfDim_E, xS_E, yS_E, plotFlag)
     end
 
-    bounds = [[leadLB_l, leadUB_l], [egoLB_l, egoUB_l]]
+    # bounds = [[leadLB_l, leadUB_l], [egoLB_l, egoUB_l]]
+    bounds = [[leadLB, leadUB], [egoLB, egoUB]]
     return bounds
 end
 
@@ -215,7 +231,8 @@ ACC = FlatPolyProblem(
     acc_update_rule, #Update rule for ACC dynamics
     acc_dynamics, #Dynamics of the ACC benchmark
     bound_acc, #Function to bound ACC dynamics
-    acc_control #Control function for ACC benchmark
+    acc_control, #Control function for ACC benchmark
+    acc_dyn_con_link!
 )
 
 query = FlatPolyQuery(
@@ -233,129 +250,19 @@ query = FlatPolyQuery(
 
 ###########TEST: Getting to the Backend###############
 query2 = deepcopy(query)
-query2.ntime = 1
+query2.ntime = 50
+reachset, boundset = concreach!(query2)
+extrema(reachset)
 
-query2.problem.bounds = query2.problem.bound_func(query2.problem, plotFlag=false)
-query2.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
-query2.mod_dict = Dict{Symbol,JuMP.Model}()
+#########TEST: Multi Step Concrete Reachability########
+query3 = deepcopy(query)
+query3.ntime = 50
+@time reachsets, boundsets = multi_step_concreach(query3);
 
-encode_dynamics!(query2)
+extrema(reachsets[end])
+isnothing(query.mod_dict)
+query.mod_dict = Dict{Symbol,JuMP.Model}()
+isempty(query.mod_dict)
 
-# #Encode the controller if it exists
-# if !isnothing(query2.network_file)
-#     encode_control!(query2)
-# end
-
-################################################
-#Debug encode control 
-    input_set = query2.problem.domain
-    network_file = query2.network_file
-    input_vars = []
-    control_vars = []
-    output_vars = []
-    for sym in query2.problem.varList
-        #Get dictionary of MIP variables 
-        push!(input_vars, query2.var_dict[sym][1]...)
-        push!(control_vars, query2.var_dict[sym][3][1]...)
-        push!(output_vars, query2.var_dict[sym][2]...)
-    end
-    input_vars
-    control_vars
-    output_vars
-    
-    mipModel = query2.mod_dict[query2.problem.varList[1]]
-    con_inp_vars, con_inp_set, con_vars = query2.problem.control_func(mipModel, input_vars, control_vars, output_vars, input_set)
-
-    con_inp_vars
-    con_inp_set
-    con_vars
-    #cb = add_controller_constraints!(mipModel, network_file, con_inp_set, con_inp_vars, con_vars) 
-
-    #Read network file 
-    network = read_nnet(network_file, last_layer_activation=Id())
-    #Initialize neurons (adds variables)
-    neurons = init_neurons(mipModel, network)
-    #Initialize deltas (adds binary variables)
-    deltas = init_deltas(mipModel, network)
-    #Use Taylor Johnson paper (https://arxiv.org/abs/1708.03322) to get bounds  
-    bounds = get_bounds(network, con_inp_set)
-    #Add NN MIP model to the given model
-    #This is defined in the constraints.jl file. Appears to be the Tjeng paper encoding
-    encode_network!(mipModel, network, neurons, deltas, bounds, BoundedMixedIntegerLP())
-    #Relate the NN variables to the dynamics variables
-    neurons[1]
-    neurons[end]
-    #@constraint(mipModel, neurons[1] == con_inp_vars)  # set inputvars
-    @constraint(mipModel, neurons[1][1:3] .== con_inp_vars[1:3])  # set inputvars
-    @constraint(mipModel, con_vars .== neurons[end])  # set outputvars
-    ####################################################
-
-reach_solve(query2)
-###################################
-t_idx = nothing
-########################################
-    stateVar = query2.problem.varList
-    trueInp = []
-    trueOut = []
-    stateVarTimed = Any[]
-    
-    #Compute true input and output variables 
-    for sym in stateVar
-        if !isnothing(t_idx)
-            #Account for symbolic case where dynamics are timed
-            sym_timed = Meta.parse("$(sym)_$t_idx")
-            input_vars = query2.var_dict[sym_timed][1]
-            output_vars = query2.var_dict[sym_timed][2]
-            push!(stateVarTimed, sym_timed)
-        else   
-            input_vars = query2.var_dict[sym][1]
-            output_vars = query2.var_dict[sym][2]
-        end
-
-        #TODO: To this more cleverly
-        #NOTE: Done, avoids the need for different cases
-        push!(trueInp, input_vars...)
-        push!(trueOut, output_vars...)
-    end
-    
-    integration_map = query2.problem.update_rule(trueInp, trueOut)
-    
-    timestep_nplus1_vars = GenericAffExpr{Float64,VariableRef}[]
-    lows = Array{Float64}(undef, 0)
-    highs = Array{Float64}(undef, 0)
-
-    #Loop over symbols with OVERT approximations to compute reach steps
-    sym = stateVar[2]
-    for sym in stateVar
-        #Account for symbolic case with timed dynamics
-        if !isnothing(t_idx)
-            symTimed = Meta.parse("$(sym)_$t_idx")
-            input_vars = query2.var_dict[symTimed][1]
-        else
-            input_vars = query2.var_dict[sym][1]
-        end
-        mipModel = query2.mod_dict[sym]
-        #TEST: remove
-        v = input_vars[3]
-        for v in input_vars 
-            if v in trueInp
-                dv = integration_map[v]
-                next_v = v + query2.dt*dv
-                push!(timestep_nplus1_vars, next_v)
-                @objective(mipModel, Min, next_v)
-                # @objective(mipModel, Max, dv)
-                JuMP.optimize!(mipModel)
-                termination_status(mipModel)
-                @assert termination_status(mipModel) == MOI.OPTIMAL
-                objective_bound(mipModel)
-                push!(lows, objective_value(mipModel))
-                @objective(mipModel, Max, next_v)
-                JuMP.optimize!(mipModel)
-                @assert termination_status(mipModel) == MOI.OPTIMAL
-                objective_bound(mipModel)
-                push!(highs, objective_value(mipModel))
-            end
-        end
-    end
-    #NOTE: Hyperrectangle can plot in higher dimensions as well
-    reacheable_set = Hyperrectangle(low=lows, high=highs)
+extrema(reachsets[end])
+extrema(reachSets[end])

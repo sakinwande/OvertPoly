@@ -40,6 +40,10 @@ function encode_control!(query::GraphPolyQuery)
     return neurons
 end
 
+function JuMP.objective_bound(graph::OptiGraph)
+    return MOI.get(graph, MOI.ObjectiveBound())
+end
+
 function conc_reach_solve(query)
     max_query = deepcopy(query)
     min_query = deepcopy(query)
@@ -52,49 +56,34 @@ function conc_reach_solve(query)
     min_netModel = min_query.mod_dict[:u]
     i = 0
     #Compute lower bounds
+    set_optimizer(minGraph, Gurobi.Optimizer)
+    #NOTE: Optimize each variable separately
     for sym in min_query.problem.varList 
-        i += 1
-        model = min_dynModel[i]
         v = min_query.var_dict[sym][end][1]
         dv = min_query.var_dict[sym][2][1]
         next_v_l = v + min_query.dt*dv
-        @objective(model, Min, next_v_l)
+        #NOTE: Set graph level objective directly
+        @objective(minGraph, Min, next_v_l)
+        optimize!(minGraph)
+        @assert termination_status(minGraph) == MOI.OPTIMAL
+        #push!(lows, objective_value(minGraph))
+        push!(lows, JuMP.objective_bound(minGraph))
     end
-    #Optimize the netmodel as well 
-    @objective(min_netModel, Min, 0)
-
-    set_optimizer(minGraph, Gurobi.Optimizer)
-    optimize!(minGraph)
-    @assert termination_status(minGraph) == MOI.OPTIMAL
-    i = 0
-    for _ in query.problem.varList
-        i += 1
-        push!(lows, value(objective_function(min_dynModel[i])))
-    end
-
+    
     #Compute upper bounds
     max_dynModel = max_query.mod_dict[:f]
     maxGraph = max_query.mod_dict[:graph]
     max_netModel = max_query.mod_dict[:u]
-    i = 0
+    set_optimizer(maxGraph, Gurobi.Optimizer)
     for sym in query.problem.varList 
-        i += 1
-        model = max_dynModel[i]
         v = max_query.var_dict[sym][end][1]
         dv = max_query.var_dict[sym][2][1]
         next_v_u = v + max_query.dt*dv
-        @objective(model, Min, -next_v_u)
-    end
-    #Optimize the netmodel as well
-    @objective(max_netModel, Min, 0)
-
-    set_optimizer(maxGraph, Gurobi.Optimizer)
-    optimize!(maxGraph)
-    i = 0
-    #NOTE: We use negative value for the Maximization because Plasmo converts everything into a minimization problem, and that yields negative values 
-    for _ in query.problem.varList
-        i += 1
-        push!(highs, -value(objective_function(max_dynModel[i])))
+        #NOTE: Set graph level objective directly
+        @objective(maxGraph, Min, -next_v_u)
+        optimize!(maxGraph)
+        #push!(highs, -objective_value(maxGraph))
+        push!(highs, -JuMP.objective_bound(maxGraph))
     end
     reach_set = Hyperrectangle(low=lows, high=highs)
     return reach_set 
@@ -131,11 +120,12 @@ function multi_step_concreach(query::GraphPolyQuery)
     boundSets = []
     
     #t1 = Dates.now()
+    
     for i = 1:query.ntime
+        query.problem.domain = reachSets[end]
         reachSet, boundSet = concreach!(query)
         push!(reachSets, reachSet)
         push!(boundSets, boundSet)
-        query.problem.domain = reachSet
     end
     # t2 = Dates.now()
     # println("Time for concrete reachability is ", t2-t1)
@@ -143,11 +133,216 @@ function multi_step_concreach(query::GraphPolyQuery)
 end
 
 ##################Implementing Sym Encoding###########
+function encode_sym_dynamics!(symQuery::GraphPolyQuery, x_dim)
+    """
+    Method to encode symbolic dynamics. Takes symQuery as input
+    """
+    symGraph = OptiGraph()
+    #####Enter time loop######
+    for t_ind = 1:symQuery.ntime
+        #Create a new set of nodes for each time step
+        dynNodes = @optinode(symGraph, nodes[1:x_dim])
+        #####Enter node loop####
+        for (x_ind, sym) in enumerate(symQuery.problem.varList)
+            sym_t = Meta.parse("$(sym)_$(t_ind)")
+            #Get lower and upper bounds for first variable in time step
+            LB, UB = symQuery.problem.bounds[t_ind][x_ind]
+            Tri = OA2PWA(LB)
+            xS = [(tup[1:end-1]) for tup in LB]
+            yUB = [tup[end] for tup in UB]
+            yLB = [tup[end] for tup in LB]
 
+            ccEncoding!(xS, yLB, yUB, Tri, symQuery, sym_t, x_ind, dynNodes[x_ind])
+        end
 
+        f_t = Meta.parse("f_$(t_ind)")
+        symQuery.mod_dict[f_t] = dynNodes
+    end
+    symQuery.mod_dict[:graph] = symGraph
+end
 
- f(x1, x2) = 2x1 + 1x2
- f(x1, x2, x3) = 2x1 + 1x2 + 0x3
+function encode_sym_control!(symQuery::GraphPolyQuery)
+    """
+    Method to encode symbolic control. Takes symQuery as input
+    """
+    network_file = symQuery.network_file
+    neurList = []
+    for t_ind = 1:symQuery.ntime
+        input_set = reachSets[t_ind]
+        network_file = symQuery.network_file
+        netModel = @optinode(symQuery.mod_dict[:graph])
+        neurons = add_controller_constraints!(netModel, network_file, input_set, Id())
+        u_ind = Meta.parse("u_$(t_ind)")
+        symQuery.mod_dict[u_ind] = netModel
+        push!(neurList, neurons)
+    end
+    return neurList
+end
+
+function sym_link(symQuery::GraphPolyQuery, neurList, depMat)
+    #First do intra-time dyn con links 
+    symGraph = symQuery.mod_dict[:graph]
+    for t_ind = 1:symQuery.ntime
+        dynModel = symQuery.mod_dict[Meta.parse("f_$(t_ind)")]
+        netModel = symQuery.mod_dict[Meta.parse("u_$(t_ind)")]
+
+        #Link the dynamics and control first 
+        symQuery.problem.link_func(symQuery, neurList[t_ind], symGraph, dynModel, netModel, t_ind)
+    end
+
+    #Next do intra tim variable dependency links 
+    #TEST: do for a single time step 
+    # t_ind = 1
+    for t_ind = 1:symQuery.ntime
+        #Iterate through models 
+        #TEST: Do for a single variable
+        # sym = symQuery.problem.varList[1]
+        # i = 1
+        for (i,sym) in enumerate(symQuery.problem.varList)
+            #Identify symbol at given time step
+            sym_t = Meta.parse("$(sym)_$(t_ind)")
+            #Identify input vector for this symbol
+            x_Vec = symQuery.var_dict[sym_t][1]
+            #Identify self
+            x_sym = symQuery.var_dict[sym_t][end][1]
+            #Iterate over dependency matrix
+            #counter for variable index
+            v_ind = 1
+            #TEST: Do for a single dependency
+            # j = 3
+            # dep_flag = depMat[i][j]
+            
+            for (j,dep_flag) in enumerate(depMat[i])
+                #Catch self dependency or no dependency
+                if j == i
+                    #If we reach here, that means self dependency. Automatically increment variable index by 1
+                    #println("Self dependency")
+                    v_ind += 1
+                elseif dep_flag == 0
+                    #println("No dependency")
+                    continue
+                else
+                    #If we reach here, that means a non-self dependency exists. Note that this creates duplicates but presolve should take care of that
+                    #println("Non-self dependency")
+                    
+                    #Identify non-self dependent variable
+                    dep_sym = symQuery.problem.varList[j]
+                    #Find the dependent symbol at the given time step
+                    dep_sym_t = Meta.parse("$(dep_sym)_$(t_ind)")
+                    #Link function appends pertinent variable to the end!
+                    x_dep_sym = symQuery.var_dict[dep_sym_t][end][1]
+                    #Here we're iterating over the input vector for the symbol. Self could appear here, so we need to avoid that
+                    if x_Vec[v_ind] == x_sym
+                        #Avoid linking the same variable to itself. Should not be reached in practice
+                        throw(ArgumentError("Self dependency detected"))
+                    else
+                        @linkconstraint(symGraph, x_Vec[v_ind] == x_dep_sym)
+                        v_ind += 1
+                    end
+                end
+            end
+        end
+    end 
+    #Next link time steps
+    symGraph = symQuery.mod_dict[:graph]
+    for t_ind = 1:symQuery.ntime-1
+        #Iterate through models and link pertinent variables 
+        for sym in symQuery.problem.varList
+            currSym = Meta.parse("$(sym)_$(t_ind)")
+            nextSym = Meta.parse("$(sym)_$(t_ind+1)")
+
+            xNow = symQuery.var_dict[currSym][end][1] 
+            yNow = symQuery.var_dict[currSym][2][1]
+            xNext = symQuery.var_dict[nextSym][end][1]
+
+            #Define temporal self relation 
+            @linkconstraint(symGraph, xNext == xNow + symQuery.dt*yNow)
+
+        end
+    end
+end
+
+function sym_reach_solve(symQuery::GraphPolyQuery, t_sym)
+    #Ensure that the time step is within bounds
+    @assert t_sym <= symQuery.ntime
+    #Akin to conc_reach_solve
+    max_query = deepcopy(symQuery)
+    min_query = deepcopy(symQuery)
+    lows = Array{Float64}(undef, 0)
+    highs = Array{Float64}(undef, 0)
+    minGraph = min_query.mod_dict[:graph]
+    i = 0
+
+    #Compute lower bounds
+    set_optimizer(minGraph, Gurobi.Optimizer)
+    #NOTE: Optimize each variable separately 
+    for sym in min_query.problem.varList
+        sym_t = Meta.parse("$(sym)_$(t_sym)") 
+        i += 1
+        v = min_query.var_dict[sym_t][end][1]
+        dv = min_query.var_dict[sym_t][2][1]
+        next_v_l = v + min_query.dt*dv
+        #NOTE: Set graph level objective directly
+        @objective(minGraph, Min, next_v_l)
+        optimize!(minGraph)
+        @assert termination_status(minGraph) == MOI.OPTIMAL
+        push!(lows, JuMP.objective_bound(minGraph))
+    end
+
+    #Compute upper bounds
+    maxGraph = max_query.mod_dict[:graph]
+    set_optimizer(maxGraph, Gurobi.Optimizer)
+    #NOTE: Optimize each variable separately
+    for sym in query.problem.varList 
+        sym_t = Meta.parse("$(sym)_$(t_sym)") 
+        v = max_query.var_dict[sym_t][end][1]
+        dv = max_query.var_dict[sym_t][2][1]
+        next_v_u = v + max_query.dt*dv
+        #NOTE: Set graph level objective directly
+        @objective(maxGraph, Min, -next_v_u)
+        optimize!(maxGraph)
+        push!(highs, -JuMP.objective_bound(maxGraph))
+    end
+
+    reach_set = Hyperrectangle(low=lows, high=highs)
+    return reach_set
+end
+
+function symreach(symQuery::GraphPolyQuery, depMat,t_sym)
+    """
+    Method to symbolically solve the reachability problem. Agnostic to how the boundSets are computed
+
+    args:
+    symQuery: GraphPolyQuery object
+    depMat: Dependency matrix
+    t_sym: Time step to compute the reach set
+    """
+    symQuery.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
+    symQuery.mod_dict = Dict{Symbol,Any}()
+
+    x_dim = length(symQuery.problem.varList) #state dimension
+    encode_sym_dynamics!(symQuery, x_dim)
+    neurList = encode_sym_control!(symQuery)
+    sym_link(symQuery, neurList, depMat)
+
+    sym_set = sym_reach_solve(symQuery, t_sym)
+    return sym_set
+end
+
+function hybreach(symQuery::GraphPolyQuery, depMat, t_sym, boundSets=nothing)
+    """
+    Hybrid symbolic method to compute reachable sets. Uses concrete reachability to compute the bounds and then uses symbolic reachability to compute the reach set
+    """
+
+    if isnothing(boundSets)
+        concQuery = deepcopy(symQuery)
+        boundSets = multi_step_concreach(concQuery)[2]
+    end
+    symQuery.problem.bounds = boundSets
+    sym_set = symreach(symQuery, depMat, t_sym)
+    return sym_set
+end
+
 ###############Implementing Backwards Reachability####################
 function breach_solve(bquery, t_idx::Union{Nothing,Int64}=nothing)
     """
