@@ -343,6 +343,20 @@ function hybreach(symQuery::GraphPolyQuery, depMat, t_sym, boundSets=nothing)
     return sym_set
 end
 
+function multi_step_hybreach(symQuery, depMat, concInt)
+    """
+    Hybrid symbolic reachability. Requires concretization intervals 
+    """
+    hyb_reachSets = [symQuery.problem.domain]
+    for int in concInt
+        hyQuery = deepcopy(symQuery)
+        hyQuery.ntime = int
+        hyQuery.problem.domain = hyb_reachSets[end]
+        hySet = hybreach(hyQuery, depMat, int) 
+        push!(hyb_reachSets, hySet)
+    end
+    return hyb_reachSets
+end
 ###############Implementing Backwards Reachability####################
 function breach_solve(bquery, t_idx::Union{Nothing,Int64}=nothing)
     """

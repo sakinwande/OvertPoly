@@ -41,26 +41,6 @@ function acc_dynamics(x, u)
     return xNew
 end
 
-# function acc_update_rule(input_vars, overt_output_vars)
-#     """
-#     Update rule for the ACC benchmark. 
-
-#     Args:
-#         input_vars: dictionary containing the input variables
-#         overt_output_vars: dictionary containing the output variables from the overt model
-#     """
-#     integration_map = Dict(
-#         input_vars[1] => input_vars[2],
-#         input_vars[2] => input_vars[3],
-#         input_vars[3] => overt_output_vars[1][1],
-#         input_vars[4] => input_vars[5],
-#         input_vars[5] => input_vars[6],
-#         input_vars[6] => overt_output_vars[2][1]
-#     )
-
-#     return integration_map
-# end
-
 function acc_control(input_set, ϵ=1e-12)
     """
     Control function for the ACC benchmark.

@@ -37,6 +37,7 @@ dt = 0.2
 numSteps = 10
 w = 1e-4
 domain = Hyperrectangle(low=[9.5,-4.5,2.1,1.5], high = [9.55,-4.45,2.11,1.51])
+depMat = [[1,0,1,1],[0,1,1,1], [0,0,1,0], [0,0,0,1]]
 ########TEST: Debugging Bound Unicycle#########
 # lbs, ubs = extrema(domain)
 # plotFlag = true
@@ -328,12 +329,22 @@ query2 = deepcopy(query)
 query2.ntime = 10
 @time reachSets, boundSets = multi_step_concreach(query2);
 
-#Test hybrid reachability
-depMat = [[1,0,1,1],[0,1,1,1], [0,0,1,0], [0,0,0,1]]
-t_sym = 10
+#Next, test direct symreach 
 query3 = deepcopy(query)
+query3.problem.bounds = boundSets
+@time symReach = symreach(query3, depMat, 10)
+
+#Test hybrid reachability
+
+t_sym = 10
+concInt = [2,2,2,2,2]
+query4 = deepcopy(query)
+query4.ntime = t_sym
+#@time reachSets = multi_step_hybreach(query3, depMat, concInt)
 @time reach_set = hybreach(query3, depMat, t_sym)
 
+
+#############################
 
 goalSet = Hyperrectangle(low = [-0.6, -0.2, -0.06, -0.3], high=[0.6, 0.2, 0.06, 0.3])
 

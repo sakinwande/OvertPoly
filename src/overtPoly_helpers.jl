@@ -78,14 +78,42 @@ function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-12, npoint=2, rel_error_
         end
     else
         #Mixed convexity case 
-        try
-            #Find the roots over the given interval 
-            rootVals = IntervalRootFinding.roots(d2Func, IntervalArithmetic.Interval(lb, ub))
-            #TODO: Fix soundness concerns. Soundness concern follows from the fact that the the roots are floating point numbers and technically the roots returned are an interval and not a single value
-            #These intervals have widths on the order of 10^-8
-            #Choose midpoints of these intervals 
-            rootsGuess = [mid.([root.interval for root in rootVals])]
-            d2f_zeros = sort(rootsGuess[1])
+        try 
+            #TODO: Review this 
+            if standExpr == :(sin(xₚ))
+                d2f_zeros = Any[]
+                #For trigonometric functions, zeros are known analytically
+                #Zeros for sin(x) are of the form n*pi where n is an integer
+                zer0 = ceil(lb/pi)*pi
+                while zer0 >= lb && zer0 <= ub
+                    if zer0 == -0.0
+                        zer0 = 0.0
+                    end
+                    push!(d2f_zeros, zer0)
+                    zer0 += pi
+                end
+            elseif standExpr == :(cos(xₚ))
+                d2f_zeros = Any[]
+                #For trigonometric functions, zeros are known analytically
+                #Zeros for cos(x) are of the form (n + 0.5)*pi where n is an integer
+                zer0 = ceil(lb/pi)
+                #Catch case where zer0 is even
+                if zer0 % 2 == 0
+                    zer0 += 1
+                end
+                while zer0*(pi/2) >= lb && zer0*(pi/2) <= ub && zer0 % 2 == 1
+                    push!(d2f_zeros, zer0 * (pi/2))
+                    zer0 += 2
+                end
+            else
+                #Find the roots over the given interval 
+                rootVals = IntervalRootFinding.roots(d2Func, IntervalArithmetic.Interval(lb, ub))
+                #TODO: Fix soundness concerns. Soundness concern follows from the fact that the the roots are floating point numbers and technically the roots returned are an interval and not a single value
+                #These intervals have widths on the order of 10^-8
+                #Choose midpoints of these intervals 
+                rootsGuess = [mid.([root.interval for root in rootVals])]
+                d2f_zeros = sort(rootsGuess[1])
+            end
 
             convex = nothing 
 
