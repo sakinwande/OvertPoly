@@ -938,7 +938,7 @@ function compute_coraSet(minFile, maxFile, time_ind)
     return coraSet
 end
 
-function lift_OA(emptyList, currList, boundLB, boundUB, lbs, ubs)
+function lift_OA(emptyList, currList, boundLB, boundUB, lbs, ubs, zeroVal=0.0)
     """
     Method to lift an overapproximation to a higher dimension
     by adding (constant) bounds for unused variables into the overapproximation 
@@ -963,15 +963,15 @@ function lift_OA(emptyList, currList, boundLB, boundUB, lbs, ubs)
         emptyEq = :(0*x)
         emptyLB, emptyUB = bound_univariate(emptyEq, lbEmptyVar, ubEmptyVar, plotflag = plotFlag)
         #Add corresponding dimension to the lifted bounds
-        boundLB_l = addDim(boundLB_l, i)
-        boundUB_l = addDim(boundUB_l, i)
+        boundLB_l = addDim(boundLB_l, i, zeroVal)
+        boundUB_l = addDim(boundUB_l, i, zeroVal)
 
         emptyLB_l = copy(emptyLB)
         emptyUB_l = copy(emptyUB)
         
         for idx in currList 
-            emptyLB_l = addDim(emptyLB_l, idx)
-            emptyUB_l = addDim(emptyUB_l, idx)
+            emptyLB_l = addDim(emptyLB_l, idx, zeroVal)
+            emptyUB_l = addDim(emptyUB_l, idx, zeroVal)
         end
         #Add the empty variable to the bounds 
         boundLB_l = unique(MinkSum(boundLB_l, emptyLB_l))
@@ -986,7 +986,128 @@ function lift_OA(emptyList, currList, boundLB, boundUB, lbs, ubs)
     return boundLB_l, boundUB_l
 end
 
+function sumBounds(bounds1LB, bounds1UB, bounds2LB, bounds2UB, diffFlag)
+    """
+    Method to compute the sum or difference of two functions defined over the same domain
 
-############Debug Add Dim############3
+    NOTE: Does not check if the inputs are defined over the same domain. Use carefully
+    """
+    #Vector for outputs 
+    sumLB = []
+    sumUB = []
+    #Find the union of the inputs
+    #NOTE: Assumes UB and LB have the same inputs
+    bound1Inps = [x[1:end-1] for x in bounds1LB]
+    bound2Inps = [x[1:end-1] for x in bounds2LB]
+    #Compute the union of the inputs
+    unionInps = unique(vcat(bound1Inps, bound2Inps); dims = 1)
 
+    #Interpolate bounds to ensure they are defined over the same set of points 
+    bounds1LB_i, bounds2LB_i = interpol_nd(bounds1LB, bounds2LB)
+    bounds1UB_i, bounds2UB_i = interpol_nd(bounds1UB, bounds2UB)
 
+    #Find the bounds of the sum (or difference)
+    for inp in unionInps
+        #Find the bounds of the first function
+        ind1 = findall(x->x[1:end-1] == inp, bounds1LB_i)[1]
+        lb1 = bounds1LB_i[ind1][end]
+        ub1 = bounds1UB_i[ind1][end]
+
+        #Find the bounds of the second function
+        ind2 = findall(x->x[1:end-1] == inp, bounds2LB_i)[1]
+        lb2 = bounds2LB_i[ind2][end]
+        ub2 = bounds2UB_i[ind2][end]
+        
+        #Compute the bounds of the sum (or difference). Use interval arithmetic
+        if diffFlag
+            lb = lb1 - ub2
+            ub = ub1 - lb2
+        else
+            lb = lb1 + lb2
+            ub = ub1 + ub2
+        end
+
+        #Push the bounds to the output list
+        push!(sumLB, (inp..., lb))
+        push!(sumUB, (inp..., ub))
+    end
+    return sumLB, sumUB
+end
+
+function gen_interpol_nd(boundSet)
+    """
+    Method that takes an arbitrary dimensional bound set and returns an interpolator
+    """
+    #To define A, we need to define the nodes along each dimension 
+    nDim = length(boundSet[1]) - 1 #Number of dimensions
+    #Define the nodes along each dimension
+    nodes = [unique([x[i] for x in boundSet]) for i in 1:nDim]
+    #Convert to a tuple for compatibility with Interpolations
+    nodesTup = Tuple(node for node in nodes)
+    
+    Ax_dims = [length(x) for x in nodes]
+
+    #Define A
+    A = zeros(Ax_dims...)
+    for boundVal in boundSet
+        node = boundVal[1:end-1]
+        ind = [findall(x->x==node[i], nodes[i])[1] for i in 1:nDim]
+        A[ind...] = boundVal[end]
+    end
+    
+    itp = Interpolations.interpolate(nodesTup, A, Gridded(Linear()))
+    return itp
+end
+
+function interpol_nd(boundSet_1, boundSet_2)
+    bound1Inps = [x[1:end-1] for x in boundSet_1]
+    bound2Inps = [x[1:end-1] for x in boundSet_2]
+
+    sort!(bound1Inps)
+    sort!(bound2Inps)
+    
+    #Find the union of the inputs
+    unionInps = unique(vcat(bound1Inps, bound2Inps), dims=1)
+
+    interp1 = gen_interpol_nd(boundSet_1)
+    interp2 = gen_interpol_nd(boundSet_2)
+    
+    newbounds1 = []
+    newbounds2 = []
+    #Interpolate the bounds
+    for inp in unionInps
+        push!(newbounds1, (inp..., interp1(inp...)))
+        push!(newbounds2, (inp..., interp2(inp...)))
+    end
+    return sort(newbounds1), sort(newbounds2)
+end
+
+function validBounds(fexpr, vars, LBs, UBs, verbose = false)
+    symVarVec = [Symbolics.variable(var) for var in vars]
+
+    symTestFunc = Symbolics.build_function(fexpr, symVarVec..., expression=false)
+    
+    inps = [tup[1:end-1] for tup in UBs]
+    trueFlag = true
+    i = 
+    for i = 1:length(inps)
+        trueFlag = trueFlag && (symTestFunc(inps[i]...) >= LBs[i][end] && symTestFunc(inps[i]...) <= UBs[i][end])
+
+        if !trueFlag && verbose
+            println("Failed at index $i")
+            println("Input: ", inps[i])
+            println("True value: ", symTestFunc(inps[i]...))
+            println("Computed LB: ", LBs[i][end])
+            println("Computed UB: ", UBs[i][end])
+
+            if symTestFunc(inps[i]...) <= LBs[i][end]
+                println("Invalid lower bound")
+            end
+            if symTestFunc(inps[i]...) >= UBs[i][end]
+                println("Invalid upper bound")
+            end
+            break
+        end
+    end
+    return trueFlag
+end
