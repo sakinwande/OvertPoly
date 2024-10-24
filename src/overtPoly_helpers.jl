@@ -864,7 +864,7 @@ function inpShiftLog(lb,ub;bounds=nothing)
     """
     shiftVal = 0
     if lb < 0 
-        shiftVal = 2*abs(lb)
+        shiftVal = 4*abs(lb)
     end
     if !isnothing(bounds)
         boundVals = [tup[end] for tup in bounds]
@@ -952,8 +952,8 @@ function lift_OA(emptyList, currList, boundLB, boundUB, lbs, ubs, zeroVal=0.0)
     returns: lifted bounds
     """
     # lbs, ubs = extrema(query.domain)
-    boundLB_l = copy(boundLB)
-    boundUB_l = copy(boundUB)
+    boundLB_l = sort!(copy(boundLB))
+    boundUB_l = sort!(copy(boundUB))
     plotFlag = false
     for i in copy(emptyList)
         #Find bounds for unused variable
@@ -983,7 +983,7 @@ function lift_OA(emptyList, currList, boundLB, boundUB, lbs, ubs, zeroVal=0.0)
         sort!(currList)
     end
 
-    return boundLB_l, boundUB_l
+    return sort(boundLB_l), sort(boundUB_l)
 end
 
 function sumBounds(bounds1LB, bounds1UB, bounds2LB, bounds2UB, diffFlag)
@@ -1000,7 +1000,7 @@ function sumBounds(bounds1LB, bounds1UB, bounds2LB, bounds2UB, diffFlag)
     bound1Inps = [x[1:end-1] for x in bounds1LB]
     bound2Inps = [x[1:end-1] for x in bounds2LB]
     #Compute the union of the inputs
-    unionInps = unique(vcat(bound1Inps, bound2Inps); dims = 1)
+    unionInps = sort(unique(vcat(bound1Inps, bound2Inps); dims = 1))
 
     #Interpolate bounds to ensure they are defined over the same set of points 
     bounds1LB_i, bounds2LB_i = interpol_nd(bounds1LB, bounds2LB)
@@ -1068,7 +1068,7 @@ function interpol_nd(boundSet_1, boundSet_2)
     
     #Find the union of the inputs
     unionInps = unique(vcat(bound1Inps, bound2Inps), dims=1)
-
+    sort!(unionInps)
     interp1 = gen_interpol_nd(boundSet_1)
     interp2 = gen_interpol_nd(boundSet_2)
     
@@ -1079,7 +1079,7 @@ function interpol_nd(boundSet_1, boundSet_2)
         push!(newbounds1, (inp..., interp1(inp...)))
         push!(newbounds2, (inp..., interp2(inp...)))
     end
-    return sort(newbounds1), sort(newbounds2)
+    return sort(newbounds1), sort(newbounds2), interp1, interp2
 end
 
 function validBounds(fexpr, vars, LBs, UBs, verbose = false)
@@ -1110,4 +1110,59 @@ function validBounds(fexpr, vars, LBs, UBs, verbose = false)
         end
     end
     return trueFlag
+end
+
+function ceil_n(x, n = 16)
+    """
+    Method to round a float towards infinity with a specified number of sig figs
+    """
+    return ceil(x, digits = n)
+end
+
+function floor_n(x, n = 16)
+    """
+    Method to round a float towards negative infinity with a specified number of sig figs
+    """
+    return floor(x, digits = n)
+end
+
+function prodBounds(lb1, ub1, lb2, ub2)
+    #Vector for outputs
+    prodLB = []
+    prodUB = []
+
+    #Find the union of the inputs 
+    #NOTE: Assumes lb and ub have the same inputs 
+
+    bound1Inps = [tup[1:end-1] for tup in lb1]
+    bound2Inps = [tup[1:end-1] for tup in lb2]
+
+    #Find the union of the inputs
+    unionInps = sort(unique(vcat(bound1Inps, bound2Inps), dims=1))
+
+    #interpolate the bounds to ensure they are defined over the same set of points 
+    lb1_i, lb2_i = interpol_nd(lb1, lb2)
+    ub1_i, ub2_i = interpol_nd(ub1, ub2)
+
+    #Find the bounds of the product
+    for inp in unionInps
+        #Find the bounds of the first function
+        ind1 = findall(x->x[1:end-1] == inp, lb1_i)[1]
+        lb1 = lb1_i[ind1][end]
+        ub1 = ub1_i[ind1][end]
+
+        #Find the bounds of the second function
+        ind2 = findall(x->x[1:end-1] == inp, lb2_i)[1]
+        lb2 = lb2_i[ind2][end]
+        ub2 = ub2_i[ind2][end]
+        
+        #Compute the bounds of the product. Use interval arithmetic
+        lb = min(lb1*lb2, lb1*ub2, ub1*lb2, ub1*ub2)
+        ub = max(lb1*lb2, lb1*ub2, ub1*lb2, ub1*ub2)
+        #Push the bounds to the output list
+        push!(prodLB, (inp..., lb))
+        push!(prodUB, (inp..., ub))
+    end
+
+    return prodLB, prodUB
 end

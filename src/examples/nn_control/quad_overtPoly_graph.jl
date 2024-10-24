@@ -78,6 +78,8 @@ lbs, ubs = extrema(domain)
     if ub_x1_p1_sp1 - lb_x1_p1_sp1 < 1e-5
         lb_x1_p1_sp1 = lb_x1_p1_sp1 - 1e-5
         ub_x1_p1_sp1 = ub_x1_p1_sp1 + 1e-5
+        lbs[8] = lb_x1_p1_sp1
+        ubs[8] = ub_x1_p1_sp1
     end
     x1_p1_sp1_LB, x1_p1_sp1_UB = interpol_nd(bound_univariate(x1_p1_sp1, lb_x1_p1_sp1, ub_x1_p1_sp1)...)
     
@@ -92,6 +94,8 @@ lbs, ubs = extrema(domain)
     if ub_x1_p1_sp2 - lb_x1_p1_sp2 < 1e-5
         lb_x1_p1_sp2 = lb_x1_p1_sp2 - 1e-5
         ub_x1_p1_sp2 = ub_x1_p1_sp2 + 1e-5
+        lbs[9] = lb_x1_p1_sp2
+        ubs[9] = ub_x1_p1_sp2
     end
     x1_p1_sp2_LB, x1_p1_sp2_UB = interpol_nd(bound_univariate(x1_p1_sp2, lb_x1_p1_sp2, ub_x1_p1_sp2)...)
 
@@ -176,8 +180,8 @@ lbs, ubs = extrema(domain)
     end
     
     #Compute exp to get bounds for cos(x8)*cos(x9)*x4
-    x1_p1_LB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in x1_p1_LB_l]
-    x1_p1_UB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in x1_p1_UB_l]
+    x1_p1_LB_s = [(tup[1:end-1]..., floor_n(exp(tup[end]))) for tup in x1_p1_LB_l]
+    x1_p1_UB_s = [(tup[1:end-1]..., ceil_n(exp(tup[end]))) for tup in x1_p1_UB_l]
 
     if sanityFlag
         validBounds(:((cos(x8) + $s_x1p1sp1)*(cos(x9) + $s_x1p1sp2)*(x4 + $s_x1p1sp3)), [:x4, :x8, :x9], x1_p1_LB_s, x1_p1_UB_s, true)
@@ -229,6 +233,7 @@ lbs, ubs = extrema(domain)
 
     #Part 2: f(x8, x9) = sin(x8)*cos(x9)
     #K-A decomposition is exp(log(sin(x8)) + log(cos(x9)))
+
     #Sub-part 1 = sin(x8)
     #Bounding sine around zero is tricky :|
     #NOTE: Use wider bounds for now 
@@ -238,6 +243,8 @@ lbs, ubs = extrema(domain)
     if ub_x1_p2_sp1 - lb_x1_p2_sp1 < 1e-5
         lb_x1_p2_sp1 = lb_x1_p2_sp1 - 1e-5
         ub_x1_p2_sp1 = ub_x1_p2_sp1 + 1e-5
+        lbs[8] = lb_x1_p2_sp1
+        ubs[8] = ub_x1_p2_sp1
     end
     x1_p2_sp1_LB, x1_p2_sp1_UB = interpol_nd(bound_univariate(x1_p2_sp1, lb_x1_p2_sp1, ub_x1_p2_sp1)...)
 
@@ -252,6 +259,8 @@ lbs, ubs = extrema(domain)
     if ub_x1_p2_sp2 - lb_x1_p2_sp2 < 1e-5
         lb_x1_p2_sp2 = lb_x1_p2_sp2 - 1e-5
         ub_x1_p2_sp2 = ub_x1_p2_sp2 + 1e-5
+        lbs[9] = lb_x1_p2_sp2
+        ubs[9] = ub_x1_p2_sp2
     end
     x1_p2_sp2_LB, x1_p2_sp2_UB = interpol_nd(bound_univariate(x1_p2_sp2, lb_x1_p2_sp2, ub_x1_p2_sp2)...)
 
@@ -287,17 +296,27 @@ lbs, ubs = extrema(domain)
     x1_p2_sp2_LB_ll = addDim(x1_p2_sp2_LB_l, 1, 0.0) #for x8, index 1
     x1_p2_sp2_UB_ll = addDim(x1_p2_sp2_UB_l, 1, 0.0) #for x8, index 1
 
+     
     #Combine sp1 and sp2 to get log(sin(x8)*cos(x9))
     x1_p2_LB_l = MinkSum(x1_p2_sp1_LB_ll, x1_p2_sp2_LB_ll)
     x1_p2_UB_l = MinkSum(x1_p2_sp1_UB_ll, x1_p2_sp2_UB_ll)
 
+    if sanityFlag
+        validBounds(:(log(sin(x8) + $s_x1p2sp1) + log(cos(x9) + $s_x1p2sp2)), [:x8, :x9], x1_p2_LB_l, x1_p2_UB_l, true)
+    end
+    
+    if sanityFlag
+        validBounds(:(log((sin(x8) + $s_x1p2sp1)*(cos(x9) + $s_x1p2sp2))), [:x8, :x9], x1_p2_LB_l, x1_p2_UB_l, true)
+    end
+    
     #Compute exp to get bounds for sin(x8)*cos(x9)
-    x1_p2_LB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in x1_p2_LB_l]
-    x1_p2_UB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in x1_p2_UB_l]
+    x1_p2_LB_s = [(tup[1:end-1]..., floor_n(exp(tup[end]))) for tup in x1_p2_LB_l]
+    x1_p2_UB_s = [(tup[1:end-1]..., ceil_n(exp(tup[end]))) for tup in x1_p2_UB_l]
 
     if sanityFlag
         validBounds(:((sin(x8)+ $s_x1p2sp1)*(cos(x9) + $s_x1p2sp2)), [:x8, :x9], x1_p2_LB_s, x1_p2_UB_s, true)
     end
+    
     #Account for the shift induced by the log
     #Don't have to round bc we used zeroVal = 0.0
     #This will be done in a loop, but check the logic first
@@ -345,9 +364,14 @@ lbs, ubs = extrema(domain)
     if ub_x1_p3_sp1 - lb_x1_p3_sp1 < 1e-5
         lb_x1_p3_sp1 = lb_x1_p3_sp1 - 1e-5
         ub_x1_p3_sp1 = ub_x1_p3_sp1 + 1e-5
+        lbs[7] = lb_x1_p3_sp1
+        ubs[7] = ub_x1_p3_sp1
     end
     x1_p3_sp1_LB, x1_p3_sp1_UB = interpol_nd(bound_univariate(x1_p3_sp1, lb_x1_p3_sp1, ub_x1_p3_sp1)...)
 
+    if sanityFlag
+        validBounds(x1_p3_sp1, [:x], x1_p3_sp1_LB, x1_p3_sp1_UB, true)
+    end
     #Sub-part 2 = x5
     x1_p3_sp2 = :(1*x)
     lb_x1_p3_sp2 = lbs[5]
@@ -355,6 +379,9 @@ lbs, ubs = extrema(domain)
     #Specify digits for interpolation
     x1_p3_sp2_LB, x1_p3_sp2_UB = interpol_nd(bound_univariate(x1_p3_sp2, lb_x1_p3_sp2, ub_x1_p3_sp2)...)
 
+    if sanityFlag
+        validBounds(x1_p3_sp2, [:x], x1_p3_sp2_LB, x1_p3_sp2_UB, true)
+    end
     #Find how much to shift each pair of bounds by for valid log
     s_x1p3sp1 = inpShiftLog(lb_x1_p3_sp1, ub_x1_p3_sp1, bounds=x1_p3_sp1_LB)
     s_x1p3sp2 = inpShiftLog(lb_x1_p3_sp2, ub_x1_p3_sp2, bounds=x1_p3_sp2_LB)
@@ -381,9 +408,13 @@ lbs, ubs = extrema(domain)
     x1_p3_UB_l = MinkSum(x1_p3_sp1_UB_ll, x1_p3_sp2_UB_ll)
 
     #Compute exp to get bounds for sin(x7)*x5
-    x1_p3_LB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in x1_p3_LB_l]
-    x1_p3_UB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in x1_p3_UB_l]
+    x1_p3_LB_s = [(tup[1:end-1]..., floor_n(exp(tup[end]))) for tup in x1_p3_LB_l]
+    x1_p3_UB_s = [(tup[1:end-1]..., ceil_n(exp(tup[end]))) for tup in x1_p3_UB_l]
 
+    if sanityFlag
+        validBounds(:((x5 + $s_x1p3sp2)*(sin(x7) + $s_x1p3sp1)), [:x5, :x7], x1_p3_LB_s, x1_p3_UB_s, true)
+    end
+    
     #Account for the shift induced by the log
     #Don't have to round bc we used zeroVal = 0.0
     #This will be done in a loop, but check the logic first
@@ -395,7 +426,7 @@ lbs, ubs = extrema(domain)
     #f1f2 = f_hat - f1b - f2a - ab
     #a is s_x1p3sp1, b is s_x1p3sp2
     #f1 is sin(x7)[x1_p3_sp1], f2 is x5[x1_p3_sp2]
-    for tup in x1_p3_LB_s
+    for tup in x1_p3_UB_s
         #Index 1 is x5, its bounds are in x1_p3_sp2
         ind2 = findall(x->x[1] == tup[1], x1_p3_sp2_LB)[1]
         #Index 2 is x7, its bounds are in x1_p3_sp1
@@ -405,7 +436,7 @@ lbs, ubs = extrema(domain)
         push!(x1_p3_UB, (tup[1:end-1]..., f1f2_UB))
     end
 
-    for tup in x1_p3_UB_s
+    for tup in x1_p3_LB_s
         #Index 1 is x5, its bounds are in x1_p3_sp2
         ind2 = findall(x->x[1] == tup[1], x1_p3_sp2_UB)[1]
         #Index 2 is x7, its bounds are in x1_p3_sp1
@@ -415,6 +446,10 @@ lbs, ubs = extrema(domain)
         push!(x1_p3_LB, (tup[1:end-1]..., f1f2_LB))
     end
 
+    if sanityFlag
+        validBounds(:(x5*sin(x7)), [:x5, :x7], x1_p3_LB, x1_p3_UB, true)
+    end
+    
     #Part 4: f(x6, x7) = x6cos(x7)
     #K-A decomposition is exp(log(x6) + log(cos(x7)))
     #Sub-part 1 = x6
@@ -423,6 +458,9 @@ lbs, ubs = extrema(domain)
     ub_x1_p4_sp1 = ubs[6]
     x1_p4_sp1_LB, x1_p4_sp1_UB = interpol_nd(bound_univariate(x1_p4_sp1, lb_x1_p4_sp1, ub_x1_p4_sp1)...)
 
+    if sanityFlag
+        validBounds(x1_p4_sp1, [:x], x1_p4_sp1_LB, x1_p4_sp1_UB, true)
+    end
     #Sub-part 2 = cos(x7)
     x1_p4_sp2 = :(cos(x))
     lb_x1_p4_sp2 = lbs[7]
@@ -430,10 +468,15 @@ lbs, ubs = extrema(domain)
     if ub_x1_p4_sp2 - lb_x1_p4_sp2 < 1e-5
         lb_x1_p4_sp2 = lb_x1_p4_sp2 - 1e-5
         ub_x1_p4_sp2 = ub_x1_p4_sp2 + 1e-5
+        lbs[7] = lb_x1_p4_sp2
+        ubs[7] = ub_x1_p4_sp2
     end
     #Specify digits for interpolation
     x1_p4_sp2_LB, x1_p4_sp2_UB = interpol_nd(bound_univariate(x1_p4_sp2, lb_x1_p4_sp2, ub_x1_p4_sp2)...)
 
+    if sanityFlag
+        validBounds(x1_p4_sp2, [:x], x1_p4_sp2_LB, x1_p4_sp2_UB, true)
+    end
     #Find how much to shift each pair of bounds by for valid log
     s_x1p4sp1 = inpShiftLog(lb_x1_p4_sp1, ub_x1_p4_sp1, bounds=x1_p4_sp1_LB)
     s_x1p4sp2 = inpShiftLog(lb_x1_p4_sp2, ub_x1_p4_sp2, bounds=x1_p4_sp2_LB)
@@ -460,8 +503,8 @@ lbs, ubs = extrema(domain)
     x1_p4_UB_l = MinkSum(x1_p4_sp1_UB_ll, x1_p4_sp2_UB_ll)
 
     #Compute exp to get bounds for x6*cos(x7)
-    x1_p4_LB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in x1_p4_LB_l]
-    x1_p4_UB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in x1_p4_UB_l]
+    x1_p4_LB_s = [(tup[1:end-1]..., floor_n(exp(tup[end]))) for tup in x1_p4_LB_l]
+    x1_p4_UB_s = [(tup[1:end-1]..., ceil_n(exp(tup[end]))) for tup in x1_p4_UB_l]
 
     #Account for the shift induced by the log
     #Don't have to round bc we used zeroVal = 0.0
@@ -475,7 +518,7 @@ lbs, ubs = extrema(domain)
     #a is s_x1p4sp1, b is s_x1p4sp2
     #f1 is x6[x1_p4_sp1], f2 is cos(x7)[x1_p4_sp2]
 
-    for tup in x1_p4_LB_s
+    for tup in x1_p4_UB_s
         #Index 1 is x6, its bounds are in x1_p4_sp1
         ind1 = findall(x->x[1] == tup[1], x1_p4_sp1_LB)[1]
         #Index 2 is x7, its bounds are in x1_p4_sp2
@@ -485,7 +528,7 @@ lbs, ubs = extrema(domain)
         push!(x1_p4_UB, (tup[1:end-1]..., f1f2_UB))
     end
 
-    for tup in x1_p4_UB_s
+    for tup in x1_p4_LB_s
         #Index 1 is x6, its bounds are in x1_p4_sp1
         ind1 = findall(x->x[1] == tup[1], x1_p4_sp1_UB)[1]
         #Index 2 is x7, its bounds are in x1_p4_sp2
@@ -495,6 +538,9 @@ lbs, ubs = extrema(domain)
         push!(x1_p4_LB, (tup[1:end-1]..., f1f2_LB))
     end
 
+    if sanityFlag
+        validBounds(:(x6*cos(x7)), [:x6, :x7], x1_p4_LB, x1_p4_UB, true)
+    end
     #Part 5: f(x9) = sin(x9)
     x1_p5 = :(sin(x))
     lb_x1_p5 = lbs[9]
@@ -502,6 +548,8 @@ lbs, ubs = extrema(domain)
     if ub_x1_p5 - lb_x1_p5 < 1e-5
         lb_x1_p5 = lb_x1_p5 - 1e-5
         ub_x1_p5 = ub_x1_p5 + 1e-5
+        lbs[9] = lb_x1_p5
+        ubs[9] = ub_x1_p5
     end
     #Specify digits for interpolation
     x1_p5_LB, x1_p5_UB = interpol_nd(bound_univariate(x1_p5, lb_x1_p5, ub_x1_p5)...)
@@ -522,6 +570,8 @@ lbs, ubs = extrema(domain)
     if ub_x1_p6_sp2 - lb_x1_p6_sp2 < 1e-5
         lb_x1_p6_sp2 = lb_x1_p6_sp2 - 1e-5
         ub_x1_p6_sp2 = ub_x1_p6_sp2 + 1e-5
+        lbs[7] = lb_x1_p6_sp2
+        ubs[7] = ub_x1_p6_sp2
     end 
     #Specify digits for interpolation
     x1_p6_sp2_LB, x1_p6_sp2_UB = interpol_nd(bound_univariate(x1_p6_sp2, lb_x1_p6_sp2, ub_x1_p6_sp2)...)
@@ -552,8 +602,8 @@ lbs, ubs = extrema(domain)
     x1_p6_UB_l = MinkSum(x1_p6_sp1_UB_ll, x1_p6_sp2_UB_ll)
 
     #Compute exp to get bounds for x6*sin(x7)
-    x1_p6_LB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in x1_p6_LB_l]
-    x1_p6_UB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in x1_p6_UB_l]
+    x1_p6_LB_s = [(tup[1:end-1]..., floor_n(exp(tup[end]))) for tup in x1_p6_LB_l]
+    x1_p6_UB_s = [(tup[1:end-1]..., ceil_n(exp(tup[end]))) for tup in x1_p6_UB_l]
 
     #Account for the shift induced by the log
     #Don't have to round bc we used zeroVal = 0.0
@@ -567,7 +617,7 @@ lbs, ubs = extrema(domain)
     #a is s_x1p6sp1, b is s_x1p6sp2
     #f1 is x6[x1_p6_sp1], f2 is sin(x7)[x1_p6_sp2]
 
-    for tup in x1_p6_LB_s
+    for tup in x1_p6_UB_s
         #Index 1 is x6, its bounds are in x1_p6_sp1
         ind1 = findall(x->x[1] == tup[1], x1_p6_sp1_LB)[1]
         #Index 2 is x7, its bounds are in x1_p6_sp2
@@ -577,7 +627,7 @@ lbs, ubs = extrema(domain)
         push!(x1_p6_UB, (tup[1:end-1]..., f1f2_UB))
     end
 
-    for tup in x1_p6_UB_s
+    for tup in x1_p6_LB_s
         #Index 1 is x6, its bounds are in x1_p6_sp1
         ind1 = findall(x->x[1] == tup[1], x1_p6_sp1_UB)[1]
         #Index 2 is x7, its bounds are in x1_p6_sp2
@@ -587,6 +637,9 @@ lbs, ubs = extrema(domain)
         push!(x1_p6_LB, (tup[1:end-1]..., f1f2_LB))
     end
 
+    if sanityFlag
+        validBounds(:(x6*sin(x7)), [:x6, :x7], x1_p6_LB, x1_p6_UB, true)
+    end
     #Part 7: f(x5, x7) = x5cos(x7)
     #K-A decomposition is exp(log(x5) + log(cos(x7)))
     #Sub-part 1 = x5
@@ -603,6 +656,8 @@ lbs, ubs = extrema(domain)
     if ub_x1_p7_sp2 - lb_x1_p7_sp2 < 1e-5
         lb_x1_p7_sp2 = lb_x1_p7_sp2 - 1e-5
         ub_x1_p7_sp2 = ub_x1_p7_sp2 + 1e-5
+        lbs[7] = lb_x1_p7_sp2
+        ubs[7] = ub_x1_p7_sp2
     end
     #Specify digits for interpolation
     x1_p7_sp2_LB, x1_p7_sp2_UB = interpol_nd(bound_univariate(x1_p7_sp2, lb_x1_p7_sp2, ub_x1_p7_sp2)...)
@@ -634,8 +689,8 @@ lbs, ubs = extrema(domain)
     x1_p7_UB_l = MinkSum(x1_p7_sp1_UB_ll, x1_p7_sp2_UB_ll)
 
     #Compute exp to get bounds for x5*cos(x7)
-    x1_p7_LB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in x1_p7_LB_l]
-    x1_p7_UB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in x1_p7_UB_l]
+    x1_p7_LB_s = [(tup[1:end-1]..., floor_n(exp(tup[end]))) for tup in x1_p7_LB_l]
+    x1_p7_UB_s = [(tup[1:end-1]..., ceil_n(exp(tup[end]))) for tup in x1_p7_UB_l]
 
     #Account for the shift induced by the log
     #Don't have to round bc we used zeroVal = 0.0
@@ -649,7 +704,7 @@ lbs, ubs = extrema(domain)
     #a is s_x1p7sp1, b is s_x1p7sp2
     #f1 is x5[x1_p7_sp1], f2 is cos(x7)[x1_p7_sp2]
 
-    for tup in x1_p7_LB_s
+    for tup in x1_p7_UB_s
         #Index 1 is x5, its bounds are in x1_p7_sp1
         ind1 = findall(x->x[1] == tup[1], x1_p7_sp1_LB)[1]
         #Index 2 is x7, its bounds are in x1_p7_sp2
@@ -659,7 +714,7 @@ lbs, ubs = extrema(domain)
         push!(x1_p7_UB, (tup[1:end-1]..., f1f2_UB))
     end
 
-    for tup in x1_p7_UB_s
+    for tup in x1_p7_LB_s
         #Index 1 is x5, its bounds are in x1_p7_sp1
         ind1 = findall(x->x[1] == tup[1], x1_p7_sp1_UB)[1]
         #Index 2 is x7, its bounds are in x1_p7_sp2
@@ -669,6 +724,10 @@ lbs, ubs = extrema(domain)
         push!(x1_p7_LB, (tup[1:end-1]..., f1f2_LB))
     end
 
+    if sanityFlag
+        validBounds(:(x5*cos(x7)), [:x5, :x7], x1_p7_LB, x1_p7_UB, true)
+    end
+    
     #Now each chunk is bounded. Next, we need to combine chunks 
     #Combine part 6 and part 7 to get f₈(x₅, x₆, x₇)
     #First, lift f6 to be a function of x₅ as well 
@@ -688,6 +747,108 @@ lbs, ubs = extrema(domain)
     #Now, combine the two lifted chunks to get f₈(x₅, x₆, x₇)
     x1_p8_LB, x1_p8_UB = sumBounds(l_x1_p6_LB, l_x1_p6_UB, l_x1_p7_LB, l_x1_p7_UB, true)
 
+    if sanityFlag
+        validBounds(:(x6*sin(x7) - x5*cos(x7)), [:x5, :x6, :x7], x1_p8_LB, x1_p8_UB, true)
+    end
 
+    #Next, combine f₅ with f₈ to get f₉(x₅, x₆, x₇, x₉)
+    #Lift f5 to be a function of x₅, x₆, x₇
+    emptyList = [1,2,3] #Since x₅, x₆, x₇ come before 9
+    currList = [4]
+    lbList = lbs[5:7]
+    push!(lbList, lbs[9])
+    ubList = ubs[5:7]
+    push!(ubList, ubs[9])
 
+    l_x1_p5_LB, l_x1_p5_UB = lift_OA(emptyList, currList, x1_p5_LB, x1_p5_UB, lbList, ubList)
+
+    #Then lift f8 to be a function of x₉
+    emptyList = [4] #Since x₉ comes after 5, 6, 7
+    currList = [1,2,3]
+
+    l_x1_p8_LB, l_x1_p8_UB = lift_OA(emptyList, currList, x1_p8_LB, x1_p8_UB, lbList, ubList)
+    
+    #Define a function to compute the product of two sets of bounds 
+    x1_p9_LB, x1_p9_UB = prodBounds(l_x1_p5_LB, l_x1_p5_UB, l_x1_p8_LB, l_x1_p8_UB)
+
+    if sanityFlag
+        validBounds(:(sin(x9)*((x6*sin(x7) - x5*cos(x7)))), [:x5, :x6, :x7, :x9], x1_p9_LB, x1_p9_UB, true)
+    end
+
+    #Next, define f₁₀(x₅, x₆, x₇) as f₃(x₅, x₇) + f₄(x₆, x₇)
+    #First, lift f₃(x₅, x₇) = x5*sin(x7) to be a function of x6 as well
+    emptyList = [2] #Since x₆ comes after 5 and before 7
+    currList = [1,3]
+    lbList = lbs[5:7]
+    ubList = ubs[5:7]
+
+    l_x1_p3_LB, l_x1_p3_UB = lift_OA(emptyList, currList, x1_p3_LB, x1_p3_UB, lbList, ubList)
+
+    #Then lift f₄(x₆, x₇) = x6*cos(x7) to be a function of x₅ as well
+    emptyList = [1] #Since x₅ comes before 6 and 7
+    currList = [2,3]
+
+    l_x1_p4_LB, l_x1_p4_UB = lift_OA(emptyList, currList, x1_p4_LB, x1_p4_UB, lbList, ubList)
+
+    #Combine the two lifted chunks to get f₁₀(x₅, x₆, x₇)
+    x1_p10_LB, x1_p10_UB = sumBounds(l_x1_p3_LB, l_x1_p3_UB, l_x1_p4_LB, l_x1_p4_UB, false)
+
+    if sanityFlag
+        validBounds(:(x5*sin(x7) + x6*cos(x7)), [:x5, :x6, :x7], x1_p10_LB, x1_p10_UB, true)
+    end
+
+    #Next define f₁₁(x₅, x₆, x₇, x₈, x₉) as f₂(x₈, x₉) * f₁₀(x₅, x₆, x₇)
+    #First, lift f₂(x₈, x₉) = sin(x8)cos(x9) to be a function of x₅, x₆, x₇
+    emptyList = [1,2,3] #Since x₅, x₆, x₇ come before 8 and 9
+    currList = [4,5]
+    lbList = lbs[5:9]
+    ubList = ubs[5:9]
+
+    l_x1_p2_LB, l_x1_p2_UB = lift_OA(emptyList, currList, x1_p2_LB, x1_p2_UB, lbList, ubList)
+    
+    #Then lift f₁₀(x₅, x₆, x₇) to be a function of x₈, x₉
+    emptyList = [4,5] #Since x₈, x₉ come after 5, 6, 7
+    currList = [1,2,3]
+
+    l_x1_p10_LB, l_x1_p10_UB = lift_OA(emptyList, currList, x1_p10_LB, x1_p10_UB, lbList, ubList)
+
+    #Combine the two lifted chunks to get f₁₁(x₅, x₆, x₇, x₈, x₉)
+    x1_p11_LB, x1_p11_UB = prodBounds(l_x1_p2_LB, l_x1_p2_UB, l_x1_p10_LB, l_x1_p10_UB)
+
+    if sanityFlag
+        validBounds(:(sin(x8)*cos(x9)*(x5*sin(x7) + x6*cos(x7))), [:x5, :x6, :x7, :x8, :x9], x1_p11_LB, x1_p11_UB, true)
+    end
+    
+    #Combine 3 distinct chunks to get f₁₂(x₄, x₅, x₆, x₇, x₈, x₉) = f₁(x₄, x₈, x₉) + f₁₁(x₅, x₆, x₇, x₈, x₉) + f₉(x₅, x₆, x₇, x₉)
+    
+    #First lift f₁(x₄, x₈, x₉) = x4*cos(x8)*cos(x9) to be a function of x₅, x₆, x₇
+    emptyList = [2,3,4] #Since x₅, x₆, x₇ come before 4 and 8, 9
+    currList = [1,5,6]
+    lbList = lbs[4:9]
+    ubList = ubs[4:9]
+
+    l_x1_p1_LB, l_x1_p1_UB = lift_OA(emptyList, currList, x1_p1_LB, x1_p1_UB, lbList, ubList)
+    
+    #Then lift f₁₁(x₅, x₆, x₇, x₈, x₉) to be a function of x₄
+    emptyList = [1] #Since x₄ comes before 5, 6, 7, 8, 9
+    currList = [2,3,4,5,6]
+
+    l_x1_p11_LB, l_x1_p11_UB = lift_OA(emptyList, currList, x1_p11_LB, x1_p11_UB, lbList, ubList)
+    
+    #Finally, lift f₉(x₅, x₆, x₇, x₉) to be a function of x₄ and x₈
+    emptyList = [1,5] #Since x₄ comes before 5, 6, 7, 9 and x₈ comes after 7
+    currList = [2,3,4,6]
+
+    l_x1_p9_LB, l_x1_p9_UB = lift_OA(emptyList, currList, x1_p9_LB, x1_p9_UB, lbList, ubList)
+
+    #Combine the three lifted chunks to get f₁₂(x₄, x₅, x₆, x₇, x₈, x₉)
+    x1_p12_LB_i, x1_p12_UB_i = sumBounds(l_x1_p1_LB, l_x1_p1_UB, l_x1_p11_LB, l_x1_p11_UB, false)
+    x1_p12_LB, x1_p12_UB = sumBounds(x1_p12_LB_i, x1_p12_UB_i, l_x1_p9_LB, l_x1_p9_UB, false)
+    
+    if sanityFlag
+        validBounds(:(x4*cos(x8)*cos(x9) + sin(x8)*cos(x9)*(x5*sin(x7) + x6*cos(x7)) + sin(x9)*((x6*sin(x7) - x5*cos(x7)))), [:x4, :x5, :x6, :x7, :x8, :x9], x1_p12_LB, x1_p12_UB, true)
+    end
+    
+    
+    
     include("../../overtPoly_helpers.jl")
