@@ -1460,3 +1460,450 @@ function bound_quadx3(Quad, plotFlag = false, sanityFlag = true)
 
     return x3_p4_LB, x3_p4_UB
 end
+
+function bound_quadx4(Quad, plotFlag = false, sanityFlag = true)
+    lbs, ubs = extrema(Quad.domain)
+
+    #Bounding x₅*x₁₂ -x₆*x₁₁ - g*sin(x₈)
+    #Part 1: f₁(x₅,x₁₂) = x₅*x₁₂
+    #Sub-part 1: x₅
+    x4_p1_sp1 = :(1*x)
+    lb_x4_p1_sp1 = lbs[5]
+    ub_x4_p1_sp1 = ubs[5]
+
+    x4_p1_sp1_LB, x4_p1_sp1_UB = interpol_nd(bound_univariate(x4_p1_sp1, lb_x4_p1_sp1, ub_x4_p1_sp1)...)
+
+    #Sub-part 2: x₁₂
+    x4_p1_sp2 = :(1*x)
+    lb_x4_p1_sp2 = lbs[12]
+    ub_x4_p1_sp2 = ubs[12]
+
+    x4_p1_sp2_LB, x4_p1_sp2_UB = interpol_nd(bound_univariate(x4_p1_sp2, lb_x4_p1_sp2, ub_x4_p1_sp2)...)
+
+    #Evaluate the product of the bounds 
+    #First, lift sub part 1 to a space of (x₅,x₁₂)
+    emptyList = [2] #x12 is missing 
+    currList = [1] 
+    lbList = [lbs[5], lbs[12]]
+    ubList = [ubs[5], ubs[12]]
+
+    l_x4_p1_sp1_LB, l_x4_p1_sp1_UB = lift_OA(emptyList, currList, x4_p1_sp1_LB, x4_p1_sp1_UB, lbList, ubList)
+
+    #Next, lift sub part 2 to a space of (x₅,x₁₂)
+    emptyList = [1] #x5 is missing
+    currList = [2]
+
+    l_x4_p1_sp2_LB, l_x4_p1_sp2_UB = lift_OA(emptyList, currList, x4_p1_sp2_LB, x4_p1_sp2_UB, lbList, ubList)
+
+    #Now, multiply the lifted bounds
+    x4_p1_LB, x4_p1_UB = prodBounds(l_x4_p1_sp1_LB, l_x4_p1_sp1_UB, l_x4_p1_sp2_LB, l_x4_p1_sp2_UB)
+
+    if sanityFlag
+        validBounds(:(x₅*x₁₂),[:x₅,:x₁₂], x4_p1_LB, x4_p1_UB)
+    end
+
+    #Part 2: f₂(x₆, x₁₁) = x₆*x₁₁
+    #Sub-part 1: x₆
+    x4_p2_sp1 = :(1*x)
+    lb_x4_p2_sp1 = lbs[6]
+    ub_x4_p2_sp1 = ubs[6]
+
+    x4_p2_sp1_LB, x4_p2_sp1_UB = interpol_nd(bound_univariate(x4_p2_sp1, lb_x4_p2_sp1, ub_x4_p2_sp1)...)
+
+    #Sub-part 2: x₁₁
+    x4_p2_sp2 = :(1*x)
+    lb_x4_p2_sp2 = lbs[11]
+    ub_x4_p2_sp2 = ubs[11]
+
+    x4_p2_sp2_LB, x4_p2_sp2_UB = interpol_nd(bound_univariate(x4_p2_sp2, lb_x4_p2_sp2, ub_x4_p2_sp2)...)
+
+    #Evaluate the product of the bounds
+    #First, lift sub part 1 to a space of (x₆,x₁₁)
+    emptyList = [2] #x11 is missing
+    currList = [1]
+    lbList = [lbs[6], lbs[11]]
+    ubList = [ubs[6], ubs[11]]
+
+    l_x4_p2_sp1_LB, l_x4_p2_sp1_UB = lift_OA(emptyList, currList, x4_p2_sp1_LB, x4_p2_sp1_UB, lbList, ubList)
+
+    #Next, lift sub part 2 to a space of (x₆,x₁₁)
+    emptyList = [1] #x6 is missing
+    currList = [2]
+
+    l_x4_p2_sp2_LB, l_x4_p2_sp2_UB = lift_OA(emptyList, currList, x4_p2_sp2_LB, x4_p2_sp2_UB, lbList, ubList)
+
+    #Now, multiply the lifted bounds
+    x4_p2_LB, x4_p2_UB = prodBounds(l_x4_p2_sp1_LB, l_x4_p2_sp1_UB, l_x4_p2_sp2_LB, l_x4_p2_sp2_UB)
+
+    if sanityFlag
+        validBounds(:(x₆*x₁₁),[:x₆,:x₁₁], x4_p2_LB, x4_p2_UB)
+    end
+
+    #Part 3: f₃(x₈) = -g*sin(x₈)
+    x4_p3 = :($g*sin(x₈))
+    lb_x4_p3 = lbs[8]
+    ub_x4_p3 = ubs[8]
+
+    if ub_x4_p3 - lb_x4_p3 < 1e-5
+        lb_x4_p3 = lb_x4_p3 - 1e-5
+        ub_x4_p3 = ub_x4_p3 + 1e-5
+        lbs[8] = lb_x4_p3
+        ubs[8] = ub_x4_p3
+    end
+
+    x4_p3_LB, x4_p3_UB = interpol_nd(bound_univariate(x4_p3,lb_x4_p3,ub_x4_p3)...)
+    
+    #Recover complete bounds by combining each set of bounds 
+    #Complete bounds are f(x₅,x₆,x₈,x₁₁,x₁₂) = x₅*x₁₂ -x₆*x₁₁ - g*sin(x₈)
+    #First lift each part to a space of (x₅,x₆,x₈,x₁₁,x₁₂)
+    #Lift part 1
+    emptyList = [2,3,4] #x6,x8,x11 are missing
+    currList = [1,5]
+    lbList = [lbs[5], lbs[6], lbs[8], lbs[11], lbs[12]]
+    ubList = [ubs[5], ubs[6], ubs[8], ubs[11], ubs[12]]
+
+    l_x4_p1_LB, l_x4_p1_UB = lift_OA(emptyList, currList, x4_p1_LB, x4_p1_UB, lbList, ubList)
+
+    #Lift part 2
+    emptyList = [1,3,5] #x5,x8,x12 are missing
+    currList = [2,4]
+
+    l_x4_p2_LB, l_x4_p2_UB = lift_OA(emptyList, currList, x4_p2_LB, x4_p2_UB, lbList, ubList)
+
+    #Lift part 3
+    emptyList = [1,2,4,5] #x5,x6,x11,x12 are missing
+    currList = [3]
+
+    l_x4_p3_LB, l_x4_p3_UB = lift_OA(emptyList, currList, x4_p3_LB, x4_p3_UB, lbList, ubList)
+    
+    #Combine the lifted bounds
+    x4_LB_i, x4_UB_i = sumBounds(l_x4_p1_LB, l_x4_p1_UB, l_x4_p2_LB, l_x4_p2_UB,true)
+    x4_LB, x4_UB = sumBounds(x4_LB_i, x4_UB_i, l_x4_p3_LB, l_x4_p3_UB,true)
+
+    if sanityFlag
+        validBounds(:(x₅*x₁₂ - x₆*x₁₁ - $g*sin(x₈)),[:x₅,:x₆,:x₈,:x₁₁,:x₁₂], x4_LB, x4_UB,true)
+    end
+    return x4_LB, x4_UB
+end
+
+function bound_quadx5(Quad, plotFlag = false, sanityFlag = true)
+    lbs, ubs = extrema(Quad.domain)
+
+    #Bounding x₆*x₁₀ - x₄*x₁₂ + g*sin(x₇)*cos(x₈)
+    #Part 1: x₆*x₁₀
+    #Sub-part 1: x₆
+    x5_p1_sp1 = :(1*x)
+    lb_x5_p1_sp1 = lbs[6]
+    ub_x5_p1_sp1 = ubs[6]
+
+    x5_p1_sp1_LB, x5_p1_sp1_UB = interpol_nd(bound_univariate(x5_p1_sp1, lb_x5_p1_sp1, ub_x5_p1_sp1)...)
+
+    #Sub-part 2: x₁₀
+    x5_p1_sp2 = :(1*x)
+    lb_x5_p1_sp2 = lbs[10]
+    ub_x5_p1_sp2 = ubs[10]
+
+    x5_p1_sp2_LB, x5_p1_sp2_UB = interpol_nd(bound_univariate(x5_p1_sp2, lb_x5_p1_sp2, ub_x5_p1_sp2)...)
+
+    #Lift the bounds to the same space
+    emptyList = [2] #Since x₁₀ comes after x₆
+    currList = [1]
+    lbList = [lbs[6], lbs[10]]
+    ubList = [ubs[6], ubs[10]]
+
+    l_x5_p1_sp1_LB, l_x5_p1_sp1_UB = lift_OA(emptyList, currList, x5_p1_sp1_LB, x5_p1_sp1_UB, lbList, ubList)
+
+    #Now lift sub part 2 to space of (x₆, x₁₀)
+    emptyList = [1] #Since x₆ comes before x₁₀
+    currList = [2]
+
+    l_x5_p1_sp2_LB, l_x5_p1_sp2_UB = lift_OA(emptyList, currList, x5_p1_sp2_LB, x5_p1_sp2_UB, lbList, ubList)
+
+    #Now multiply the lifted bounds
+    x5_p1_LB, x5_p1_UB = prodBounds(l_x5_p1_sp1_LB, l_x5_p1_sp1_UB, l_x5_p1_sp2_LB, l_x5_p1_sp2_UB)
+
+    if sanityFlag
+        validBounds(:(x6*x10), [:x6, :x10], x5_p1_LB, x5_p1_UB)
+    end
+
+
+    #Part 2: x₄*x₁₂
+    #Sub-part 1: x₄
+    x5_p2_sp1 = :(1*x)
+    lb_x5_p2_sp1 = lbs[4]
+    ub_x5_p2_sp1 = ubs[4]
+
+    x5_p2_sp1_LB, x5_p2_sp1_UB = interpol_nd(bound_univariate(x5_p2_sp1, lb_x5_p2_sp1, ub_x5_p2_sp1)...)
+
+    #Sub-part 2: x₁₂
+    x5_p2_sp2 = :(1*x)
+    lb_x5_p2_sp2 = lbs[12]
+    ub_x5_p2_sp2 = ubs[12]
+
+    x5_p2_sp2_LB, x5_p2_sp2_UB = interpol_nd(bound_univariate(x5_p2_sp2, lb_x5_p2_sp2, ub_x5_p2_sp2)...)
+
+    #Lift the bounds to the same space
+    emptyList = [2] #Since x₁₂ comes after x₄
+    currList = [1]
+    lbList = [lbs[4], lbs[12]]
+    ubList = [ubs[4], ubs[12]]
+
+    l_x5_p2_sp1_LB, l_x5_p2_sp1_UB = lift_OA(emptyList, currList, x5_p2_sp1_LB, x5_p2_sp1_UB, lbList, ubList)
+
+    #Now lift sub part 2 to space of (x₄, x₁₂)
+    emptyList = [1] #Since x₄ comes before x₁₂
+    currList = [2]
+
+    l_x5_p2_sp2_LB, l_x5_p2_sp2_UB = lift_OA(emptyList, currList, x5_p2_sp2_LB, x5_p2_sp2_UB, lbList, ubList)
+
+    #Now multiply the lifted bounds
+    x5_p2_LB, x5_p2_UB = prodBounds(l_x5_p2_sp1_LB, l_x5_p2_sp1_UB, l_x5_p2_sp2_LB, l_x5_p2_sp2_UB)
+
+    if sanityFlag
+        validBounds(:(x4*x12), [:x4, :x12], x5_p2_LB, x5_p2_UB)
+    end
+
+    #Part 3: g*sin(x₇)*cos(x₈)
+    #Sub-part 1: g*sin(x₇)
+    x5_p3_sp1 = :($g*sin(x))
+    lb_x5_p3_sp1 = lbs[7]
+    ub_x5_p3_sp1 = ubs[7]
+
+    if ub_x5_p3_sp1 - lb_x5_p3_sp1 < 1e-5
+        lb_x5_p3_sp1 = lb_x5_p3_sp1 - 1e-5
+        ub_x5_p3_sp1 = ub_x5_p3_sp1 + 1e-5
+        lbs[7] = lb_x5_p3_sp1
+        ubs[7] = ub_x5_p3_sp1
+    end
+
+    x5_p3_sp1_LB, x5_p3_sp1_UB = interpol_nd(bound_univariate(x5_p3_sp1, lb_x5_p3_sp1, ub_x5_p3_sp1)...)
+
+    #Sub-part 2: cos(x₈)
+    x5_p3_sp2 = :(cos(x))
+    lb_x5_p3_sp2 = lbs[8]
+    ub_x5_p3_sp2 = ubs[8]
+
+    if ub_x5_p3_sp2 - lb_x5_p3_sp2 < 1e-5
+        lb_x5_p3_sp2 = lb_x5_p3_sp2 - 1e-5
+        ub_x5_p3_sp2 = ub_x5_p3_sp2 + 1e-5
+        lbs[8] = lb_x5_p3_sp2
+        ubs[8] = ub_x5_p3_sp2
+    end
+
+    x5_p3_sp2_LB, x5_p3_sp2_UB = interpol_nd(bound_univariate(x5_p3_sp2, lb_x5_p3_sp2, ub_x5_p3_sp2)...)
+
+    #Lift the bounds to the same space
+    emptyList = [2] #Since x₈ comes after x₇
+    currList = [1]
+    lbList = [lbs[7], lbs[8]]
+    ubList = [ubs[7], ubs[8]]
+
+    l_x5_p3_sp1_LB, l_x5_p3_sp1_UB = lift_OA(emptyList, currList, x5_p3_sp1_LB, x5_p3_sp1_UB, lbList, ubList)
+
+    #Now lift sub part 2 to space of (x₇, x₈)
+    emptyList = [1] #Since x₇ comes before x₈
+    currList = [2]
+
+    l_x5_p3_sp2_LB, l_x5_p3_sp2_UB = lift_OA(emptyList, currList, x5_p3_sp2_LB, x5_p3_sp2_UB, lbList, ubList)
+
+    #Now multiply the lifted bounds
+    x5_p3_LB, x5_p3_UB = prodBounds(l_x5_p3_sp1_LB, l_x5_p3_sp1_UB, l_x5_p3_sp2_LB, l_x5_p3_sp2_UB)
+
+    if sanityFlag
+        validBounds(:($g*sin(x7)*cos(x8)), [:x7, :x8], x5_p3_LB, x5_p3_UB)
+    end
+
+    #Now add the bounds to obtain f(x₄,x₆,x₇,x₈,x₁₀,x₁₂) = x₆*x₁₀ - x₄*x₁₂ + g*sin(x₇)*cos(x₈)
+    #Lift the bounds to the same space
+    #First lift part 1 to the space of (x₄,x₆,x₇,x₈,x₁₀,x₁₂)
+    emptyList = [1,3,4,6] #Mising x4,x7,x8, and x12
+    currList = [2,5] 
+    lbList = [lbs[4], lbs[6], lbs[7], lbs[8], lbs[10], lbs[12]]
+    ubList = [ubs[4], ubs[6], ubs[7], ubs[8], ubs[10], ubs[12]]
+
+    l_x5_p1_LB, l_x5_p1_UB = lift_OA(emptyList, currList, x5_p1_LB, x5_p1_UB, lbList, ubList)
+
+    #Now lift part 2 to the space of (x₄,x₆,x₇,x₈,x₁₀,x₁₂)
+    emptyList = [2,3,4,5] #Missing x6, x7, x8, and x10
+    currList = [1,6]
+
+    l_x5_p2_LB, l_x5_p2_UB = lift_OA(emptyList, currList, x5_p2_LB, x5_p2_UB, lbList, ubList)
+
+    #Now lift part 3 to the space of (x₄,x₆,x₇,x₈,x₁₀,x₁₂)
+    emptyList = [1,2,5,6] #Missing x4, x6, x10, and x12
+    currList = [3,4]
+
+    l_x5_p3_LB, l_x5_p3_UB = lift_OA(emptyList, currList, x5_p3_LB, x5_p3_UB, lbList, ubList)
+
+    #Now add the lifted bounds
+    x5_LB_i, x5_UB_i = sumBounds(l_x5_p1_LB, l_x5_p1_UB, l_x5_p2_LB, l_x5_p2_UB,true)
+    x5_LB, x5_UB = sumBounds(x5_LB_i, x5_UB_i, l_x5_p3_LB, l_x5_p3_UB,false)
+
+    if sanityFlag
+        validBounds(:($g*sin(x7)*cos(x8) + x6*x10 - x4*x12), [:x4, :x6, :x7, :x8, :x10, :x12], x5_LB, x5_UB)
+    end
+
+    return x5_LB, x5_UB
+end
+
+function bound_bound_quadx6(Quad, plotFlag, sanityFlag)
+    lbs, ubs = extrema(Quad.domain)
+
+    #Bounding x₄*x₁₁ - x₅*x₁₀ + g*cos(x₇)*cos(x₈) - g
+    #Part 1: x₄*x₁₁
+    #Sub-part 1: x₄
+    x6_p1_sp1 = :(1*x)
+    lb_x6_p1_sp1 = lbs[4]
+    ub_x6_p1_sp1 = ubs[4]
+
+    x6_p1_sp1_LB, x6_p1_sp1_UB = interpol_nd(bound_univariate(x6_p1_sp1, lb_x6_p1_sp1, ub_x6_p1_sp1)...)
+
+    #Sub-part 2: x₁₁
+    x6_p1_sp2 = :(1*x)
+    lb_x6_p1_sp2 = lbs[11]
+    ub_x6_p1_sp2 = ubs[11]
+
+    x6_p1_sp2_LB, x6_p1_sp2_UB = interpol_nd(bound_univariate(x6_p1_sp2, lb_x6_p1_sp2, ub_x6_p1_sp2)...)
+
+    #Lift the bounds to the same space
+    emptyList = [2] #Since x₁₁ comes after x₄
+    currList = [1]
+    lbList = [lbs[4], lbs[11]]
+    ubList = [ubs[4], ubs[11]]
+
+    l_x6_p1_sp1_LB, l_x6_p1_sp1_UB = lift_OA(emptyList, currList, x6_p1_sp1_LB, x6_p1_sp1_UB, lbList, ubList)
+
+    #Now lift sub part 2 to space of (x₄, x₁₁)
+    emptyList = [1] #Since x₄ comes before x₁₁
+    currList = [2]
+
+    l_x6_p1_sp2_LB, l_x6_p1_sp2_UB = lift_OA(emptyList, currList, x6_p1_sp2_LB, x6_p1_sp2_UB, lbList, ubList)
+
+    #Now multiply the lifted bounds
+    x6_p1_LB, x6_p1_UB = prodBounds(l_x6_p1_sp1_LB, l_x6_p1_sp1_UB, l_x6_p1_sp2_LB, l_x6_p1_sp2_UB)
+
+    if sanityFlag
+        validBounds(:(x4*x11), [:x4, :x11], x6_p1_LB, x6_p1_UB)
+    end
+
+    #Part 2: x₅*x₁₀
+    #Sub-part 1: x₅
+    x6_p2_sp1 = :(1*x)
+    lb_x6_p2_sp1 = lbs[5]
+    ub_x6_p2_sp1 = ubs[5]
+
+    x6_p2_sp1_LB, x6_p2_sp1_UB = interpol_nd(bound_univariate(x6_p2_sp1, lb_x6_p2_sp1, ub_x6_p2_sp1)...)
+
+    #Sub-part 2: x₁₀
+    x6_p2_sp2 = :(1*x)
+    lb_x6_p2_sp2 = lbs[10]
+    ub_x6_p2_sp2 = ubs[10]
+
+    x6_p2_sp2_LB, x6_p2_sp2_UB = interpol_nd(bound_univariate(x6_p2_sp2, lb_x6_p2_sp2, ub_x6_p2_sp2)...)
+
+    #Lift the bounds to the same space
+    emptyList = [2] #Since x₁₀ comes after x₅
+    currList = [1]
+    lbList = [lbs[5], lbs[10]]
+    ubList = [ubs[5], ubs[10]]
+
+    l_x6_p2_sp1_LB, l_x6_p2_sp1_UB = lift_OA(emptyList, currList, x6_p2_sp1_LB, x6_p2_sp1_UB, lbList, ubList)
+
+    #Now lift sub part 2 to space of (x₅, x₁₀)
+    emptyList = [1] #Since x₅ comes before x₁₀
+    currList = [2]
+
+    l_x6_p2_sp2_LB, l_x6_p2_sp2_UB = lift_OA(emptyList, currList, x6_p2_sp2_LB, x6_p2_sp2_UB, lbList, ubList)
+
+    #Now multiply the lifted bounds
+    x6_p2_LB, x6_p2_UB = prodBounds(l_x6_p2_sp1_LB, l_x6_p2_sp1_UB, l_x6_p2_sp2_LB, l_x6_p2_sp2_UB)
+
+    if sanityFlag
+        validBounds(:(x5*x10), [:x5, :x10], x6_p2_LB, x6_p2_UB)
+    end
+
+    #Part 3: g*cos(x₇)*cos(x₈) - g
+    #Sub-part 1: g*cos(x₇)
+    x6_p3_sp1 = :($g*cos(x))
+    lb_x6_p3_sp1 = lbs[7]
+    ub_x6_p3_sp1 = ubs[7]
+
+    if ub_x6_p3_sp1 - lb_x6_p3_sp1 < 1e-5
+        lb_x6_p3_sp1 = lb_x6_p3_sp1 - 1e-5
+        ub_x6_p3_sp1 = ub_x6_p3_sp1 + 1e-5
+        lbs[7] = lb_x6_p3_sp1
+        ubs[7] = ub_x6_p3_sp1
+    end
+
+    x6_p3_sp1_LB, x6_p3_sp1_UB = interpol_nd(bound_univariate(x6_p3_sp1, lb_x6_p3_sp1, ub_x6_p3_sp1)...)
+
+    #Sub-part 2: cos(x₈)
+    x6_p3_sp2 = :(cos(x))
+    lb_x6_p3_sp2 = lbs[8]
+    ub_x6_p3_sp2 = ubs[8]
+
+    if ub_x6_p3_sp2 - lb_x6_p3_sp2 < 1e-5
+        lb_x6_p3_sp2 = lb_x6_p3_sp2 - 1e-5
+        ub_x6_p3_sp2 = ub_x6_p3_sp2 + 1e-5
+        lbs[8] = lb_x6_p3_sp2
+        ubs[8] = ub_x6_p3_sp2
+    end
+
+    x6_p3_sp2_LB, x6_p3_sp2_UB = interpol_nd(bound_univariate(x6_p3_sp2, lb_x6_p3_sp2, ub_x6_p3_sp2)...)
+
+    #Lift the bounds to the same space
+    emptyList = [2] #Since x₈ comes after x₇
+    currList = [1]
+    lbList = [lbs[7], lbs[8]]
+    ubList = [ubs[7], ubs[8]]
+
+    l_x6_p3_sp1_LB, l_x6_p3_sp1_UB = lift_OA(emptyList, currList, x6_p3_sp1_LB, x6_p3_sp1_UB, lbList, ubList)
+
+    #Now lift sub part 2 to space of (x₇, x₈)
+    emptyList = [1] #Since x₇ comes before x₈
+    currList = [2]
+
+    l_x6_p3_sp2_LB, l_x6_p3_sp2_UB = lift_OA(emptyList, currList, x6_p3_sp2_LB, x6_p3_sp2_UB, lbList, ubList)
+
+    #Now multiply the lifted bounds
+    x6_p3_LB, x6_p3_UB = prodBounds(l_x6_p3_sp1_LB, l_x6_p3_sp1_UB, l_x6_p3_sp2_LB, l_x6_p3_sp2_UB)
+
+    #Subtract g
+    x6_p3_LB = [(tup[1:end-1]..., tup[end] - g) for tup in x6_p3_LB]
+    x6_p3_UB = [(tup[1:end-1]..., tup[end] - g) for tup in x6_p3_UB]
+
+    if sanityFlag
+        validBounds(:($g*cos(x7)*cos(x8) - $g), [:x7, :x8], x6_p3_LB, x6_p3_UB)
+    end
+
+    #Now add the bounds to recover f(x₄, x₅, x₇, x₈, x₁₀, x₁₁)
+    #Lift the bounds to the same space
+    #First lift part 1 to the space of (x₄, x₅, x₇, x₈, x₁₀, x₁₁)
+    emptyList = [2,3,4,5] #Missing x₅,x₇, x₈ and x₁₀
+    currList = [1,6]
+    lbList = [lbs[4], lbs[5], lbs[7], lbs[8], lbs[10], lbs[11]]
+    ubList = [ubs[4], ubs[5], ubs[7], ubs[8], ubs[10], ubs[11]]
+
+    l_x6_p1_LB, l_x6_p1_UB = lift_OA(emptyList, currList, x6_p1_LB, x6_p1_UB, lbList, ubList)
+
+    #Now lift part 2 to the space of (x₄, x₅, x₇, x₈, x₁₀, x₁₁)
+    emptyList = [1,3,4,6] #Missing x₄,x₇, x₈ and x₁₁
+    currList = [2,5]
+
+    l_x6_p2_LB, l_x6_p2_UB = lift_OA(emptyList, currList, x6_p2_LB, x6_p2_UB, lbList, ubList)
+
+    #Now lift part 3 to the space of (x₄, x₅, x₇, x₈, x₁₀, x₁₁)
+    emptyList = [1,2,5,6] #Missing x₄,x₅, x₁₀ and x₁₁
+    currList = [3,4]
+
+    l_x6_p3_LB, l_x6_p3_UB = lift_OA(emptyList, currList, x6_p3_LB, x6_p3_UB, lbList, ubList)
+
+    #Now add the lifted bounds
+    x6_LB_i, x6_UB_i = sumBounds(l_x6_p1_LB, l_x6_p1_UB, l_x6_p2_LB, l_x6_p2_UB,true)
+    x6_LB, x6_UB = sumBounds(x6_LB_i, x6_UB_i, l_x6_p3_LB, l_x6_p3_UB,false)
+
+    if sanityFlag
+        validBounds(:($g*cos(x7)*cos(x8) - $g + x4*x11 - x5*x10), [:x4, :x5, :x7, :x8, :x10, :x11], x6_LB, x6_UB)
+    end
+    return x6_LB, x6_UB
+end
