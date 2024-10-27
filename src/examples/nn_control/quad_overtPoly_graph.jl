@@ -61,8 +61,85 @@ function quad_control(input_set)
 end
 
 #TODO: Implement this function
-function quad_dyn_con_link!(query)
-    boo = 1
+function quad_dyn_con_link!(query, neurons, graph, dynModel, netModel, t_ind=nothing)
+    #Define variables that are inputs to the network model 
+    @variable(netModel, x1)
+    @variable(netModel, x2)
+    @variable(netModel, x3)
+    @variable(netModel, x4)
+    @variable(netModel, x5)
+    @variable(netModel, x6)
+    @variable(netModel, x7)
+    @variable(netModel, x8)
+    @variable(netModel, x9)
+    @variable(netModel, x10)
+    @variable(netModel, x11)
+    @variable(netModel, x12)
+
+    #Specify inputs to the network
+    @constraint(netModel, neurons[1][1] == x1)
+    @constraint(netModel, neurons[1][2] == x2)
+    @constraint(netModel, neurons[1][3] == x3)
+    @constraint(netModel, neurons[1][4] == x4)
+    @constraint(netModel, neurons[1][5] == x5)
+    @constraint(netModel, neurons[1][6] == x6)
+    @constraint(netModel, neurons[1][7] == x7)
+    @constraint(netModel, neurons[1][8] == x8)
+    @constraint(netModel, neurons[1][9] == x9)
+    @constraint(netModel, neurons[1][10] == x10)
+    @constraint(netModel, neurons[1][11] == x11)
+    @constraint(netModel, neurons[1][12] == x12)
+
+    #Link network inputs to appropriate dynamics models 
+    @linkconstraint(graph, netModel[:x1] == dynModel[1][:x][1])
+    @linkconstraint(graph, netModel[:x2] == dynModel[2][:x][1])
+    @linkconstraint(graph, netModel[:x3] == dynModel[3][:x][1])
+    @linkconstraint(graph, netModel[:x4] == dynModel[4][:x][1])
+    @linkconstraint(graph, netModel[:x5] == dynModel[5][:x][2])
+    @linkconstraint(graph, netModel[:x6] == dynModel[6][:x][3])
+    @linkconstraint(graph, netModel[:x7] == dynModel[7][:x][1])
+    @linkconstraint(graph, netModel[:x8] == dynModel[8][:x][2])
+    @linkconstraint(graph, netModel[:x9] == dynModel[9][:x][3])
+    @linkconstraint(graph, netModel[:x10] == dynModel[10][:x][1])
+    @linkconstraint(graph, netModel[:x11] == dynModel[11][:x][2])
+    @linkconstraint(graph, netModel[:x12] == dynModel[12][:x][3])
+
+    #Define network outputs 
+    @variable(netModel, u1)
+    @variable(netModel, u2)
+    @variable(netModel, u3)
+
+    #Connect network outputs to neurons 
+    @constraint(netModel, neurons[end][1] == u1)
+    @constraint(netModel, neurons[end][2] == u2)
+    @constraint(netModel, neurons[end][3] == u3)
+
+    #Connect network outputs to dynamics model
+    @linkconstraint(graph, netModel[:u1] == dynModel[6][:u][1])
+    @linkconstraint(graph, netModel[:u2] == dynModel[10][:u][1])
+    @linkconstraint(graph, netModel[:u3] == dynModel[11][:u][1])
+
+    #Finally, identify pertient variable for each model
+    for (i, sym) in query.problem.varList 
+        if !isnothing(t_ind)
+            sym_t = Meta.parse("$(sym)_$(t_ind)")
+        else
+            sym_t = sym
+        end
+        if i > 3 && i % 3 == 2
+            #Catches 5, 8, 11
+            pertVar = dynModel[i][:x][2]
+            push!(query.var_dict[sym_t], [pertVar])
+        elseif i > 3 && i % 3 == 0
+            #Catches 6, 9, 12
+            pertVar = dynModel[i][:x][3]
+            push!(query.var_dict[sym_t], [pertVar])
+        else
+            pertVar = dynModel[i][:x][1]
+            push!(query.var_dict[sym_t], [pertVar])
+        end
+
+    end
 end
 
 function bound_quad(Quad, plotFlag = false, sanityFlag = true)
@@ -108,54 +185,8 @@ query = GraphPolyQuery(
     2
 )
 
-###############
-#Bounding the quadcopter dynamics
-sanityFlag = true
-plotFlag = false
+#Next, test multi-step reachability
+query1 = deepcopy(query)
+query1.ntime = 1
+@time concreach!(query1)
 
-
-###############################
-include("../../overtPoly_helpers.jl")
-include("quad_helpers.jl")
-##############################################
-function bound_quadx10(Quad, plotFlag, sanityFlag)
-    lbs, ubs = extrema(Quad.domain)
-
-    #Bounding ((Jy - Jz)/Jx)*x₁₁*x₁₂
-    #Sub-part 1: (Jy - Jz)/Jx * x₁₁
-    x10_p1_sp1 = :($((Jy - Jz)/Jx)*x) 
-    lb_x10_p1_sp1 = lbs[11]
-    ub_x10_p1_sp1 = ubs[11]
-
-    x10_p1_sp1_LB, x10_p1_sp1_UB = interpol_nd(bound_univariate(x10_p1_sp1, lb_x10_p1_sp1, ub_x10_p1_sp1)...)
-
-    #Sub-part 2: x₁₂
-    x10_p1_sp2 = :(1*x)
-    lb_x10_p1_sp2 = lbs[12]
-    ub_x10_p1_sp2 = ubs[12]
-
-    x10_p1_sp2_LB, x10_p1_sp2_UB = interpol_nd(bound_univariate(x10_p1_sp2, lb_x10_p1_sp2, ub_x10_p1_sp2)...)
-
-    #Lift the bounds to the same space
-    emptyList = [2] #Sub part 1 missing x₁₂
-    currList = [1]
-    lbList = [lbs[11], lbs[12]]
-    ubList = [ubs[11], ubs[12]]
-
-    l_x10_p1_sp1_LB, l_x10_p1_sp1_UB = lift_OA(emptyList, currList, x10_p1_sp1_LB, x10_p1_sp1_UB, lbList, ubList)
-
-    #Now lift sub part 2 to space of (x₁₁, x₁₂)
-    emptyList = [1] #Sub part 2 missing x₁₁
-    currList = [2]
-
-    l_x10_p1_sp2_LB, l_x10_p1_sp2_UB = lift_OA(emptyList, currList, x10_p1_sp2_LB, x10_p1_sp2_UB, lbList, ubList)
-
-    #Now multiply the lifted bounds
-    x10_p1_LB, x10_p1_UB = prodBounds(l_x10_p1_sp1_LB, l_x10_p1_sp1_UB, l_x10_p1_sp2_LB, l_x10_p1_sp2_UB)
-
-    if sanityFlag
-        validBounds(:($((Jy - Jz)/Jx)*x11*x12), [:x11, :x12], x10_p1_LB, x10_p1_UB)
-    end
-
-    return x10_p1_LB, x10_p1_UB
-end

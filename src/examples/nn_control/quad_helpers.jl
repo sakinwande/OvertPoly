@@ -40,9 +40,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     end
     x1_p1_sp1_LB, x1_p1_sp1_UB = interpol_nd(bound_univariate(x1_p1_sp1, lb_x1_p1_sp1, ub_x1_p1_sp1)...)
     
-    if sanityFlag
-        validBounds(x1_p1_sp1, [:x], x1_p1_sp1_LB, x1_p1_sp1_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(x1_p1_sp1, [:x], x1_p1_sp1_LB, x1_p1_sp1_UB, true)
+    # end
 
     #Sub-part 2 = cos(x9)
     x1_p1_sp2 = :(cos(x))
@@ -56,9 +56,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     end
     x1_p1_sp2_LB, x1_p1_sp2_UB = interpol_nd(bound_univariate(x1_p1_sp2, lb_x1_p1_sp2, ub_x1_p1_sp2)...)
 
-    if sanityFlag
-        validBounds(x1_p1_sp2, [:x], x1_p1_sp2_LB, x1_p1_sp2_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(x1_p1_sp2, [:x], x1_p1_sp2_LB, x1_p1_sp2_UB, true)
+    # end
     
     #Sub-part 3 = x4
     x1_p1_sp3 = :(1*x)
@@ -66,9 +66,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     ub_x1_p1_sp3 = ubs[4]
     x1_p1_sp3_LB, x1_p1_sp3_UB = interpol_nd(bound_univariate(x1_p1_sp3, lb_x1_p1_sp3, ub_x1_p1_sp3)...)
 
-    if sanityFlag
-        validBounds(x1_p1_sp3, [:x], x1_p1_sp3_LB, x1_p1_sp3_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(x1_p1_sp3, [:x], x1_p1_sp3_LB, x1_p1_sp3_UB, true)
+    # end
 
     #Find how much to shift each pair of bounds by for valid log 
     s_x1p1sp1 = inpShiftLog(lb_x1_p1_sp1, ub_x1_p1_sp1, bounds=x1_p1_sp1_LB)
@@ -94,9 +94,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     x1_p1_sp1_UB_ll = addDim(x1_p1_sp1_UB_l, 1, 0.0) #for x4, index 1
     x1_p1_sp1_UB_ll = addDim(x1_p1_sp1_UB_ll, 3, 0.0) #for x9 index 3
 
-    if sanityFlag
-        validBounds(:(log((cos(x8) + $s_x1p1sp1))), [:x4, :x8, :x9], x1_p1_sp1_LB_ll, x1_p1_sp1_UB_ll, true)
-    end
+    # if sanityFlag
+    #     validBounds(:(log((cos(x8) + $s_x1p1sp1))), [:x4, :x8, :x9], x1_p1_sp1_LB_ll, x1_p1_sp1_UB_ll, true)
+    # end
 
     #For sp2, add dimension for x4 and x8
     x1_p1_sp2_LB_ll = addDim(x1_p1_sp2_LB_l, 1, 0.0) #for x4, index 1
@@ -105,9 +105,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     x1_p1_sp2_UB_ll = addDim(x1_p1_sp2_UB_l, 1, 0.0) #for x4, index 1
     x1_p1_sp2_UB_ll = addDim(x1_p1_sp2_UB_ll, 2, 0.0) #for x8 index 2
 
-    if sanityFlag
-        validBounds(:(log((cos(x9) + $s_x1p1sp2))), [:x4, :x8, :x9], x1_p1_sp2_LB_ll, x1_p1_sp2_UB_ll, true)
-    end
+    # if sanityFlag
+    #     validBounds(:(log((cos(x9) + $s_x1p1sp2))), [:x4, :x8, :x9], x1_p1_sp2_LB_ll, x1_p1_sp2_UB_ll, true)
+    # end
 
     #For sp3, add dimension for x8 and x9
     x1_p1_sp3_LB_ll = addDim(x1_p1_sp3_LB_l, 2, 0.0) #for x8, index 2
@@ -116,33 +116,33 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     x1_p1_sp3_UB_ll = addDim(x1_p1_sp3_UB_l, 2, 0.0) #for x8, index 2
     x1_p1_sp3_UB_ll = addDim(x1_p1_sp3_UB_ll, 3, 0.0) #for x9 index 3
 
-    if sanityFlag 
-        validBounds(:(log((x4 + $s_x1p1sp3))), [:x4, :x8, :x9], x1_p1_sp3_LB_ll, x1_p1_sp3_UB_ll, true)
-    end
+    # if sanityFlag 
+    #     validBounds(:(log((x4 + $s_x1p1sp3))), [:x4, :x8, :x9], x1_p1_sp3_LB_ll, x1_p1_sp3_UB_ll, true)
+    # end
 
     #Combine sp1 and sp2 first to get log(cos(x8)*cos(x9))
     x1_p1_sp4_LB_l = MinkSum(x1_p1_sp1_LB_ll, x1_p1_sp2_LB_ll)
     x1_p1_sp4_UB_l = MinkSum(x1_p1_sp1_UB_ll, x1_p1_sp2_UB_ll)
 
-    if sanityFlag
-        validBounds(:((0*log(x4 + $s_x1p1sp3)+ log(cos(x8) + $s_x1p1sp1) + log(cos(x9) + $s_x1p1sp2))), [:x4, :x8, :x9], x1_p1_sp4_LB_l, x1_p1_sp4_UB_l, true)
-    end
+    # if sanityFlag
+    #     validBounds(:((0*log(x4 + $s_x1p1sp3)+ log(cos(x8) + $s_x1p1sp1) + log(cos(x9) + $s_x1p1sp2))), [:x4, :x8, :x9], x1_p1_sp4_LB_l, x1_p1_sp4_UB_l, true)
+    # end
 
     #Combine sp4 with sp3 to get log(cos(x8)*cos(x9)*x4)
     x1_p1_LB_l = MinkSum(x1_p1_sp4_LB_l, x1_p1_sp3_LB_ll)
     x1_p1_UB_l = MinkSum(x1_p1_sp4_UB_l, x1_p1_sp3_UB_ll)
 
-    if sanityFlag
-        validBounds(:((log(x4 + $s_x1p1sp3))+log(cos(x8)+$s_x1p1sp1)+log(cos(x9) + $s_x1p1sp2)), [:x4, :x8, :x9], x1_p1_LB_l, x1_p1_UB_l, true)
-    end
+    # if sanityFlag
+    #     validBounds(:((log(x4 + $s_x1p1sp3))+log(cos(x8)+$s_x1p1sp1)+log(cos(x9) + $s_x1p1sp2)), [:x4, :x8, :x9], x1_p1_LB_l, x1_p1_UB_l, true)
+    # end
     
     #Compute exp to get bounds for cos(x8)*cos(x9)*x4
     x1_p1_LB_s = [(tup[1:end-1]..., floor_n(exp(tup[end]))) for tup in x1_p1_LB_l]
     x1_p1_UB_s = [(tup[1:end-1]..., ceil_n(exp(tup[end]))) for tup in x1_p1_UB_l]
 
-    if sanityFlag
-        validBounds(:((cos(x8) + $s_x1p1sp1)*(cos(x9) + $s_x1p1sp2)*(x4 + $s_x1p1sp3)), [:x4, :x8, :x9], x1_p1_LB_s, x1_p1_UB_s, true)
-    end
+    # if sanityFlag
+    #     validBounds(:((cos(x8) + $s_x1p1sp1)*(cos(x9) + $s_x1p1sp2)*(x4 + $s_x1p1sp3)), [:x4, :x8, :x9], x1_p1_LB_s, x1_p1_UB_s, true)
+    # end
 
     #Account for the shift induced by the log
     #Don't have to round bc we used zeroVal = 0.0
@@ -184,9 +184,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     end
 
     #Sanity check, validity
-    if sanityFlag
-        validBounds(:(x4*cos(x8)*cos(x9)), [:x4, :x8, :x9], x1_p1_LB, x1_p1_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(:(x4*cos(x8)*cos(x9)), [:x4, :x8, :x9], x1_p1_LB, x1_p1_UB, true)
+    # end
 
     #Part 2: f(x8, x9) = sin(x8)*cos(x9)
     #K-A decomposition is exp(log(sin(x8)) + log(cos(x9)))
@@ -205,9 +205,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     end
     x1_p2_sp1_LB, x1_p2_sp1_UB = interpol_nd(bound_univariate(x1_p2_sp1, lb_x1_p2_sp1, ub_x1_p2_sp1)...)
 
-    if sanityFlag
-        validBounds(x1_p2_sp1, [:x],x1_p2_sp1_LB, x1_p2_sp1_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(x1_p2_sp1, [:x],x1_p2_sp1_LB, x1_p2_sp1_UB, true)
+    # end
     
     #Sub-part 2 = cos(x9)
     x1_p2_sp2 = :(cos(x))
@@ -221,9 +221,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     end
     x1_p2_sp2_LB, x1_p2_sp2_UB = interpol_nd(bound_univariate(x1_p2_sp2, lb_x1_p2_sp2, ub_x1_p2_sp2)...)
 
-    if sanityFlag
-        validBounds(x1_p2_sp2, [:x],x1_p2_sp2_LB, x1_p2_sp2_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(x1_p2_sp2, [:x],x1_p2_sp2_LB, x1_p2_sp2_UB, true)
+    # end
     
     #Find how much to shift each pair of bounds by for valid log
     s_x1p2sp1 = inpShiftLog(lb_x1_p2_sp1, ub_x1_p2_sp1, bounds=x1_p2_sp1_LB)
@@ -236,13 +236,13 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     x1_p2_sp2_LB_l = [(tup[1:end-1]..., log(tup[end] + s_x1p2sp2)) for tup in x1_p2_sp2_LB]
     x1_p2_sp2_UB_l = [(tup[1:end-1]..., log(tup[end] + s_x1p2sp2)) for tup in x1_p2_sp2_UB]
 
-    if sanityFlag
-        validBounds(:(log(sin(x8) + $s_x1p2sp1)), [:x8], x1_p2_sp1_LB_l, x1_p2_sp1_UB_l, true)
-    end
+    # if sanityFlag
+    #     validBounds(:(log(sin(x8) + $s_x1p2sp1)), [:x8], x1_p2_sp1_LB_l, x1_p2_sp1_UB_l, true)
+    # end
 
-    if sanityFlag
-        validBounds(:(log(cos(x9) + $s_x1p2sp2)), [:x9], x1_p2_sp2_LB_l, x1_p2_sp2_UB_l, true)
-    end
+    # if sanityFlag
+    #     validBounds(:(log(cos(x9) + $s_x1p2sp2)), [:x9], x1_p2_sp2_LB_l, x1_p2_sp2_UB_l, true)
+    # end
     #Add dimensions to prepare for Minkowski sum
     #p2 is a function of x8, x9. For sp1, add dimension for x9
     #Set zeroval to be zero
@@ -258,21 +258,21 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     x1_p2_LB_l = MinkSum(x1_p2_sp1_LB_ll, x1_p2_sp2_LB_ll)
     x1_p2_UB_l = MinkSum(x1_p2_sp1_UB_ll, x1_p2_sp2_UB_ll)
 
-    if sanityFlag
-        validBounds(:(log(sin(x8) + $s_x1p2sp1) + log(cos(x9) + $s_x1p2sp2)), [:x8, :x9], x1_p2_LB_l, x1_p2_UB_l, true)
-    end
+    # if sanityFlag
+    #     validBounds(:(log(sin(x8) + $s_x1p2sp1) + log(cos(x9) + $s_x1p2sp2)), [:x8, :x9], x1_p2_LB_l, x1_p2_UB_l, true)
+    # end
     
-    if sanityFlag
-        validBounds(:(log((sin(x8) + $s_x1p2sp1)*(cos(x9) + $s_x1p2sp2))), [:x8, :x9], x1_p2_LB_l, x1_p2_UB_l, true)
-    end
+    # if sanityFlag
+    #     validBounds(:(log((sin(x8) + $s_x1p2sp1)*(cos(x9) + $s_x1p2sp2))), [:x8, :x9], x1_p2_LB_l, x1_p2_UB_l, true)
+    # end
     
     #Compute exp to get bounds for sin(x8)*cos(x9)
     x1_p2_LB_s = [(tup[1:end-1]..., floor_n(exp(tup[end]))) for tup in x1_p2_LB_l]
     x1_p2_UB_s = [(tup[1:end-1]..., ceil_n(exp(tup[end]))) for tup in x1_p2_UB_l]
 
-    if sanityFlag
-        validBounds(:((sin(x8)+ $s_x1p2sp1)*(cos(x9) + $s_x1p2sp2)), [:x8, :x9], x1_p2_LB_s, x1_p2_UB_s, true)
-    end
+    # if sanityFlag
+    #     validBounds(:((sin(x8)+ $s_x1p2sp1)*(cos(x9) + $s_x1p2sp2)), [:x8, :x9], x1_p2_LB_s, x1_p2_UB_s, true)
+    # end
     
     #Account for the shift induced by the log
     #Don't have to round bc we used zeroVal = 0.0
@@ -308,9 +308,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
         push!(x1_p2_LB, (tup[1:end-1]..., f1f2_LB))
     end
 
-    if sanityFlag
-        validBounds(:(sin(x8)*cos(x9)), [:x8, :x9], x1_p2_LB, x1_p2_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(:(sin(x8)*cos(x9)), [:x8, :x9], x1_p2_LB, x1_p2_UB, true)
+    # end
 
     #Part 3: f(x5, x7) = sin(x7)*x5
     #K-A decomposition is exp(log(sin(x7)) + log(x5))
@@ -326,9 +326,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     end
     x1_p3_sp1_LB, x1_p3_sp1_UB = interpol_nd(bound_univariate(x1_p3_sp1, lb_x1_p3_sp1, ub_x1_p3_sp1)...)
 
-    if sanityFlag
-        validBounds(x1_p3_sp1, [:x], x1_p3_sp1_LB, x1_p3_sp1_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(x1_p3_sp1, [:x], x1_p3_sp1_LB, x1_p3_sp1_UB, true)
+    # end
     #Sub-part 2 = x5
     x1_p3_sp2 = :(1*x)
     lb_x1_p3_sp2 = lbs[5]
@@ -336,9 +336,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     #Specify digits for interpolation
     x1_p3_sp2_LB, x1_p3_sp2_UB = interpol_nd(bound_univariate(x1_p3_sp2, lb_x1_p3_sp2, ub_x1_p3_sp2)...)
 
-    if sanityFlag
-        validBounds(x1_p3_sp2, [:x], x1_p3_sp2_LB, x1_p3_sp2_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(x1_p3_sp2, [:x], x1_p3_sp2_LB, x1_p3_sp2_UB, true)
+    # end
     #Find how much to shift each pair of bounds by for valid log
     s_x1p3sp1 = inpShiftLog(lb_x1_p3_sp1, ub_x1_p3_sp1, bounds=x1_p3_sp1_LB)
     s_x1p3sp2 = inpShiftLog(lb_x1_p3_sp2, ub_x1_p3_sp2, bounds=x1_p3_sp2_LB)
@@ -368,9 +368,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     x1_p3_LB_s = [(tup[1:end-1]..., floor_n(exp(tup[end]))) for tup in x1_p3_LB_l]
     x1_p3_UB_s = [(tup[1:end-1]..., ceil_n(exp(tup[end]))) for tup in x1_p3_UB_l]
 
-    if sanityFlag
-        validBounds(:((x5 + $s_x1p3sp2)*(sin(x7) + $s_x1p3sp1)), [:x5, :x7], x1_p3_LB_s, x1_p3_UB_s, true)
-    end
+    # if sanityFlag
+    #     validBounds(:((x5 + $s_x1p3sp2)*(sin(x7) + $s_x1p3sp1)), [:x5, :x7], x1_p3_LB_s, x1_p3_UB_s, true)
+    # end
     
     #Account for the shift induced by the log
     #Don't have to round bc we used zeroVal = 0.0
@@ -403,9 +403,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
         push!(x1_p3_LB, (tup[1:end-1]..., f1f2_LB))
     end
 
-    if sanityFlag
-        validBounds(:(x5*sin(x7)), [:x5, :x7], x1_p3_LB, x1_p3_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(:(x5*sin(x7)), [:x5, :x7], x1_p3_LB, x1_p3_UB, true)
+    # end
     
     #Part 4: f(x6, x7) = x6cos(x7)
     #K-A decomposition is exp(log(x6) + log(cos(x7)))
@@ -415,9 +415,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     ub_x1_p4_sp1 = ubs[6]
     x1_p4_sp1_LB, x1_p4_sp1_UB = interpol_nd(bound_univariate(x1_p4_sp1, lb_x1_p4_sp1, ub_x1_p4_sp1)...)
 
-    if sanityFlag
-        validBounds(x1_p4_sp1, [:x], x1_p4_sp1_LB, x1_p4_sp1_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(x1_p4_sp1, [:x], x1_p4_sp1_LB, x1_p4_sp1_UB, true)
+    # end
     #Sub-part 2 = cos(x7)
     x1_p4_sp2 = :(cos(x))
     lb_x1_p4_sp2 = lbs[7]
@@ -431,9 +431,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     #Specify digits for interpolation
     x1_p4_sp2_LB, x1_p4_sp2_UB = interpol_nd(bound_univariate(x1_p4_sp2, lb_x1_p4_sp2, ub_x1_p4_sp2)...)
 
-    if sanityFlag
-        validBounds(x1_p4_sp2, [:x], x1_p4_sp2_LB, x1_p4_sp2_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(x1_p4_sp2, [:x], x1_p4_sp2_LB, x1_p4_sp2_UB, true)
+    # end
     #Find how much to shift each pair of bounds by for valid log
     s_x1p4sp1 = inpShiftLog(lb_x1_p4_sp1, ub_x1_p4_sp1, bounds=x1_p4_sp1_LB)
     s_x1p4sp2 = inpShiftLog(lb_x1_p4_sp2, ub_x1_p4_sp2, bounds=x1_p4_sp2_LB)
@@ -495,9 +495,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
         push!(x1_p4_LB, (tup[1:end-1]..., f1f2_LB))
     end
 
-    if sanityFlag
-        validBounds(:(x6*cos(x7)), [:x6, :x7], x1_p4_LB, x1_p4_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(:(x6*cos(x7)), [:x6, :x7], x1_p4_LB, x1_p4_UB, true)
+    # end
     #Part 5: f(x9) = sin(x9)
     x1_p5 = :(sin(x))
     lb_x1_p5 = lbs[9]
@@ -594,9 +594,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
         push!(x1_p6_LB, (tup[1:end-1]..., f1f2_LB))
     end
 
-    if sanityFlag
-        validBounds(:(x6*sin(x7)), [:x6, :x7], x1_p6_LB, x1_p6_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(:(x6*sin(x7)), [:x6, :x7], x1_p6_LB, x1_p6_UB, true)
+    # end
     #Part 7: f(x5, x7) = x5cos(x7)
     #K-A decomposition is exp(log(x5) + log(cos(x7)))
     #Sub-part 1 = x5
@@ -681,9 +681,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
         push!(x1_p7_LB, (tup[1:end-1]..., f1f2_LB))
     end
 
-    if sanityFlag
-        validBounds(:(x5*cos(x7)), [:x5, :x7], x1_p7_LB, x1_p7_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(:(x5*cos(x7)), [:x5, :x7], x1_p7_LB, x1_p7_UB, true)
+    # end
     
     #Now each chunk is bounded. Next, we need to combine chunks 
     #Combine part 6 and part 7 to get f₈(x₅, x₆, x₇)
@@ -704,9 +704,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     #Now, combine the two lifted chunks to get f₈(x₅, x₆, x₇)
     x1_p8_LB, x1_p8_UB = sumBounds(l_x1_p6_LB, l_x1_p6_UB, l_x1_p7_LB, l_x1_p7_UB, true)
 
-    if sanityFlag
-        validBounds(:(x6*sin(x7) - x5*cos(x7)), [:x5, :x6, :x7], x1_p8_LB, x1_p8_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(:(x6*sin(x7) - x5*cos(x7)), [:x5, :x6, :x7], x1_p8_LB, x1_p8_UB, true)
+    # end
 
     #Next, combine f₅ with f₈ to get f₉(x₅, x₆, x₇, x₉)
     #Lift f5 to be a function of x₅, x₆, x₇
@@ -728,9 +728,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     #Define a function to compute the product of two sets of bounds 
     x1_p9_LB, x1_p9_UB = prodBounds(l_x1_p5_LB, l_x1_p5_UB, l_x1_p8_LB, l_x1_p8_UB)
 
-    if sanityFlag
-        validBounds(:(sin(x9)*((x6*sin(x7) - x5*cos(x7)))), [:x5, :x6, :x7, :x9], x1_p9_LB, x1_p9_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(:(sin(x9)*((x6*sin(x7) - x5*cos(x7)))), [:x5, :x6, :x7, :x9], x1_p9_LB, x1_p9_UB, true)
+    # end
 
     #Next, define f₁₀(x₅, x₆, x₇) as f₃(x₅, x₇) + f₄(x₆, x₇)
     #First, lift f₃(x₅, x₇) = x5*sin(x7) to be a function of x6 as well
@@ -750,9 +750,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     #Combine the two lifted chunks to get f₁₀(x₅, x₆, x₇)
     x1_p10_LB, x1_p10_UB = sumBounds(l_x1_p3_LB, l_x1_p3_UB, l_x1_p4_LB, l_x1_p4_UB, false)
 
-    if sanityFlag
-        validBounds(:(x5*sin(x7) + x6*cos(x7)), [:x5, :x6, :x7], x1_p10_LB, x1_p10_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(:(x5*sin(x7) + x6*cos(x7)), [:x5, :x6, :x7], x1_p10_LB, x1_p10_UB, true)
+    # end
 
     #Next define f₁₁(x₅, x₆, x₇, x₈, x₉) as f₂(x₈, x₉) * f₁₀(x₅, x₆, x₇)
     #First, lift f₂(x₈, x₉) = sin(x8)cos(x9) to be a function of x₅, x₆, x₇
@@ -772,9 +772,9 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     #Combine the two lifted chunks to get f₁₁(x₅, x₆, x₇, x₈, x₉)
     x1_p11_LB, x1_p11_UB = prodBounds(l_x1_p2_LB, l_x1_p2_UB, l_x1_p10_LB, l_x1_p10_UB)
 
-    if sanityFlag
-        validBounds(:(sin(x8)*cos(x9)*(x5*sin(x7) + x6*cos(x7))), [:x5, :x6, :x7, :x8, :x9], x1_p11_LB, x1_p11_UB, true)
-    end
+    # if sanityFlag
+    #     validBounds(:(sin(x8)*cos(x9)*(x5*sin(x7) + x6*cos(x7))), [:x5, :x6, :x7, :x8, :x9], x1_p11_LB, x1_p11_UB, true)
+    # end
     
     #Combine 3 distinct chunks to get f₁₂(x₄, x₅, x₆, x₇, x₈, x₉) = f₁(x₄, x₈, x₉) + f₁₁(x₅, x₆, x₇, x₈, x₉) + f₉(x₅, x₆, x₇, x₉)
     
@@ -803,9 +803,18 @@ function bound_quadx1(QUAD, plotFlag = false, sanityFlag = false)
     x1_p12_LB, x1_p12_UB = sumBounds(x1_p12_LB_i, x1_p12_UB_i, l_x1_p9_LB, l_x1_p9_UB, false)
     
     if sanityFlag
-        validBounds(:(x4*cos(x8)*cos(x9) + sin(x8)*cos(x9)*(x5*sin(x7) + x6*cos(x7)) + sin(x9)*((x6*sin(x7) - x5*cos(x7)))), [:x4, :x5, :x6, :x7, :x8, :x9], x1_p12_LB, x1_p12_UB, true)
+        @assert validBounds(:(x4*cos(x8)*cos(x9) + sin(x8)*cos(x9)*(x5*sin(x7) + x6*cos(x7)) + sin(x9)*((x6*sin(x7) - x5*cos(x7)))), [:x4, :x5, :x6, :x7, :x8, :x9], x1_p12_LB, x1_p12_UB, true) "Invalid bounds for x1"
     end
-    return x1_p12_LB, x1_p12_UB
+
+    #Finally, bounds for x1 have to be a function of x1. Lift bounds to space of (x₁,x₄, x₅, x₆, x₇, x₈, x₉)
+    emptyList = [1]
+    currList = [2,3,4,5,6,7]
+    lbList = [lbs[1], lbs[4:9]...]
+    ubList = [ubs[1], ubs[4:9]...]
+
+    x1_p12_LB_l, x1_p12_UB_l = lift_OA(emptyList, currList, x1_p12_LB, x1_p12_UB, lbList, ubList)
+    
+    return x1_p12_LB_l, x1_p12_UB_l
 end
 
 function bound_quadx2(Quad, plotFlag = false, sanityFlag = true)
@@ -882,9 +891,9 @@ function bound_quadx2(Quad, plotFlag = false, sanityFlag = true)
     x2_p1_LB_i, x2_p1_UB_i = prodBounds(l_x2_p1_sp1_LB, l_x2_p1_sp1_UB, l_x2_p1_sp2_LB, l_x2_p1_sp2_UB)
     x2_p1_LB, x2_p1_UB = prodBounds(x2_p1_LB_i, x2_p1_UB_i, l_x2_p1_sp3_LB, l_x2_p1_sp3_UB)
 
-    if sanityFlag
-        validBounds(:(x4*cos(x8)*cos(x9)), [:x4, :x8, :x9], x2_p1_LB, x2_p1_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(x4*cos(x8)*cos(x9)), [:x4, :x8, :x9], x2_p1_LB, x2_p1_UB)
+    # end
 
 
     #Part 2: f₂(x₈, x₉) = sin(x₈)*sin(x₉)
@@ -933,13 +942,13 @@ function bound_quadx2(Quad, plotFlag = false, sanityFlag = true)
     #Now multiply the lifted bounds
     x2_p2_LB, x2_p2_UB = prodBounds(l_x2_p2_sp1_LB, l_x2_p2_sp1_UB, l_x2_p2_sp2_LB, l_x2_p2_sp2_UB)
 
-    if sanityFlag
-        validBounds(:(sin(x8)*sin(x9)), [:x8, :x9], x2_p2_LB, x2_p2_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(sin(x8)*sin(x9)), [:x8, :x9], x2_p2_LB, x2_p2_UB)
+    # end
 
    #Part 3: f₃(x₅,x₇) = x₅*sin(x₇) 
    #Sub part 1: x₅
-    x2_p3_sp1 = :(1*x)
+   x2_p3_sp1 = :(1*x)
     lb_x2_p3_sp1 = lbs[5]
     ub_x2_p3_sp1 = ubs[5]
 
@@ -978,9 +987,9 @@ function bound_quadx2(Quad, plotFlag = false, sanityFlag = true)
     #Now multiply the lifted bounds
     x2_p3_LB, x2_p3_UB = prodBounds(l_x2_p3_sp1_LB, l_x2_p3_sp1_UB, l_x2_p3_sp2_LB, l_x2_p3_sp2_UB)
 
-    if sanityFlag
-        validBounds(:(x5*sin(x7)), [:x5, :x7], x2_p3_LB, x2_p3_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(x5*sin(x7)), [:x5, :x7], x2_p3_LB, x2_p3_UB)
+    # end
 
     #Part 4: f₄(x₅,x₇) = x₆*cos(x₇)
     #Sub part 1: x₆
@@ -1017,13 +1026,13 @@ function bound_quadx2(Quad, plotFlag = false, sanityFlag = true)
     currList = [2]
 
     l_x2_p4_sp2_LB, l_x2_p4_sp2_UB = lift_OA(emptyList, currList, x2_p4_sp2_LB, x2_p4_sp2_UB, lbList, ubList)
-    
+
     #Now multiply the lifted bounds
     x2_p4_LB, x2_p4_UB = prodBounds(l_x2_p4_sp1_LB, l_x2_p4_sp1_UB, l_x2_p4_sp2_LB, l_x2_p4_sp2_UB)
 
-    if sanityFlag
-        validBounds(:(x6*cos(x7)), [:x6, :x7], x2_p4_LB, x2_p4_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(x6*cos(x7)), [:x6, :x7], x2_p4_LB, x2_p4_UB)
+    # end
 
     #Part 5: f₅(x₉) = cos(x₉)
     x2_p5 = :(cos(x))
@@ -1039,9 +1048,9 @@ function bound_quadx2(Quad, plotFlag = false, sanityFlag = true)
 
     x2_p5_LB, x2_p5_UB = interpol_nd(bound_univariate(x2_p5, lb_x2_p5, ub_x2_p5)...)
 
-    if sanityFlag
-        validBounds(:(cos(x9)), [:x9], x2_p5_LB, x2_p5_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(cos(x9)), [:x9], x2_p5_LB, x2_p5_UB)
+    # end
 
     #Part 6: f₆(x₅, x₇) = x₅*cos(x₇)
     #Sub part 1: x₅
@@ -1085,10 +1094,10 @@ function bound_quadx2(Quad, plotFlag = false, sanityFlag = true)
     #Now multiply the lifted bounds
     x2_p6_LB, x2_p6_UB = prodBounds(l_x2_p6_sp1_LB, l_x2_p6_sp1_UB, l_x2_p6_sp2_LB, l_x2_p6_sp2_UB)
 
-    if sanityFlag
-        validBounds(:(x5*cos(x7)), [:x5, :x7], x2_p6_LB, x2_p6_UB)
-    end
-   
+    # if sanityFlag
+    #     validBounds(:(x5*cos(x7)), [:x5, :x7], x2_p6_LB, x2_p6_UB)
+    # end
+
     #Part 7: f₇(x₅, x₇) = x₆*sin(x₇)
     #Sub part 1: x₆
     x2_p7_sp1 = :(1*x)
@@ -1129,11 +1138,11 @@ function bound_quadx2(Quad, plotFlag = false, sanityFlag = true)
 
     #Now multiply the lifted bounds
     x2_p7_LB, x2_p7_UB = prodBounds(l_x2_p7_sp1_LB, l_x2_p7_sp1_UB, l_x2_p7_sp2_LB, l_x2_p7_sp2_UB)
-   
-    if sanityFlag
-        validBounds(:(x6*sin(x7)), [:x6, :x7], x2_p7_LB, x2_p7_UB)
-    end
-    
+
+    # if sanityFlag
+    #     validBounds(:(x6*sin(x7)), [:x6, :x7], x2_p7_LB, x2_p7_UB)
+    # end
+
     #Now beging combining chunks to get the full bounds
     #Define f₈(x₅, x₆, x₇) = f₆(x₅, x₇) - f₇(x₆, x₇)
     #Lift f₆(x₅, x₇) to space of (x₅, x₆, x₇)
@@ -1153,9 +1162,9 @@ function bound_quadx2(Quad, plotFlag = false, sanityFlag = true)
     #Now subtract the lifted bounds
     x2_p8_LB, x2_p8_UB = sumBounds(l_x2_p6_LB, l_x2_p6_UB, l_x2_p7_LB, l_x2_p7_UB, true)
 
-    if sanityFlag
-        validBounds(:(x5*cos(x7) - x6*sin(x7)), [:x5, :x6, :x7], x2_p8_LB, x2_p8_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(x5*cos(x7) - x6*sin(x7)), [:x5, :x6, :x7], x2_p8_LB, x2_p8_UB)
+    # end
 
     #Define f₉(x₅, x₆, x₇, x₉) = f₅(x₉) * f₈(x₅, x₆, x₇)
     #Lift f₅(x₉) to space of (x₅, x₆, x₇, x₉)
@@ -1175,9 +1184,9 @@ function bound_quadx2(Quad, plotFlag = false, sanityFlag = true)
     #Now multiply the lifted bounds
     x2_p9_LB, x2_p9_UB = prodBounds(l_x2_p5_LB, l_x2_p5_UB, l_x2_p8_LB, l_x2_p8_UB)
 
-    if sanityFlag
-        validBounds(:(cos(x9)*(x5*cos(x7) - x6*sin(x7))), [:x5, :x6, :x7, :x9], x2_p9_LB, x2_p9_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(cos(x9)*(x5*cos(x7) - x6*sin(x7))), [:x5, :x6, :x7, :x9], x2_p9_LB, x2_p9_UB)
+    # end
 
     #Define f₁₀(x₅, x₆, x₇) = f₃(x₅, x₇) + f₄(x₆, x₇)
     #Lift f₃(x₅, x₇) to space of (x₅, x₆, x₇)
@@ -1197,10 +1206,10 @@ function bound_quadx2(Quad, plotFlag = false, sanityFlag = true)
     #Now add the lifted bounds
     x2_p10_LB, x2_p10_UB = sumBounds(l_x2_p3_LB, l_x2_p3_UB, l_x2_p4_LB, l_x2_p4_UB, false)
 
-    if sanityFlag
-        validBounds(:(x5*sin(x7) + x6*cos(x7)), [:x5, :x6, :x7], x2_p10_LB, x2_p10_UB)
-    end
-    
+    # if sanityFlag
+    #     validBounds(:(x5*sin(x7) + x6*cos(x7)), [:x5, :x6, :x7], x2_p10_LB, x2_p10_UB)
+    # end
+
     #Define f₁₁(x₅, x₆, x₇, x₈, x₉) = f₂(x₈, x₉) * f₁₀(x₅, x₆, x₇)
     #Lift f₂(x₈, x₉) to space of (x₅, x₆, x₇, x₈, x₉)
     emptyList = [1, 2, 3] #Since x₈, x₉ come after x₅, x₆, x₇
@@ -1215,14 +1224,14 @@ function bound_quadx2(Quad, plotFlag = false, sanityFlag = true)
     currList = [1, 2, 3]
 
     l_x2_p10_LB, l_x2_p10_UB = lift_OA(emptyList, currList, x2_p10_LB, x2_p10_UB, lbList, ubList)
-    
+
     #Now multiply the lifted bounds
     x2_p11_LB, x2_p11_UB = prodBounds(l_x2_p2_LB, l_x2_p2_UB, l_x2_p10_LB, l_x2_p10_UB)
 
-    if sanityFlag
-        validBounds(:(sin(x8)*sin(x9)*(x5*sin(x7) + x6*cos(x7))), [:x5, :x6, :x7, :x8, :x9], x2_p11_LB, x2_p11_UB)
-    end
-   
+    # if sanityFlag
+    #     validBounds(:(sin(x8)*sin(x9)*(x5*sin(x7) + x6*cos(x7))), [:x5, :x6, :x7, :x8, :x9], x2_p11_LB, x2_p11_UB)
+    # end
+
     #Combine 3 distinct chunks to get f₁₂(x₄, x₅, x₆, x₇, x₈, x₉) = f₁(x₄, x₈, x₉) + f₁₁(x₅, x₆, x₇, x₈, x₉) + f₉(x₅, x₆, x₇, x₉)
 
     #Lift f₁(x₄, x₈, x₉) to space of (x₄, x₅, x₆, x₇, x₈, x₉)
@@ -1250,9 +1259,18 @@ function bound_quadx2(Quad, plotFlag = false, sanityFlag = true)
     x2_p12_LB, x2_p12_UB = sumBounds(x2_p12_LB_i, x2_p12_UB_i, l_x2_p9_LB, l_x2_p9_UB, false)
 
     if sanityFlag
-        validBounds(:(x4*cos(x8)*cos(x9) + sin(x8)*sin(x9)*(x5*sin(x7) + x6*cos(x7)) + cos(x9)*(x5*cos(x7) - x6*sin(x7))), [:x4, :x5, :x6, :x7, :x8, :x9], x2_p12_LB, x2_p12_UB)
+        @assert validBounds(:(x4*cos(x8)*cos(x9) + sin(x8)*sin(x9)*(x5*sin(x7) + x6*cos(x7)) + cos(x9)*(x5*cos(x7) - x6*sin(x7))), [:x4, :x5, :x6, :x7, :x8, :x9], x2_p12_LB, x2_p12_UB) "Invalid bounds for x2"
     end
-    return x2_p12_LB, x2_p12_UB
+
+    #Finally, bounds for x2 have to be a function of x2. Lift bounds to space of (x₂, x₄, x₅, x₆, x₇, x₈, x₉)
+    emptyList = [1] #Since x₂ comes after x₄, x₅, x₆, x₇, x₈, x₉
+    currList = [2, 3, 4, 5, 6, 7]
+    lbList = [lbs[2], lbs[4:9]...]
+    ubList = [ubs[2], ubs[4:9]...]
+
+    x2_p12_LB_l, x2_p12_UB_l = lift_OA(emptyList, currList, x2_p12_LB, x2_p12_UB, lbList, ubList)
+    
+    return x2_p12_LB_l, x2_p12_UB_l
 end
 
 function bound_quadx3(Quad, plotFlag = false, sanityFlag = true)
@@ -1299,9 +1317,9 @@ function bound_quadx3(Quad, plotFlag = false, sanityFlag = true)
     #Now, multiply the lifted bounds
     x3_p1_LB, x3_p1_UB = prodBounds(l_x3_p1_sp1_LB, l_x3_p1_sp1_UB, l_x3_p1_sp2_LB, l_x3_p1_sp2_UB)
 
-    if sanityFlag
-        validBounds(:(x₄*sin(x₈)), [:x₄, :x₈], x3_p1_LB, x3_p1_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(x₄*sin(x₈)), [:x₄, :x₈], x3_p1_LB, x3_p1_UB)
+    # end
     
     #Part 2: f₂(x₅, x₇, x₈) = x₅*sin(x₇)*cos(x₈) 
     #Sub-part 1: x₅
@@ -1364,9 +1382,9 @@ function bound_quadx3(Quad, plotFlag = false, sanityFlag = true)
     x3_p2_LB_i, x3_p2_UB_i = prodBounds(l_x3_p2_sp1_LB, l_x3_p2_sp1_UB, l_x3_p2_sp2_LB, l_x3_p2_sp2_UB)
     x3_p2_LB, x3_p2_UB = prodBounds(x3_p2_LB_i, x3_p2_UB_i, l_x3_p2_sp3_LB, l_x3_p2_sp3_UB)
 
-    if sanityFlag
-        validBounds(:(x₅*sin(x₇)*cos(x₈)), [:x₅, :x₇, :x₈], x3_p2_LB, x3_p2_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(x₅*sin(x₇)*cos(x₈)), [:x₅, :x₇, :x₈], x3_p2_LB, x3_p2_UB)
+    # end
     
     #Part 3: f₃(x₆,x₇,x₈) = x₆*cos(x₇)*cos(x₈)
     #Sub-part 1: x₆
@@ -1429,9 +1447,9 @@ function bound_quadx3(Quad, plotFlag = false, sanityFlag = true)
     x3_p3_LB_i, x3_p3_UB_i = prodBounds(l_x3_p3_sp1_LB, l_x3_p3_sp1_UB, l_x3_p3_sp2_LB, l_x3_p3_sp2_UB)
     x3_p3_LB, x3_p3_UB = prodBounds(x3_p3_LB_i, x3_p3_UB_i, l_x3_p3_sp3_LB, l_x3_p3_sp3_UB)
 
-    if sanityFlag
-        validBounds(:(x₆*cos(x₇)*cos(x₈)), [:x₆, :x₇, :x₈], x3_p3_LB, x3_p3_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(x₆*cos(x₇)*cos(x₈)), [:x₆, :x₇, :x₈], x3_p3_LB, x3_p3_UB)
+    # end
 
     #Finally, combine the bounds to get f(x₄, x₅, x₆, x₇, x₈) = x₄*sin(x₈) - x₅*sin(x₇)*cos(x₈) - x₆*cos(x₇)*cos(x₈)
 
@@ -1458,7 +1476,19 @@ function bound_quadx3(Quad, plotFlag = false, sanityFlag = true)
     x3_p4_LB_i, x3_p4_UB_i = sumBounds(l_x3_p1_LB, l_x3_p1_UB, l_x3_p2_LB, l_x3_p2_UB, true)
     x3_p4_LB, x3_p4_UB = sumBounds(x3_p4_LB_i, x3_p4_UB_i, l_x3_p3_LB, l_x3_p3_UB, true)
 
-    return x3_p4_LB, x3_p4_UB
+    if sanityFlag
+        @assert validBounds(:(x4*sin(x8) - x5*sin(x7)*cos(x8) - x6*cos(x7)*cos(x8)), [:x4, :x5, :x6, :x7, :x8], x3_p4_LB, x3_p4_UB) "Invalid bounds for x3"
+    end
+
+    #Finally, bounds for x3 have to be a function of x3. Lift bounds to space of (x₃, x₄, x₅, x₆, x₇, x₈)
+    emptyList = [1] #Since x3 comes before x4, x5, x6, x7, x8
+    currList = [2, 3, 4, 5, 6]
+    lbList = lbs[3:8]
+    ubList = ubs[3:8]
+
+    x3_p4_LB_l, x3_p4_UB_l = lift_OA(emptyList, currList, x3_p4_LB, x3_p4_UB, lbList, ubList)
+
+    return x3_p4_LB_l, x3_p4_UB_l
 end
 
 function bound_quadx4(Quad, plotFlag = false, sanityFlag = true)
@@ -1498,9 +1528,9 @@ function bound_quadx4(Quad, plotFlag = false, sanityFlag = true)
     #Now, multiply the lifted bounds
     x4_p1_LB, x4_p1_UB = prodBounds(l_x4_p1_sp1_LB, l_x4_p1_sp1_UB, l_x4_p1_sp2_LB, l_x4_p1_sp2_UB)
 
-    if sanityFlag
-        validBounds(:(x₅*x₁₂),[:x₅,:x₁₂], x4_p1_LB, x4_p1_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(x₅*x₁₂),[:x₅,:x₁₂], x4_p1_LB, x4_p1_UB)
+    # end
 
     #Part 2: f₂(x₆, x₁₁) = x₆*x₁₁
     #Sub-part 1: x₆
@@ -1535,9 +1565,9 @@ function bound_quadx4(Quad, plotFlag = false, sanityFlag = true)
     #Now, multiply the lifted bounds
     x4_p2_LB, x4_p2_UB = prodBounds(l_x4_p2_sp1_LB, l_x4_p2_sp1_UB, l_x4_p2_sp2_LB, l_x4_p2_sp2_UB)
 
-    if sanityFlag
-        validBounds(:(x₆*x₁₁),[:x₆,:x₁₁], x4_p2_LB, x4_p2_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(x₆*x₁₁),[:x₆,:x₁₁], x4_p2_LB, x4_p2_UB)
+    # end
 
     #Part 3: f₃(x₈) = -g*sin(x₈)
     x4_p3 = :($g*sin(x₈))
@@ -1581,9 +1611,18 @@ function bound_quadx4(Quad, plotFlag = false, sanityFlag = true)
     x4_LB, x4_UB = sumBounds(x4_LB_i, x4_UB_i, l_x4_p3_LB, l_x4_p3_UB,true)
 
     if sanityFlag
-        validBounds(:(x₅*x₁₂ - x₆*x₁₁ - $g*sin(x₈)),[:x₅,:x₆,:x₈,:x₁₁,:x₁₂], x4_LB, x4_UB,true)
+        @assert validBounds(:(x₅*x₁₂ - x₆*x₁₁ - $g*sin(x₈)),[:x₅,:x₆,:x₈,:x₁₁,:x₁₂], x4_LB, x4_UB,true) "Invalid bounds for x4"
     end
-    return x4_LB, x4_UB
+
+    #Finally, bounds for x4 have to be a function of x4. Lift bounds to space of (x₄,x₅,x₆,x₈,x₁₁,x₁₂)
+
+    emptyList = [1] #Since x4 comes before x5,x6,x8,x11,x12
+    currList = [2,3,4,5,6]
+    lbList = [lbs[4], lbs[5], lbs[6], lbs[8], lbs[11], lbs[12]]
+    ubList = [ubs[4], ubs[5], ubs[6], ubs[8], ubs[11], ubs[12]]
+
+    x4_LB_l, x4_UB_l = lift_OA(emptyList, currList, x4_LB, x4_UB, lbList, ubList)
+    return x4_LB_l, x4_UB_l
 end
 
 function bound_quadx5(Quad, plotFlag = false, sanityFlag = true)
@@ -1622,9 +1661,9 @@ function bound_quadx5(Quad, plotFlag = false, sanityFlag = true)
     #Now multiply the lifted bounds
     x5_p1_LB, x5_p1_UB = prodBounds(l_x5_p1_sp1_LB, l_x5_p1_sp1_UB, l_x5_p1_sp2_LB, l_x5_p1_sp2_UB)
 
-    if sanityFlag
-        validBounds(:(x6*x10), [:x6, :x10], x5_p1_LB, x5_p1_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(x6*x10), [:x6, :x10], x5_p1_LB, x5_p1_UB)
+    # end
 
 
     #Part 2: x₄*x₁₂
@@ -1659,9 +1698,9 @@ function bound_quadx5(Quad, plotFlag = false, sanityFlag = true)
     #Now multiply the lifted bounds
     x5_p2_LB, x5_p2_UB = prodBounds(l_x5_p2_sp1_LB, l_x5_p2_sp1_UB, l_x5_p2_sp2_LB, l_x5_p2_sp2_UB)
 
-    if sanityFlag
-        validBounds(:(x4*x12), [:x4, :x12], x5_p2_LB, x5_p2_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(x4*x12), [:x4, :x12], x5_p2_LB, x5_p2_UB)
+    # end
 
     #Part 3: g*sin(x₇)*cos(x₈)
     #Sub-part 1: g*sin(x₇)
@@ -1709,9 +1748,9 @@ function bound_quadx5(Quad, plotFlag = false, sanityFlag = true)
     #Now multiply the lifted bounds
     x5_p3_LB, x5_p3_UB = prodBounds(l_x5_p3_sp1_LB, l_x5_p3_sp1_UB, l_x5_p3_sp2_LB, l_x5_p3_sp2_UB)
 
-    if sanityFlag
-        validBounds(:($g*sin(x7)*cos(x8)), [:x7, :x8], x5_p3_LB, x5_p3_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:($g*sin(x7)*cos(x8)), [:x7, :x8], x5_p3_LB, x5_p3_UB)
+    # end
 
     #Now add the bounds to obtain f(x₄,x₆,x₇,x₈,x₁₀,x₁₂) = x₆*x₁₀ - x₄*x₁₂ + g*sin(x₇)*cos(x₈)
     #Lift the bounds to the same space
@@ -1740,10 +1779,17 @@ function bound_quadx5(Quad, plotFlag = false, sanityFlag = true)
     x5_LB, x5_UB = sumBounds(x5_LB_i, x5_UB_i, l_x5_p3_LB, l_x5_p3_UB,false)
 
     if sanityFlag
-        validBounds(:($g*sin(x7)*cos(x8) + x6*x10 - x4*x12), [:x4, :x6, :x7, :x8, :x10, :x12], x5_LB, x5_UB)
+        @assert validBounds(:($g*sin(x7)*cos(x8) + x6*x10 - x4*x12), [:x4, :x6, :x7, :x8, :x10, :x12], x5_LB, x5_UB) "Invalid bounds for x5"
     end
 
-    return x5_LB, x5_UB
+    #Finally, bounds for x5 have to be a function of x5. Lift bounds to space of (x₄,x₅,x₆,x₇,x₈,x₁₀,x₁₂)
+    emptyList = [2] #Since x5 comes after x4 but before x6, x7, x8, x10, x12
+    currList = [1,3,4,5,6,7]
+    lbList = [lbs[4], lbs[5], lbs[6], lbs[7], lbs[8], lbs[10], lbs[12]]
+    ubList = [ubs[4], ubs[5], ubs[6], ubs[7], ubs[8], ubs[10], ubs[12]]
+
+    x5_LB_l, x5_UB_l = lift_OA(emptyList, currList, x5_LB, x5_UB, lbList, ubList)
+    return x5_LB_l, x5_UB_l
 end
 
 function bound_quadx6(Quad, plotFlag, sanityFlag)
@@ -1782,9 +1828,9 @@ function bound_quadx6(Quad, plotFlag, sanityFlag)
     #Now multiply the lifted bounds
     x6_p1_LB, x6_p1_UB = prodBounds(l_x6_p1_sp1_LB, l_x6_p1_sp1_UB, l_x6_p1_sp2_LB, l_x6_p1_sp2_UB)
 
-    if sanityFlag
-        validBounds(:(x4*x11), [:x4, :x11], x6_p1_LB, x6_p1_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(x4*x11), [:x4, :x11], x6_p1_LB, x6_p1_UB)
+    # end
 
     #Part 2: x₅*x₁₀
     #Sub-part 1: x₅
@@ -1818,9 +1864,9 @@ function bound_quadx6(Quad, plotFlag, sanityFlag)
     #Now multiply the lifted bounds
     x6_p2_LB, x6_p2_UB = prodBounds(l_x6_p2_sp1_LB, l_x6_p2_sp1_UB, l_x6_p2_sp2_LB, l_x6_p2_sp2_UB)
 
-    if sanityFlag
-        validBounds(:(x5*x10), [:x5, :x10], x6_p2_LB, x6_p2_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(x5*x10), [:x5, :x10], x6_p2_LB, x6_p2_UB)
+    # end
 
     #Part 3: g*cos(x₇)*cos(x₈) - g
     #Sub-part 1: g*cos(x₇)
@@ -1872,9 +1918,9 @@ function bound_quadx6(Quad, plotFlag, sanityFlag)
     x6_p3_LB = [(tup[1:end-1]..., tup[end] - g) for tup in x6_p3_LB]
     x6_p3_UB = [(tup[1:end-1]..., tup[end] - g) for tup in x6_p3_UB]
 
-    if sanityFlag
-        validBounds(:($g*cos(x7)*cos(x8) - $g), [:x7, :x8], x6_p3_LB, x6_p3_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:($g*cos(x7)*cos(x8) - $g), [:x7, :x8], x6_p3_LB, x6_p3_UB)
+    # end
 
     #Now add the bounds to recover f(x₄, x₅, x₇, x₈, x₁₀, x₁₁)
     #Lift the bounds to the same space
@@ -1903,9 +1949,17 @@ function bound_quadx6(Quad, plotFlag, sanityFlag)
     x6_LB, x6_UB = sumBounds(x6_LB_i, x6_UB_i, l_x6_p3_LB, l_x6_p3_UB,false)
 
     if sanityFlag
-        validBounds(:($g*cos(x7)*cos(x8) - $g + x4*x11 - x5*x10), [:x4, :x5, :x7, :x8, :x10, :x11], x6_LB, x6_UB)
+        @assert validBounds(:($g*cos(x7)*cos(x8) - $g + x4*x11 - x5*x10), [:x4, :x5, :x7, :x8, :x10, :x11], x6_LB, x6_UB) "Invalid bounds for x6"
     end
-    return x6_LB, x6_UB
+
+    #Finally, bounds for x6 have to be a function of x6. Lift bounds to space of (x₄,x₅,x₆,x₇,x₈,x₁₀,x₁₁)
+    emptyList = [3] #Since x6 comes after x4 and x5 but before x7, x8, x10, x11
+    currList = [1,2,4,5,6,7]
+    lbList = [lbs[4], lbs[5], lbs[6], lbs[7], lbs[8], lbs[10], lbs[11]]
+    ubList = [ubs[4], ubs[5], ubs[6], ubs[7], ubs[8], ubs[10], ubs[11]]
+
+    x6_LB_l, x6_UB_l = lift_OA(emptyList, currList, x6_LB, x6_UB, lbList, ubList)
+    return x6_LB_l, x6_UB_l
 end
 
 function bound_quadx7(Quad, plotFlag, sanityFlag)
@@ -1978,9 +2032,9 @@ function bound_quadx7(Quad, plotFlag, sanityFlag)
     x7_p2_LB_i, x7_p2_UB_i = prodBounds(l_x7_p2_sp1_LB, l_x7_p2_sp1_UB, l_x7_p2_sp2_LB, l_x7_p2_sp2_UB)
     x7_p2_LB, x7_p2_UB = prodBounds(x7_p2_LB_i, x7_p2_UB_i, l_x7_p2_sp3_LB, l_x7_p2_sp3_UB)
 
-    if sanityFlag
-        validBounds(:((x7)*tan(x8)*x11), [:x7, :x8, :x11], x7_p2_LB, x7_p2_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:((x7)*tan(x8)*x11), [:x7, :x8, :x11], x7_p2_LB, x7_p2_UB)
+    # end
 
     #Part 3: cos(x₇)*tan(x₈)*x₁₂
     #Sub-part 1: cos(x₇)
@@ -2042,9 +2096,9 @@ function bound_quadx7(Quad, plotFlag, sanityFlag)
     x7_p3_LB_i, x7_p3_UB_i = prodBounds(l_x7_p3_sp1_LB, l_x7_p3_sp1_UB, l_x7_p3_sp2_LB, l_x7_p3_sp2_UB)
     x7_p3_LB, x7_p3_UB = prodBounds(x7_p3_LB_i, x7_p3_UB_i, l_x7_p3_sp3_LB, l_x7_p3_sp3_UB)
 
-    if sanityFlag
-        validBounds(:(cos(x7)*tan(x8)*x12), [:x7, :x8, :x12], x7_p3_LB, x7_p3_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(cos(x7)*tan(x8)*x12), [:x7, :x8, :x12], x7_p3_LB, x7_p3_UB)
+    # end
 
     #Now add the bounds to obtain f(x₇,x₈,x₁₀,x₁₁,x₁₂) = x₁₀ + sin(x₇)*tan(x₈)*x₁₁ + cos(x₇)*tan(x₈)*x₁₂
     #Lift the bounds to the same space
@@ -2073,9 +2127,10 @@ function bound_quadx7(Quad, plotFlag, sanityFlag)
     x7_LB, x7_UB = sumBounds(x7_LB_i, x7_UB_i, l_x7_p3_LB, l_x7_p3_UB,false)
 
     if sanityFlag
-        validBounds(:((x10) + sin(x7)*tan(x8)*x11 + cos(x7)*tan(x8)*x12), [:x7, :x8, :x10, :x11, :x12], x7_LB, x7_UB)
+        @assert validBounds(:((x10) + sin(x7)*tan(x8)*x11 + cos(x7)*tan(x8)*x12), [:x7, :x8, :x10, :x11, :x12], x7_LB, x7_UB) "Invalid bounds for x7"
     end
 
+    #bounds for x7 include x7. We are done
     return x7_LB, x7_UB
 end
 
@@ -2122,9 +2177,9 @@ function bound_quadx8(Quad, plotFlag, sanityFlag)
     #Now multiply the lifted bounds
     x8_p1_LB, x8_p1_UB = prodBounds(l_x8_p1_sp1_LB, l_x8_p1_sp1_UB, l_x8_p1_sp2_LB, l_x8_p1_sp2_UB)
 
-    if sanityFlag
-        validBounds(:(cos(x7)*x11), [:x7, :x11], x8_p1_LB, x8_p1_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(cos(x7)*x11), [:x7, :x11], x8_p1_LB, x8_p1_UB)
+    # end
 
     #Part 2: sin(x₇)*x₁₂
     #Sub-part 1: sin(x₇)
@@ -2165,9 +2220,9 @@ function bound_quadx8(Quad, plotFlag, sanityFlag)
     #Now multiply the lifted bounds
     x8_p2_LB, x8_p2_UB = prodBounds(l_x8_p2_sp1_LB, l_x8_p2_sp1_UB, l_x8_p2_sp2_LB, l_x8_p2_sp2_UB)
 
-    if sanityFlag
-        validBounds(:(sin(x7)*x12), [:x7, :x12], x8_p2_LB, x8_p2_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(sin(x7)*x12), [:x7, :x12], x8_p2_LB, x8_p2_UB)
+    # end
 
     #Now add the bounds to obtain f(x₇,x₁₁,x₁₂) = cos(x₇)*x₁₁ - sin(x₇)*x₁₂
     #Lift the bounds to the same space
@@ -2189,10 +2244,18 @@ function bound_quadx8(Quad, plotFlag, sanityFlag)
     x8_LB, x8_UB = sumBounds(l_x8_p1_LB, l_x8_p1_UB, l_x8_p2_LB, l_x8_p2_UB,true)
 
     if sanityFlag
-        validBounds(:(cos(x7)*x11 - sin(x7)*x12), [:x7, :x11, :x12], x8_LB, x8_UB)
+        @assert validBounds(:(cos(x7)*x11 - sin(x7)*x12), [:x7, :x11, :x12], x8_LB, x8_UB) "Invalid bounds for x8"
     end
 
-    return x8_LB, x8_UB
+    #Finally, bounds for x8 have to be a function of x8. Lift bounds to space of (x₇,x₈,x₁₁,x₁₂)
+    emptyList = [2] #Since x8 comes after x7 but before x11 and x12
+    currList = [1,3,4]
+    lbList = [lbs[7], lbs[8], lbs[11], lbs[12]]
+    ubList = [ubs[7], ubs[8], ubs[11], ubs[12]]
+
+    x8_LB_l, x8_UB_l = lift_OA(emptyList, currList, x8_LB, x8_UB, lbList, ubList)
+
+    return x8_LB_l, x8_UB_l
 end
 
 function bound_quadx9(Quad, plotFlag, sanityFlag)
@@ -2254,9 +2317,9 @@ function bound_quadx9(Quad, plotFlag, sanityFlag)
     #Compute the division of the bounds to obtain sin(x₇)/cos(x₈)
     x9_p1_sp4_LB, x9_p1_sp4_UB = divBounds(l_x9_p1_sp1_LB, l_x9_p1_sp1_UB, l_x9_p1_sp2_LB, l_x9_p1_sp2_UB)
     
-    if sanityFlag
-        validBounds(:(sin(x7)/cos(x8)), [:x7, :x8], x9_p1_sp4_LB, x9_p1_sp4_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(sin(x7)/cos(x8)), [:x7, :x8], x9_p1_sp4_LB, x9_p1_sp4_UB)
+    # end
 
     #Lift the bounds of x₁₁ to the space of (x₇, x₈, x₁₁)
     emptyList = [1, 2] #x₁₁ missing x₇ and x₈
@@ -2274,9 +2337,9 @@ function bound_quadx9(Quad, plotFlag, sanityFlag)
     #Multiply the bounds of sin(x₇)/cos(x₈) and x₁₁
     x9_p1_LB, x9_p1_UB = prodBounds(l_x9_p1_sp3_LB, l_x9_p1_sp3_UB, l_x9_p1_sp4_LB, l_x9_p1_sp4_UB)
 
-    if sanityFlag
-        validBounds(:((sin(x7)/cos(x8))*x11), [:x7, :x8, :x11], x9_p1_LB, x9_p1_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:((sin(x7)/cos(x8))*x11), [:x7, :x8, :x11], x9_p1_LB, x9_p1_UB)
+    # end
 
     #Part 2: (cos(x₇)/cos(x₈))*x₁₂
     #Sub-part 1: cos(x₇)
@@ -2331,9 +2394,9 @@ function bound_quadx9(Quad, plotFlag, sanityFlag)
     #Compute the division of the bounds to obtain cos(x₇)/cos(x₈)
     x9_p2_sp4_LB, x9_p2_sp4_UB = divBounds(l_x9_p2_sp1_LB, l_x9_p2_sp1_UB, l_x9_p2_sp2_LB, l_x9_p2_sp2_UB)
 
-    if sanityFlag
-        validBounds(:(cos(x7)/cos(x8)), [:x7, :x8], x9_p2_sp4_LB, x9_p2_sp4_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:(cos(x7)/cos(x8)), [:x7, :x8], x9_p2_sp4_LB, x9_p2_sp4_UB)
+    # end
 
     #Lift the bounds of x₁₂ to the space of (x₇, x₈, x₁₂)
     emptyList = [1, 2] #x₁₂ missing x₇ and x₈
@@ -2352,9 +2415,9 @@ function bound_quadx9(Quad, plotFlag, sanityFlag)
     #Multiply the bounds of cos(x₇)/cos(x₈) and x₁₂
     x9_p2_LB, x9_p2_UB = prodBounds(l_x9_p2_sp3_LB, l_x9_p2_sp3_UB, l_x9_p2_sp4_LB, l_x9_p2_sp4_UB)
 
-    if sanityFlag
-        validBounds(:((cos(x7)/cos(x8))*x12), [:x7, :x8, :x12], x9_p2_LB, x9_p2_UB)
-    end
+    # if sanityFlag
+    #     validBounds(:((cos(x7)/cos(x8))*x12), [:x7, :x8, :x12], x9_p2_LB, x9_p2_UB)
+    # end
 
     #Subtract the bounds of part 1 and part 2
     #First lift the bounds of part 1 to the space of (x₇, x₈,x₁₁, x₁₂)
@@ -2374,10 +2437,18 @@ function bound_quadx9(Quad, plotFlag, sanityFlag)
     x9_LB, x9_UB = sumBounds(l_x9_p1_LB, l_x9_p1_UB, l_x9_p2_LB, l_x9_p2_UB,true)
 
     if sanityFlag
-        validBounds(:((sin(x7)/cos(x8))*x11 - (cos(x7)/cos(x8))*x12), [:x7, :x8, :x11, :x12], x9_LB, x9_UB)
+        @assert validBounds(:((sin(x7)/cos(x8))*x11 - (cos(x7)/cos(x8))*x12), [:x7, :x8, :x11, :x12], x9_LB, x9_UB) "Invalid bounds for x9"
     end
 
-    return x9_LB, x9_UB
+    #Finally, bounds for x9 have to be a function of x9. Lift bounds to space of (x₇,x₈,x₉,x₁₁,x₁₂)
+    emptyList = [3] #Since x9 comes after x7 and x8 but before x11 and x12
+    currList = [1,2,4,5]
+    lbList = [lbs[7], lbs[8], lbs[9], lbs[11], lbs[12]]
+    ubList = [ubs[7], ubs[8], ubs[9], ubs[11], ubs[12]]
+
+    x9_LB_l, x9_UB_l = lift_OA(emptyList, currList, x9_LB, x9_UB, lbList, ubList)
+    
+    return x9_LB_l, x9_UB_l
 end
 
 function bound_quadx10(Quad, plotFlag, sanityFlag)
@@ -2416,10 +2487,18 @@ function bound_quadx10(Quad, plotFlag, sanityFlag)
     x10_p1_LB, x10_p1_UB = prodBounds(l_x10_p1_sp1_LB, l_x10_p1_sp1_UB, l_x10_p1_sp2_LB, l_x10_p1_sp2_UB)
 
     if sanityFlag
-        validBounds(:($((Jy - Jz)/Jx)*x11*x12), [:x11, :x12], x10_p1_LB, x10_p1_UB)
+        @assert validBounds(:($((Jy - Jz)/Jx)*x11*x12), [:x11, :x12], x10_p1_LB, x10_p1_UB) "Invalid bounds for x10"
     end
 
-    return x10_p1_LB, x10_p1_UB
+    #Finally, bounds for x10 have to be a function of x10. Lift bounds to space of (x₁₀, x₁₁, x₁₂)
+    emptyList = [1] #Since x10 comes before x11 and x12
+    currList = [2,3]
+    lbList = [lbs[10], lbs[11], lbs[12]]
+    ubList = [ubs[10], ubs[11], ubs[12]]
+
+    x10_LB, x10_UB = lift_OA(emptyList, currList, x10_p1_LB, x10_p1_UB, lbList, ubList)
+
+    return x10_LB, x10_UB
 end
 
 function bound_quadx11(Quad, plotFlag, sanityFlag)
@@ -2458,10 +2537,17 @@ function bound_quadx11(Quad, plotFlag, sanityFlag)
     x11_p1_LB, x11_p1_UB = prodBounds(l_x11_p1_sp1_LB, l_x11_p1_sp1_UB, l_x11_p1_sp2_LB, l_x11_p1_sp2_UB)
 
     if sanityFlag
-        validBounds(:($((Jz - Jx)/Jy)*x10*x12), [:x10, :x12], x11_p1_LB, x11_p1_UB)
+        @assert validBounds(:($((Jz - Jx)/Jy)*x10*x12), [:x10, :x12], x11_p1_LB, x11_p1_UB) "Invalid bounds for x11"
     end
-    
-    return x11_p1_LB, x11_p1_UB
+
+    #Finally, bounds for x11 have to be a function of x11. Lift bounds to space of (x₁₀, x₁₁, x₁₂)
+    emptyList = [2] #Since x11 comes after x10 and before x12
+    currList = [1,3]
+    lbList = [lbs[10], lbs[11], lbs[12]]
+    ubList = [ubs[10], ubs[11], ubs[12]]
+
+    x11_LB, x11_UB = lift_OA(emptyList, currList, x11_p1_LB, x11_p1_UB, lbList, ubList)
+    return x11_LB, x11_UB
 end
 
 function bound_quadx12(Quad, plotFlag, sanityFlag)
@@ -2500,8 +2586,16 @@ function bound_quadx12(Quad, plotFlag, sanityFlag)
     x12_p1_LB, x12_p1_UB = prodBounds(l_x12_p1_sp1_LB, l_x12_p1_sp1_UB, l_x12_p1_sp2_LB, l_x12_p1_sp2_UB)
 
     if sanityFlag
-        validBounds(:($((Jx - Jy)/Jz)*x10*x11), [:x10, :x11], x12_p1_LB, x12_p1_UB)
+        @assert validBounds(:($((Jx - Jy)/Jz)*x10*x11), [:x10, :x11], x12_p1_LB, x12_p1_UB) "Invalid bounds for x12"
     end
 
-    return x12_p1_LB, x12_p1_UB
+    #Finally, bounds for x12 have to be a function of x12. Lift bounds to space of (x₁₀, x₁₁, x₁₂)
+    emptyList = [3] #Since x12 comes after x10 and x11
+    currList = [1,2]
+    lbList = [lbs[10], lbs[11], lbs[12]]
+    ubList = [ubs[10], ubs[11], ubs[12]]
+
+    x12_LB, x12_UB = lift_OA(emptyList, currList, x12_p1_LB, x12_p1_UB, lbList, ubList)
+
+    return x12_LB, x12_UB
 end
