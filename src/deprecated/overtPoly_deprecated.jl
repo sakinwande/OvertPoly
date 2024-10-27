@@ -1107,3 +1107,50 @@ function concreach!(query::OvertPQuery)
     reachSet =  reach_solve(query)
     return reachSet, query.problem.bounds
 end
+
+#Find how much to shift each pair of bounds to ensure log is valid 
+s_x9p1sp1 = inpShiftLog(lb_x9_p1_sp1, ub_x9_p1_sp1,bounds=x9_p1_sp1_LB)
+s_x9p1sp2 = inpShiftLog(lb_x9_p1_sp2, ub_x9_p1_sp2,bounds=x9_p1_sp2_LB)
+
+#Apply log
+x9_p1_sp1_LB_l = [(tup[1:end-1]..., log(tup[end] + s_x9p1sp1)) for tup in x9_p1_sp1_LB]
+x9_p1_sp1_UB_l = [(tup[1:end-1]..., log(tup[end] + s_x9p1sp1)) for tup in x9_p1_sp1_UB]
+
+x9_p1_sp2_LB_l = [(tup[1:end-1]..., log(tup[end] + s_x9p1sp2)) for tup in x9_p1_sp2_LB]
+x9_p1_sp2_UB_l = [(tup[1:end-1]..., log(tup[end] + s_x9p1sp2)) for tup in x9_p1_sp2_UB]
+
+#Lift bounds of sp1 and sp2 to the same space of (x₇, x₈)
+emptyList = [2] #Sub part 1 missing x₈
+currList = [1]
+lbList = [lbs[7], lbs[8]]
+ubList = [ubs[7], ubs[8]]
+
+l_x9_p1_sp1_LB_l, l_x9_p1_sp1_UB_l = lift_OA(emptyList, currList, x9_p1_sp1_LB_l,x9_p1_sp1_UB_l, lbList, ubList)
+
+#Lift sub part 2 to space of (x₇, x₈, x₁₁)
+emptyList = [1] #Sub part 2 missing x₇ and x₁₁
+currList = [2]
+
+l_x9_p1_sp2_LB_l, l_x9_p1_sp2_UB_l = lift_OA(emptyList, currList, x9_p1_sp2_LB_l,x9_p1_sp2_UB_l, lbList, ubList)
+
+#Experimenting here, instead of taking a Minkowski sum, let's just sumBounds. My hypothesis is that MinkSum and sumBounds are equivalent
+#So... sum the lifted bounds 
+
+x9_p1_sp4_LB_l, x9_p1_sp4_UB_l = sumBounds(l_x9_p1_sp1_LB_l, l_x9_p1_sp1_UB_l, l_x9_p1_sp2_LB_l, l_x9_p1_sp2_UB_l, true)
+
+if sanityFlag
+    validBounds(:(log(sin(x7) + $s_x9p1sp2) - log(cos(x8) + $s_x9p1sp2)), [:x7, :x8], x9_p1_sp4_LB_l, x9_p1_sp4_UB_l, true)
+end
+
+#Compute exp to get bounds for (sin(x₇) + s_x9p1sp2)/(cos(x₈) + s_x9p1sp2)
+x9_p1_sp4_LB_s = [(tup[1:end-1]..., floor_n(exp(tup[end]))) for tup in x9_p1_sp4_LB_l]
+x9_p1_sp4_UB_s = [(tup[1:end-1]..., ceil_n(exp(tup[end]))) for tup in x9_p1_sp4_UB_l]
+
+if sanityFlag 
+    validBounds(:((sin(x7)+$s_x9p1sp2)/(cos(x8) + $s_x9p1sp2)), [:x7, :x8], x9_p1_sp4_LB_s, x9_p1_sp4_UB_s, true)
+end
+
+#Need to shift the bounds to recover sin(x₇)/cos(x₈)
+#f1/f2 = ((f1 + s1)/(f2 + s2) * (f2 + s2) - s1)/((f2 + s2)/)
+x9_p1_sp4_LB = []
+x9_p1_sp4_UB = []

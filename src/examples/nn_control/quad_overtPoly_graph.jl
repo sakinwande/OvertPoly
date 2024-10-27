@@ -65,7 +65,21 @@ function quad_dyn_con_link!(query)
     boo = 1
 end
 
-function bound_quad()
+function bound_quad(Quad, plotFlag = false, sanityFlag = true)
+    x1LB, x1UB = bound_quadx1(Quad, plotFlag, sanityFlag)
+    x2LB, x2UB = bound_quadx2(Quad, plotFlag, sanityFlag)
+    x3LB, x3UB = bound_quadx3(Quad, plotFlag, sanityFlag)
+    x4LB, x4UB = bound_quadx4(Quad, plotFlag, sanityFlag)
+    x5LB, x5UB = bound_quadx5(Quad, plotFlag, sanityFlag)
+    x6LB, x6UB = bound_quadx6(Quad, plotFlag, sanityFlag)
+    x7LB, x7UB = bound_quadx7(Quad, plotFlag, sanityFlag)
+    x8LB, x8UB = bound_quadx8(Quad, plotFlag, sanityFlag)
+    x9LB, x9UB = bound_quadx9(Quad, plotFlag, sanityFlag)
+    x10LB, x10UB = bound_quadx10(Quad, plotFlag, sanityFlag)
+    x11LB, x11UB = bound_quadx11(Quad, plotFlag, sanityFlag)
+    x12LB, x12UB = bound_quadx12(Quad, plotFlag, sanityFlag)
+
+    return [[x1LB, x1UB], [x2LB, x2UB], [x3LB, x3UB], [x4LB, x4UB], [x5LB, x5UB], [x6LB, x6UB], [x7LB, x7UB], [x8LB, x8UB], [x9LB, x9UB], [x10LB, x10UB], [x11LB, x11UB], [x12LB, x12UB]]
 end
 
 Quad = GraphPolyProblem(
@@ -98,15 +112,50 @@ query = GraphPolyQuery(
 #Bounding the quadcopter dynamics
 sanityFlag = true
 plotFlag = false
-# function bound_quad(Quad, plotFlag = false, sanityFlag = true)
-    x1LB, x1UB = bound_quadx1(Quad, plotFlag, sanityFlag)
-    x2LB, x2UB = bound_quadx2(Quad, plotFlag, sanityFlag)
-    x3LB, x3UB = bound_quadx3(Quad, plotFlag, sanityFlag)
-    x4LB, x4UB = bound_quadx4(Quad, plotFlag, sanityFlag)
-    x5LB, x5UB = bound_quadx5(Quad, plotFlag, sanityFlag)
-    x6LB, x6UB = bound_quadx6(Quad, plotFlag, sanityFlag)
 
 
+###############################
 include("../../overtPoly_helpers.jl")
 include("quad_helpers.jl")
 ##############################################
+function bound_quadx10(Quad, plotFlag, sanityFlag)
+    lbs, ubs = extrema(Quad.domain)
+
+    #Bounding ((Jy - Jz)/Jx)*x₁₁*x₁₂
+    #Sub-part 1: (Jy - Jz)/Jx * x₁₁
+    x10_p1_sp1 = :($((Jy - Jz)/Jx)*x) 
+    lb_x10_p1_sp1 = lbs[11]
+    ub_x10_p1_sp1 = ubs[11]
+
+    x10_p1_sp1_LB, x10_p1_sp1_UB = interpol_nd(bound_univariate(x10_p1_sp1, lb_x10_p1_sp1, ub_x10_p1_sp1)...)
+
+    #Sub-part 2: x₁₂
+    x10_p1_sp2 = :(1*x)
+    lb_x10_p1_sp2 = lbs[12]
+    ub_x10_p1_sp2 = ubs[12]
+
+    x10_p1_sp2_LB, x10_p1_sp2_UB = interpol_nd(bound_univariate(x10_p1_sp2, lb_x10_p1_sp2, ub_x10_p1_sp2)...)
+
+    #Lift the bounds to the same space
+    emptyList = [2] #Sub part 1 missing x₁₂
+    currList = [1]
+    lbList = [lbs[11], lbs[12]]
+    ubList = [ubs[11], ubs[12]]
+
+    l_x10_p1_sp1_LB, l_x10_p1_sp1_UB = lift_OA(emptyList, currList, x10_p1_sp1_LB, x10_p1_sp1_UB, lbList, ubList)
+
+    #Now lift sub part 2 to space of (x₁₁, x₁₂)
+    emptyList = [1] #Sub part 2 missing x₁₁
+    currList = [2]
+
+    l_x10_p1_sp2_LB, l_x10_p1_sp2_UB = lift_OA(emptyList, currList, x10_p1_sp2_LB, x10_p1_sp2_UB, lbList, ubList)
+
+    #Now multiply the lifted bounds
+    x10_p1_LB, x10_p1_UB = prodBounds(l_x10_p1_sp1_LB, l_x10_p1_sp1_UB, l_x10_p1_sp2_LB, l_x10_p1_sp2_UB)
+
+    if sanityFlag
+        validBounds(:($((Jy - Jz)/Jx)*x11*x12), [:x11, :x12], x10_p1_LB, x10_p1_UB)
+    end
+
+    return x10_p1_LB, x10_p1_UB
+end

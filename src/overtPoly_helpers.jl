@@ -393,7 +393,7 @@ function plotSurf(baseFunc, lbVec, ubVec, surfDim, xS, yS, saveFlag=false)
 
 end
 
-function addDim(vec, dim, zeroVal = 1e-12)
+function addDim(vec, dim, zeroVal = 0.0)
     """
     Add a dimension to each tuple in a vector of tuples. This is equivalent to lifting a n-d polytope to a dimention nd+1
 
@@ -1165,4 +1165,52 @@ function prodBounds(lb1, ub1, lb2, ub2)
     end
 
     return prodLB, prodUB
+end
+
+function divBounds(lb1, ub1, lb2, ub2)
+    # """
+    # Method to divide bound 1 by bound 2.
+    # Assumes that 0 is not in the interval of bound 2
+    # """
+    try
+        @assert minimum([tup[end] for tup in lb2]) > 0 || maximum([tup[end] for tup in ub2]) < 0
+    catch
+        println("Division by zero")
+    end
+
+    #Find the union of the inputs 
+    #NOTE: Assume lb and ub have the same inputs 
+
+    bound1Inps = [tup[1:end-1] for tup in lb1]
+    bound2Inps = [tup[1:end-1] for tup in lb2]
+
+    #Find the union of the inputs
+    unionInps = sort(unique(vcat(bound1Inps, bound2Inps), dims=1))
+
+    #Interpolate the bounds to ensure they are defined on the same input set
+    lb1_i, lb2_i = interpol_nd(lb1, lb2)
+    ub1_i, ub2_i = interpol_nd(ub1, ub2)
+
+    #Define the output bounds
+    divLB = []
+    divUB = []
+
+    for inp in unionInps 
+        ind1 = findall(x->x[1:end-1] == inp, lb1_i)[1]
+        lb1 = lb1_i[ind1][end]
+        ub1 = ub1_i[ind1][end]
+
+        ind2 = findall(x->x[1:end-1] == inp, lb2_i)[1]
+        lb2 = lb2_i[ind2][end]
+        ub2 = ub2_i[ind2][end]
+
+        #Compute the division, use interval arithmetic, assumes 0 is not in interval 2
+        lb = lb1/ub2
+        ub = ub1/lb2
+
+        push!(divLB, (inp..., lb))
+        push!(divUB, (inp..., ub))
+
+    end
+    return divLB, divUB
 end
