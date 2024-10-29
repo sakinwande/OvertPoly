@@ -54,8 +54,12 @@ function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-12, npoint=2, rel_error_
     elseif isa(Symbolics.value(df), Number)
         #In this case, the expression is linear
         ϵₗ = ϵ #small parameter to control linear conservativeness
-        UBPoints = [(lb, func(lb) + ϵₗ), (ub, func(ub) + ϵₗ)]
-        LBPoints = [(lb, func(lb) - ϵₗ), (ub, func(ub) - ϵₗ)]
+        # step = (ub - lb)/(npoint + 1)
+        # subints = [lb + i*step for i in 1:npoint]
+        # pts = [lb, subints..., ub]
+        pts = [lb, ub]
+        UBPoints = [(pt, func(pt) + ϵₗ) for pt in pts]
+        LBPoints = [(pt, func(pt) - ϵₗ) for pt in pts]
     elseif isa(Symbolics.value(d2f), Number)
         #In this case, the expression is quadratic. This is a constant curvature instance
         if d2f > 0
@@ -1079,7 +1083,7 @@ function interpol_nd(boundSet_1, boundSet_2)
         push!(newbounds1, (inp..., interp1(inp...)))
         push!(newbounds2, (inp..., interp2(inp...)))
     end
-    return sort(newbounds1), sort(newbounds2), interp1, interp2
+    return sort(newbounds1), sort(newbounds2)
 end
 
 function validBounds(fexpr, vars, LBs, UBs, verbose = false)

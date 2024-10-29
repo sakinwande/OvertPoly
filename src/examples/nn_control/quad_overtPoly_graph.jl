@@ -185,8 +185,9 @@ query = GraphPolyQuery(
     2
 )
 
-#Next, test multi-step reachability
-query1 = deepcopy(query)
-query1.ntime = 1
-@time concreach!(query1)
+#Testing high dimensional triangulation
+query.problem.bounds = query.problem.bound_func(query.problem)
 
+query.problem.bounds[1][1]
+
+using Quickhull
