@@ -15,6 +15,7 @@ function encode_dynamics!(query::GraphPolyQuery)
     ind = 0
     #Iterate through elements of varList and add appropriate variables to the appropriate model 
     for sym in query.problem.varList
+        print(sym)
         ind += 1
         LB, UB = query.problem.bounds[ind]
         Tri = OA2PWA(LB)

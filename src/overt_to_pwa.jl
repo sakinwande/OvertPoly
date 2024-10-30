@@ -9,8 +9,8 @@ function OA2PWA(Bound)
     """
 
     Dom = [tup[1:end-1] for tup in Bound]
-
-    Tri = delaunay(Dom)
+    flags = "qhull d Qt Qbb Qc Qx Qz Q12"
+    Tri = MiniQhull.delaunay(Dom, flags)
     vecVecs = sort([[col...] for col in eachcol(Tri)])
 
     # Inc = vertex2inc(Tri)

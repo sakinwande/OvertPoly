@@ -21,9 +21,11 @@ Jz = 0.104
 control_coef = [[0], [0], [0],[0], [0], [-1/m],[0], [0], [0],[1/Jx], [1/Jy], [0]]
 exprList = [] #Empty bc what's the point? We can't plot anyway
 controller = "Networks/ARCH-COMP-2023/nnet/controllerQuad.nnet"
+#TEST: Controller 
+#controller = "Networks/ARCH-COMP-2023/nnet/controllerACC.nnet"
 
 dt = 0.1
-ϵ = 1e-8
+ϵ = 1e-5
 domain = Hyperrectangle(low=[-0.4,-0.4,-0.4,-0.4,-0.4,-0.4,-ϵ,-ϵ,-ϵ,-ϵ,-ϵ,-ϵ], high=[0.4,0.4,0.4,0.4,0.4,0.4,ϵ,ϵ,ϵ,ϵ,ϵ,ϵ])
 numsteps = 50
 sigFigs = 12
@@ -185,9 +187,71 @@ query = GraphPolyQuery(
     2
 )
 
+#############################
+query.var_dict = Dict{Symbol,Any}()
+query.mod_dict = Dict{Symbol,Any}()
+graph = OptiGraph()
+query.mod_dict[:graph] = graph
+
+##############################################
+f = open(controller)
+line = readline(f)
+    while occursin("//", line) #skip comments
+        line = readline(f)
+    end
+    # number of layers
+    nlayers = parse(Int64, split(line, ",")[1])
+    # read in layer sizes
+    #Skip additional comments
+    line = readline(f)
+    line
+    layer_sizes = parse.(Int64, split(readline(f), ",")[1:nlayers+1])
+    #Skip additional comments
+    line = readline(f)
+    # read past additonal information
+    for i in 1:5
+        line = readline(f)
+    end
+    #Skip additional comments
+    line = readline(f)
+    # i=1 corresponds to the input dimension, so it's ignored
+    dim = layer_sizes[3]
+    #read_layer(dim, f)
+    
+    output_dim = dim 
+    act = ReLU()
+    # function read_layer(output_dim::Int64, f::IOStream, act = ReLU())
+
+        rowparse(splitrow) = parse.(Float64, splitrow[findall(!isempty, splitrow)])
+         # first read in weights
+         W_str_vec = [rowparse(split(readline(f), ",")) for i in 1:output_dim]
+         W_str_vec[1]
+         weights = vcat(W_str_vec'...)
+         # now read in bias
+         bias_string = [split(readline(f), ",")[1] for j in 1:output_dim]
+         bias = rowparse(bias_string)
+         # activation function is set to ReLU as default
+         return Layer(weights, bias, act)
+    end
+    
+#############################################
+encode_control!(query)
+@time concreach!(query)
+#############################
 #Testing high dimensional triangulation
 query.problem.bounds = query.problem.bound_func(query.problem)
 
 query.problem.bounds[1][1]
 
 using Quickhull
+
+#Compare Quickhull to MiniQhull
+maximum([length(query.problem.bounds[i][1]) for i = 1:12])
+Bound = query.problem.bounds[2][1]
+Dom = [tup[1:end-1] for tup in Bound]
+
+@time Tri = MiniQhull.delaunay(Dom)
+Tri2 = Quickhull.delaunay(Dom)
+vecVecs = sort([[col...] for col in eachcol(Tri)])
+
+sanityFlag = true
