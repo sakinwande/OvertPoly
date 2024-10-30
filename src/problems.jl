@@ -78,7 +78,7 @@ mutable struct GraphPolyQuery
 	ntime::Int64
 	dt::Float64
 	N_overt::Int64
-	var_dict::Union{Nothing,Dict{Symbol,Vector{AbstractVector{VariableRef}}}} #holds [x, y, u]
+	var_dict::Union{Nothing,Dict{Symbol,Any}} #holds [x, y, u]
 	mod_dict::Union{Nothing,Dict{Symbol,Any}}
 	case #Determines if variables are case 1(x, y, z etc) or case 2 (x, dx, y, dy, etc)
 end
