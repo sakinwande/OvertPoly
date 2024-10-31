@@ -1,0 +1,26 @@
+slurmstepd-barrett27: error: Unable to create TMPDIR [/tmp/user/22848]: Permission denied
+slurmstepd-barrett27: error: Setting TMPDIR to /tmp
+/var/spool/slurm-llnl/slurmd/job10970646/slurm_script: line 14: module: command not found
+ERROR: LoadError: SystemError: opening file "/barrett/scratch/akinwande/OvertPoly/overtPoly_helpers.jl": No such file or directory
+Stacktrace:
+  [1] systemerror(p::String, errno::Int32; extrainfo::Nothing)
+    @ Base ./error.jl:176
+  [2] systemerror
+    @ ./error.jl:175 [inlined]
+  [3] open(fname::String; lock::Bool, read::Nothing, write::Nothing, create::Nothing, truncate::Nothing, append::Nothing)
+    @ Base ./iostream.jl:293
+  [4] open
+    @ ./iostream.jl:275 [inlined]
+  [5] open(f::Base.var"#433#434"{String}, args::String; kwargs::@Kwargs{})
+    @ Base ./io.jl:394
+  [6] open
+    @ ./io.jl:393 [inlined]
+  [7] read
+    @ ./io.jl:486 [inlined]
+  [8] _include(mapexpr::Function, mod::Module, _path::String)
+    @ Base ./loading.jl:2132
+  [9] include(fname::String)
+    @ Base.MainInclude ./client.jl:494
+ [10] top-level scope
+    @ /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/single_pend_overtPoly_graph_bench.jl:1
+in expression starting at /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/single_pend_overtPoly_graph_bench.jl:1

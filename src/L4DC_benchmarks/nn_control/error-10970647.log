@@ -1,6 +1,6 @@
 slurmstepd-barrett27: error: Unable to create TMPDIR [/tmp/user/22848]: Permission denied
 slurmstepd-barrett27: error: Setting TMPDIR to /tmp
-/var/spool/slurm-llnl/slurmd/job10970489/slurm_script: line 11: module: command not found
+/var/spool/slurm-llnl/slurmd/job10970647/slurm_script: line 14: module: command not found
 ERROR: LoadError: IOError: stat("/afs/cs.stanford.edu/u/akinwande/.julia/environments/v1.10"): permission denied (EACCES)
 Stacktrace:
   [1] uv_error
