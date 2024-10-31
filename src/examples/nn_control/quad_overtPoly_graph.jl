@@ -117,12 +117,12 @@ function quad_dyn_con_link!(query, neurons, graph, dynModel, netModel, t_ind=not
     @constraint(netModel, neurons[end][3] == u3)
 
     #Connect network outputs to dynamics model
-    @linkconstraint(graph, netModel[:u1] == dynModel[6][:u][1])
-    @linkconstraint(graph, netModel[:u2] == dynModel[10][:u][1])
-    @linkconstraint(graph, netModel[:u3] == dynModel[11][:u][1])
+    @linkconstraint(graph, netModel[:u1] == dynModel[6][:u])
+    @linkconstraint(graph, netModel[:u2] == dynModel[10][:u])
+    @linkconstraint(graph, netModel[:u3] == dynModel[11][:u])
 
     #Finally, identify pertient variable for each model
-    for (i, sym) in query.problem.varList 
+    for (i, sym) in enumerate(query.problem.varList) 
         if !isnothing(t_ind)
             sym_t = Meta.parse("$(sym)_$(t_ind)")
         else
@@ -187,55 +187,15 @@ query = GraphPolyQuery(
     2
 )
 
-#############################
-query.var_dict = Dict{Symbol,Any}()
-query.mod_dict = Dict{Symbol,Any}()
-graph = OptiGraph()
-query.mod_dict[:graph] = graph
+# #############################
+# query.var_dict = Dict{Symbol,Any}()
+# query.mod_dict = Dict{Symbol,Any}()
+# graph = OptiGraph()
+# query.mod_dict[:graph] = graph
 
-##############################################
-f = open(controller)
-line = readline(f)
-    while occursin("//", line) #skip comments
-        line = readline(f)
-    end
-    # number of layers
-    nlayers = parse(Int64, split(line, ",")[1])
-    # read in layer sizes
-    #Skip additional comments
-    line = readline(f)
-    line
-    layer_sizes = parse.(Int64, split(readline(f), ",")[1:nlayers+1])
-    #Skip additional comments
-    line = readline(f)
-    # read past additonal information
-    for i in 1:5
-        line = readline(f)
-    end
-    #Skip additional comments
-    line = readline(f)
-    # i=1 corresponds to the input dimension, so it's ignored
-    dim = layer_sizes[3]
-    #read_layer(dim, f)
-    
-    output_dim = dim 
-    act = ReLU()
-    # function read_layer(output_dim::Int64, f::IOStream, act = ReLU())
 
-        rowparse(splitrow) = parse.(Float64, splitrow[findall(!isempty, splitrow)])
-         # first read in weights
-         W_str_vec = [rowparse(split(readline(f), ",")) for i in 1:output_dim]
-         W_str_vec[1]
-         weights = vcat(W_str_vec'...)
-         # now read in bias
-         bias_string = [split(readline(f), ",")[1] for j in 1:output_dim]
-         bias = rowparse(bias_string)
-         # activation function is set to ReLU as default
-         return Layer(weights, bias, act)
-    end
-    
-#############################################
-encode_control!(query)
+# #############################################
+# encode_control!(query)
 @time concreach!(query)
 #############################
 #Testing high dimensional triangulation

@@ -206,18 +206,24 @@ function bound_pend2(SinglePendulum; plotFlag=false)
     return bounds
 end
 
-bound_pend(SinglePendulum, plotFlag=true)
-bound_pend2(SinglePendulum, plotFlag=true)
+bound_pend(SinglePendulum, plotFlag=false)
+bound_pend2(SinglePendulum, plotFlag=false)
 #######################################
 
 ########################################
 #Use concrete reachability to trace out the trajectory
-query1 = deepcopy(query)
-query1.ntime = 20
-@time reachSets, boundSets = multi_step_concreach(query1);
 
+using BenchmarkTools
+function benchConcreach(query)
+    query1 = deepcopy(query)
+    query1.ntime = 20
+    reachSets, boundSets = multi_step_concreach(query1);
+end
 
+BenchmarkTools.DEFAULT_PARAMETERS.samples = 10
+@benchmark benchConcreach($query)
 
+@btime benchConcreach(query);
 #Verify the property
 safe_hyp = Hyperrectangle(low=[0], high=[1])
 project(reachSets[10], [1]) ⊆ safe_hyp
