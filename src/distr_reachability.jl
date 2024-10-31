@@ -265,22 +265,20 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym)
     #Ensure that the time step is within bounds
     @assert t_sym <= symQuery.ntime
     #Akin to conc_reach_solve
-    max_query = deepcopy(symQuery)
-    min_query = deepcopy(symQuery)
     lows = Array{Float64}(undef, 0)
     highs = Array{Float64}(undef, 0)
-    minGraph = min_query.mod_dict[:graph]
+    minGraph = symQuery.mod_dict[:graph]
     i = 0
 
     #Compute lower bounds
     set_optimizer(minGraph, Gurobi.Optimizer)
     #NOTE: Optimize each variable separately 
-    for sym in min_query.problem.varList
+    for sym in symQuery.problem.varList
         sym_t = Meta.parse("$(sym)_$(t_sym)") 
         i += 1
-        v = min_query.var_dict[sym_t][end][1]
-        dv = min_query.var_dict[sym_t][2][1]
-        next_v_l = v + min_query.dt*dv
+        v = symQuery.var_dict[sym_t][end][1]
+        dv = symQuery.var_dict[sym_t][2][1]
+        next_v_l = v + symQuery.dt*dv
         #NOTE: Set graph level objective directly
         @objective(minGraph, Min, next_v_l)
         optimize!(minGraph)
@@ -289,14 +287,14 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym)
     end
 
     #Compute upper bounds
-    maxGraph = max_query.mod_dict[:graph]
+    maxGraph = symQuery.mod_dict[:graph]
     set_optimizer(maxGraph, Gurobi.Optimizer)
     #NOTE: Optimize each variable separately
     for sym in query.problem.varList 
         sym_t = Meta.parse("$(sym)_$(t_sym)") 
-        v = max_query.var_dict[sym_t][end][1]
-        dv = max_query.var_dict[sym_t][2][1]
-        next_v_u = v + max_query.dt*dv
+        v = symQuery.var_dict[sym_t][end][1]
+        dv = symQuery.var_dict[sym_t][2][1]
+        next_v_u = v + symQuery.dt*dv
         #NOTE: Set graph level objective directly
         @objective(maxGraph, Min, -next_v_u)
         optimize!(maxGraph)
