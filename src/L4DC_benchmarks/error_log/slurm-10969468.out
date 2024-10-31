@@ -1,0 +1,18 @@
+slurmstepd-barrett3: error: Unable to create TMPDIR [/tmp/user/22848]: Permission denied
+slurmstepd-barrett3: error: Setting TMPDIR to /tmp
+ERROR: IOError: stat("/afs/cs.stanford.edu/u/akinwande/.julia/config/startup.jl"): permission denied (EACCES)
+Stacktrace:
+ [1] uv_error
+   @ ./libuv.jl:100 [inlined]
+ [2] stat(path::String)
+   @ Base.Filesystem ./stat.jl:152
+ [3] isfile
+   @ ./stat.jl:461 [inlined]
+ [4] _local_julia_startup_file
+   @ ./client.jl:360 [inlined]
+ [5] load_julia_startup()
+   @ Base ./client.jl:368
+ [6] exec_options(opts::Base.JLOptions)
+   @ Base ./client.jl:286
+ [7] _start()
+   @ Base ./client.jl:557
