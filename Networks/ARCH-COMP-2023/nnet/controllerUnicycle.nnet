@@ -1,10 +1,15 @@
+// Neural Network File Format by Kyle Julian, Stanford 2016
+//Number of Layers,Number of Inputs,Number of Outputs,Max Layer Size,
 3
+//Input Layer size, Hidden Layer Sizes, Output Layer Size
 4, 500, 2, 2
+//The next line is an unused flag, after that we have minimum input values, maximum input values (network inputs are truncated to fit in this range), mean input values (as well as outputs), and input (as well as output) range values 
 0
 0
 0
 0
 0
+//Weights and Biases start here
 -0.03669, -0.00337, -0.12827, 0.04493 
 -0.20032, 0.06783, -0.05677, -0.09363 
 -0.00703, -0.13856, -0.37456, 0.04985 

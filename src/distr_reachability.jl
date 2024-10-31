@@ -15,6 +15,7 @@ function encode_dynamics!(query::GraphPolyQuery)
     ind = 0
     #Iterate through elements of varList and add appropriate variables to the appropriate model 
     for sym in query.problem.varList
+        #print(sym)
         ind += 1
         LB, UB = query.problem.bounds[ind]
         Tri = OA2PWA(LB)
@@ -45,23 +46,21 @@ function JuMP.objective_bound(graph::OptiGraph)
 end
 
 function conc_reach_solve(query)
-    max_query = deepcopy(query)
-    min_query = deepcopy(query)
     lows = Array{Float64}(undef, 0)
     highs = Array{Float64}(undef, 0)
 
     ###Minimization Step########
-    min_dynModel = min_query.mod_dict[:f]
-    minGraph = min_query.mod_dict[:graph]
-    min_netModel = min_query.mod_dict[:u]
+    min_dynModel = query.mod_dict[:f]
+    minGraph = query.mod_dict[:graph]
+    min_netModel = query.mod_dict[:u]
     i = 0
     #Compute lower bounds
     set_optimizer(minGraph, Gurobi.Optimizer)
     #NOTE: Optimize each variable separately
-    for sym in min_query.problem.varList 
-        v = min_query.var_dict[sym][end][1]
-        dv = min_query.var_dict[sym][2][1]
-        next_v_l = v + min_query.dt*dv
+    for sym in query.problem.varList 
+        v = query.var_dict[sym][end][1]
+        dv = query.var_dict[sym][2][1]
+        next_v_l = v + query.dt*dv
         #NOTE: Set graph level objective directly
         @objective(minGraph, Min, next_v_l)
         optimize!(minGraph)
@@ -71,14 +70,14 @@ function conc_reach_solve(query)
     end
     
     #Compute upper bounds
-    max_dynModel = max_query.mod_dict[:f]
-    maxGraph = max_query.mod_dict[:graph]
-    max_netModel = max_query.mod_dict[:u]
+    max_dynModel = query.mod_dict[:f]
+    maxGraph = query.mod_dict[:graph]
+    max_netModel = query.mod_dict[:u]
     set_optimizer(maxGraph, Gurobi.Optimizer)
     for sym in query.problem.varList 
-        v = max_query.var_dict[sym][end][1]
-        dv = max_query.var_dict[sym][2][1]
-        next_v_u = v + max_query.dt*dv
+        v = query.var_dict[sym][end][1]
+        dv = query.var_dict[sym][2][1]
+        next_v_u = v + query.dt*dv
         #NOTE: Set graph level objective directly
         @objective(maxGraph, Min, -next_v_u)
         optimize!(maxGraph)
@@ -91,7 +90,7 @@ end
 
 function concreach!(query::GraphPolyQuery)
     query.problem.bounds = query.problem.bound_func(query.problem)
-    query.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
+    query.var_dict = Dict{Symbol,Any}()
     query.mod_dict = Dict{Symbol,Any}()
 
     encode_dynamics!(query)

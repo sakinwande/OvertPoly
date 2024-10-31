@@ -21,9 +21,11 @@ Jz = 0.104
 control_coef = [[0], [0], [0],[0], [0], [-1/m],[0], [0], [0],[1/Jx], [1/Jy], [0]]
 exprList = [] #Empty bc what's the point? We can't plot anyway
 controller = "Networks/ARCH-COMP-2023/nnet/controllerQuad.nnet"
+#TEST: Controller 
+#controller = "Networks/ARCH-COMP-2023/nnet/controllerACC.nnet"
 
 dt = 0.1
-ϵ = 1e-8
+ϵ = 1e-5
 domain = Hyperrectangle(low=[-0.4,-0.4,-0.4,-0.4,-0.4,-0.4,-ϵ,-ϵ,-ϵ,-ϵ,-ϵ,-ϵ], high=[0.4,0.4,0.4,0.4,0.4,0.4,ϵ,ϵ,ϵ,ϵ,ϵ,ϵ])
 numsteps = 50
 sigFigs = 12
@@ -115,12 +117,12 @@ function quad_dyn_con_link!(query, neurons, graph, dynModel, netModel, t_ind=not
     @constraint(netModel, neurons[end][3] == u3)
 
     #Connect network outputs to dynamics model
-    @linkconstraint(graph, netModel[:u1] == dynModel[6][:u][1])
-    @linkconstraint(graph, netModel[:u2] == dynModel[10][:u][1])
-    @linkconstraint(graph, netModel[:u3] == dynModel[11][:u][1])
+    @linkconstraint(graph, netModel[:u1] == dynModel[6][:u])
+    @linkconstraint(graph, netModel[:u2] == dynModel[10][:u])
+    @linkconstraint(graph, netModel[:u3] == dynModel[11][:u])
 
     #Finally, identify pertient variable for each model
-    for (i, sym) in query.problem.varList 
+    for (i, sym) in enumerate(query.problem.varList) 
         if !isnothing(t_ind)
             sym_t = Meta.parse("$(sym)_$(t_ind)")
         else
@@ -185,9 +187,31 @@ query = GraphPolyQuery(
     2
 )
 
+# #############################
+# query.var_dict = Dict{Symbol,Any}()
+# query.mod_dict = Dict{Symbol,Any}()
+# graph = OptiGraph()
+# query.mod_dict[:graph] = graph
+
+
+# #############################################
+# encode_control!(query)
+@time concreach!(query)
+#############################
 #Testing high dimensional triangulation
 query.problem.bounds = query.problem.bound_func(query.problem)
 
 query.problem.bounds[1][1]
 
 using Quickhull
+
+#Compare Quickhull to MiniQhull
+maximum([length(query.problem.bounds[i][1]) for i = 1:12])
+Bound = query.problem.bounds[2][1]
+Dom = [tup[1:end-1] for tup in Bound]
+
+@time Tri = MiniQhull.delaunay(Dom)
+Tri2 = Quickhull.delaunay(Dom)
+vecVecs = sort([[col...] for col in eachcol(Tri)])
+
+sanityFlag = true

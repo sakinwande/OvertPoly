@@ -1,11 +1,11 @@
 using Symbolics
 using IntervalRootFinding, IntervalArithmetic
-using MacroTools: prewalk, postwalk
+# using MacroTools: prewalk, postwalk
 using Interpolations
 using OVERT: bound, find_variables, to_pairs 
 using Plots; plotly()
 global NPLOTS = 0
-using CSV
+# using CSV
 
 function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-12, npoint=2, rel_error_tol=5e-3, plotflag=false)
     """
@@ -85,30 +85,11 @@ function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-12, npoint=2, rel_error_
         try 
             #TODO: Review this 
             if standExpr == :(sin(xₚ))
-                d2f_zeros = Any[]
-                #For trigonometric functions, zeros are known analytically
-                #Zeros for sin(x) are of the form n*pi where n is an integer
-                zer0 = ceil(lb/pi)*pi
-                while zer0 >= lb && zer0 <= ub
-                    if zer0 == -0.0
-                        zer0 = 0.0
-                    end
-                    push!(d2f_zeros, zer0)
-                    zer0 += pi
-                end
+                d2f_zeros, _ = get_sincos_regions(lb, ub)
             elseif standExpr == :(cos(xₚ))
-                d2f_zeros = Any[]
-                #For trigonometric functions, zeros are known analytically
-                #Zeros for cos(x) are of the form (n + 0.5)*pi where n is an integer
-                zer0 = ceil(lb/pi)
-                #Catch case where zer0 is even
-                if zer0 % 2 == 0
-                    zer0 += 1
-                end
-                while zer0*(pi/2) >= lb && zer0*(pi/2) <= ub && zer0 % 2 == 1
-                    push!(d2f_zeros, zer0 * (pi/2))
-                    zer0 += 2
-                end
+                d2f_zeros, _ = get_sincos_regions(lb, ub, offset=pi/2)
+            elseif standExpr == :(tan(xₚ))
+                d2f_zeros, _ = get_tan_regions(lb, ub)
             else
                 #Find the roots over the given interval 
                 rootVals = IntervalRootFinding.roots(d2Func, IntervalArithmetic.Interval(lb, ub))
@@ -1217,4 +1198,47 @@ function divBounds(lb1, ub1, lb2, ub2)
 
     end
     return divLB, divUB
+end
+
+function get_sincos_regions(a,b; offset=0)
+    """
+    Return inflection points for sin, (cos with offset of π/2)
+
+    Lifted from OVERT
+    """
+
+    n̂_a = ceil((a - offset) / π)
+    n̂_b = floor((b - offset) / π)
+    n_array = [i for i in n̂_a:n̂_b]
+
+    if length(n_array) == 0 # no inflection points within interval
+        @assert sin(a + offset) != 0.0 
+        return n_array, sin(a + offset) < 0 # true if convex, false implies concave
+    else # greater than 0 length
+        return [offset + n*π for n in n_array], nothing # nothing denotes mixed convexity
+    end
+end
+
+function get_tan_regions(a,b)
+    """
+    Lifted from OVERT
+    """
+    # assert tan doesn't span discontinuity
+    @assert (b-a) <= π
+    # background to these cases:
+    # tan is continuous for +/- π/2 centered around even multiples of π/2. e.g. -π/2 ≤ 0*π/2 ≤ π/2 and again for π/2 ≤ 2*π/2 ≤ 3π/2
+    case1 = (ceil(a / (π/2)) == floor(b / (π/2))) && ((ceil(a/ (π/2)) % 2) == 0) # for when interval spans inflection point
+    case2 = (floor(a / (π/2)) == floor(b / (π/2))) && ((floor(a/ (π/2)) % 2) == 0) # for when interval is to the right of inflection point
+    case3 = (ceil(a / (π/2)) == ceil(b / (π/2))) && ((ceil(a/ (π/2)) % 2) == 0) # for when interval is to the left of inflection point
+    @assert (case1 || case2 || case3)
+    sin_zeros, sin_convexity = get_sincos_regions(a,b)
+    cos_zeros, cos_convexity = get_sincos_regions(a,b, offset=π/2)
+    tan_zeros = sort(vcat(sin_zeros, cos_zeros))
+    if length(tan_zeros) == 0 # no inflection points within interval
+        # if sin and cos convexity diff -> tan is concave (not convex)   (true, false) -> false   or   (false, true) -> false
+        # # if sin and cos convexity same -> tan is convex   (true, true) -> true or (false, false) -> true
+        return tan_zeros, !xor(sin_convexity, cos_convexity)
+    else 
+        return tan_zeros, nothing # nothing implies mixed convexity 
+    end
 end

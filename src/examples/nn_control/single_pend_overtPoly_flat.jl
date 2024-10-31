@@ -127,7 +127,9 @@ query = FlatPolyQuery(
     nothing,         # mod_dict
     2                # case
 )
+##########################################
 
+#############################################
 #Use concrete reachability to trace out the trajectory
 query1 = deepcopy(query)
 @time reachSets, boundSets = multi_step_concreach(query1);

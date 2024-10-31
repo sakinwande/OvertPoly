@@ -1,11 +1,11 @@
 """
     read_nnet(fname::String; last_layer_activation = Id())
 
-Read in neural net from a `.nnet` file and return Network struct.
-The `.nnet` format is borrowed from [NNet](https://github.com/sisl/NNet).
-The format assumes all hidden layers have ReLU activation.
-Keyword argument `last_layer_activation` sets the activation of the last
-layer, and defaults to `Id()`, (i.e. a linear output layer).
+    Read in neural net from a `.nnet` file and return Network struct.
+    The `.nnet` format is borrowed from [NNet](https://github.com/sisl/NNet).
+    The format assumes all hidden layers have ReLU activation.
+    Keyword argument `last_layer_activation` sets the activation of the last
+    layer, and defaults to `Id()`, (i.e. a linear output layer).
 """
 function read_nnet(fname::String; last_layer_activation = Id())
     f = open(fname)
@@ -16,11 +16,18 @@ function read_nnet(fname::String; last_layer_activation = Id())
     # number of layers
     nlayers = parse(Int64, split(line, ",")[1])
     # read in layer sizes
+    #Skip additional comments
+    line = readline(f)
+    line
     layer_sizes = parse.(Int64, split(readline(f), ",")[1:nlayers+1])
+    #Skip additional comments
+    line = readline(f)
     # read past additonal information
     for i in 1:5
         line = readline(f)
     end
+    #Skip additional comments
+    line = readline(f)
     # i=1 corresponds to the input dimension, so it's ignored
     layers = Layer[read_layer(dim, f) for dim in layer_sizes[2:end-1]]
     push!(layers, read_layer(last(layer_sizes), f, last_layer_activation))

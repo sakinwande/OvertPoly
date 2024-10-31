@@ -1,4 +1,5 @@
 using JuMP
+using Plasmo
 using LazySets
 using Parameters
 include("nv/maxSens.jl")
@@ -12,7 +13,7 @@ function add_controller_constraints!(netModel, network_nnet_address, input_set,l
     Encode controller as MIP. Directly taken from OVERTVerify
     """
     #Isolate MIP model
-    model = netModel.model
+    model = netModel
     #Read network file 
     network = read_nnet(network_nnet_address, last_layer_activation=last_layer_activation)
     #Initialize neurons (adds variables)
@@ -68,9 +69,29 @@ function init_variables(model::Model, layers::Vector{Layer}; binary = false, inc
     end
     return vars
 end
+function init_variables(model::OptiNode{OptiGraph}, layers::Vector{Layer}; binary = false, include_input = false)
+    # TODO: only neurons get offset array
+    vars = Vector{Vector{NodeVariableRef}}(undef, length(layers))
+    all_layers_n = n_nodes.(layers)
+
+    if include_input
+        # input to the first layer also gets variables
+        # essentially an input constraint
+        input_layer_n = size(first(layers).weights, 2)
+        prepend!(all_layers_n, input_layer_n)
+        push!(vars, Vector{NodeVariableRef}())        # expand vars by one to account
+    end
+
+    for (i, n) in enumerate(all_layers_n)
+        vars[i] = @variable(model, [1:n], binary = binary, base_name = "z$i")
+    end
+    return vars
+end
 
 init_neurons(model::Model, layers::Vector{Layer})     = init_variables(model, layers, include_input = true)
+init_neurons(model::OptiNode{OptiGraph}, layers::Vector{Layer})     = init_variables(model, layers, include_input = true)
 init_deltas(model::Model, layers::Vector{Layer})      = init_variables(model, layers, binary = true)
+init_deltas(model::OptiNode{OptiGraph}, layers::Vector{Layer})      = init_variables(model, layers, binary = true)
 init_neurons(m,     network::Network) = init_neurons(m, network.layers)
 init_deltas(m,      network::Network) = init_deltas(m,  network.layers)
 

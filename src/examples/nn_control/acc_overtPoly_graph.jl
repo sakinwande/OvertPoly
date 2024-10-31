@@ -89,7 +89,7 @@ function bound_acc(ACC; plotFlag = false)
     ub_a_Lead_sub1 = ubs[2]
     aleadSub1 = :(2*$ac_lead - $mu*x2^2)
     #The interpolation is to ensure upper and lower bounds are over the same set of points 
-    aleadSub1LB, aleadSub1UB = interpol(bound_univariate(aleadSub1, lb_a_Lead_sub1, ub_a_Lead_sub1, plotflag = plotFlag)...)
+    aleadSub1LB, aleadSub1UB = interpol_nd(bound_univariate(aleadSub1, lb_a_Lead_sub1, ub_a_Lead_sub1, plotflag = plotFlag)...)
 
     # #######################
     #Bound second component of lead acceleration dynamics
@@ -97,7 +97,7 @@ function bound_acc(ACC; plotFlag = false)
     ub_a_Lead_sub2 = ubs[3]
     aleadSub2 = :(-2*x3)
     #Set number of digits for this one to avoid rounding out the points 
-    aleadSub2LB, aleadSub2UB = interpol(bound_univariate(aleadSub2, lb_a_Lead_sub2, ub_a_Lead_sub2, plotflag = plotFlag)..., 9)
+    aleadSub2LB, aleadSub2UB = interpol_nd(bound_univariate(aleadSub2, lb_a_Lead_sub2, ub_a_Lead_sub2, plotflag = plotFlag)...)
 
     #Add a dimension to prepare for Minkowski sum
     aleadSub1LB_l = addDim(aleadSub1LB, 2)
@@ -145,14 +145,14 @@ function bound_acc(ACC; plotFlag = false)
     ub_a_Ego_sub1 = ubs[5]
     aegoSub1 = :(-$mu*x5^2)
     #NOTE: Interpol is to ensure that the bounds are defined over same set of points
-    aegoSub1LB, aegoSub1UB = interpol(bound_univariate(aegoSub1, lb_a_Ego_sub1, ub_a_Ego_sub1, plotflag = plotFlag)...)
+    aegoSub1LB, aegoSub1UB = interpol_nd(bound_univariate(aegoSub1, lb_a_Ego_sub1, ub_a_Ego_sub1, plotflag = plotFlag)...)
 
     #Bound second component of ego dynamics
     lb_a_Ego_sub2 = lbs[6]
     ub_a_Ego_sub2 = ubs[6]
     aegoSub2 = :(-2*x6)
     #Set number of digits to be 9 bc we're dealing with very small numbers here
-    aegoSub2LB, aegoSub2UB = interpol(bound_univariate(aegoSub2, lb_a_Ego_sub2, ub_a_Ego_sub2, plotflag = plotFlag)...,9)
+    aegoSub2LB, aegoSub2UB = interpol_nd(bound_univariate(aegoSub2, lb_a_Ego_sub2, ub_a_Ego_sub2, plotflag = plotFlag)...)
 
     #Add a dimension to prepare for Minkowski sum
     aegoSub1LB_l = addDim(aegoSub1LB, 2)
@@ -288,7 +288,9 @@ query = GraphPolyQuery(
     3, #case (x, dx, ddx)
 )
 
-#TEST:MOI backend experimentation
+###################
+query0 = deepcopy(query)
+@time reachSets, boundSets = concreach!(query0);
 #########################
 query1 = deepcopy(query)
 query1.ntime = 50
