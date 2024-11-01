@@ -10,7 +10,7 @@ using Plasmo
 
 #NOTE: Controller used is unclear :(. Start w. small controller to be safe 
 #NOTE: Now we know, it's the large network :|
-#NOTE: Focus on spec. 1 since it seems to be the one relevant to ReLU net
+#NOTE: Focus onk spec. 1 since it seems to be the one relevant to ReLU net
 control_coef = [[0],[0],[0],[1]]
 controller = "Networks/ARCH-COMP-2023/nnet/controllerTORA.nnet"
 exprList = [:(1*x2), :(-x1 + 0.1*sin(x3)), :(1*x4), :(1*u)]
@@ -49,7 +49,7 @@ function bound_tora(TORA; plotFlag=false)
     lb_x2 = lbs[2]
     ub_x2 = ubs[2]
     x1Func = :(1*x2)
-    x1FuncLB_u, x1FuncUB_u = interpol(bound_univariate(x1Func, lb_x2, ub_x2, plotflag = plotFlag)...)
+    x1FuncLB_u, x1FuncUB_u = interpol_nd(bound_univariate(x1Func, lb_x2, ub_x2, plotflag = plotFlag)...)
     #NOTE: dx1 needs to be a function of x1 as well, use lifting to achieve
     emptyList = [1]
     currList = [2]
@@ -61,13 +61,17 @@ function bound_tora(TORA; plotFlag=false)
     #Next, bound dx2 (dx2 = -x1 + 0.1*sin(x3))
     #Bound first component of dx2 (-x1)
     x2FuncSub1 = :(-1*x1)
-    x2FuncSub1LB, x2FuncSub1UB = interpol(bound_univariate(x2FuncSub1, lb_x1, ub_x1, plotflag = plotFlag)...)
+    x2FuncSub1LB, x2FuncSub1UB = interpol_nd(bound_univariate(x2FuncSub1, lb_x1, ub_x1, plotflag = plotFlag)...)
 
     #Bound second component of dx2 (0.1*sin(x3))
     lb_x3 = lbs[3]
     ub_x3 = ubs[3]
-    x2FuncSub2 = :(0.1*sin(x3))
-    x2FuncSub2LB, x2FuncSub2UB = interpol(bound_univariate(x2FuncSub2, lb_x3, ub_x3, plotflag=plotFlag)...)
+    x2FuncSub2 = :(sin(x3))
+    x2FuncSub2LB, x2FuncSub2UB = interpol_nd(bound_univariate(x2FuncSub2, lb_x3, ub_x3, plotflag=plotFlag)...)
+
+    x2FuncSub2LB = [(tup[1:end-1]..., 0.1*tup[end]) for tup in x2FuncSub2LB]
+    x2FuncSub2UB = [(tup[1:end-1]..., 0.1*tup[end]) for tup in x2FuncSub2UB]
+
 
     #NOTE: I checked, bounds appear valid :)
     #Add a dimension to prepare for Minkowski sum 
@@ -90,7 +94,7 @@ function bound_tora(TORA; plotFlag=false)
     lb_x4 = lbs[4]
     ub_x4 = ubs[4]
     x3Func = :(1*x4)
-    x3FuncLB_u, x3FuncUB_u = interpol(bound_univariate(x3Func, lb_x4, ub_x4, plotflag = plotFlag)...)
+    x3FuncLB_u, x3FuncUB_u = interpol_nd(bound_univariate(x3Func, lb_x4, ub_x4, plotflag = plotFlag)...)
     #NOTE: dx3 needs to be a function of x3 as well, use lifting to achieve
     emptyList = [1]
     currList = [2]
@@ -101,7 +105,7 @@ function bound_tora(TORA; plotFlag=false)
     κ = 1e-8
     # x4Func = :($κ*x4)
     x4Func = :(0*x4)
-    x4FuncLB, x4FuncUB = interpol(bound_univariate(x4Func, lb_x4, ub_x4, plotflag = plotFlag)...)
+    x4FuncLB, x4FuncUB = interpol_nd(bound_univariate(x4Func, lb_x4, ub_x4, plotflag = plotFlag)...)
     bounds = [[x1FuncLB, x1FuncUB], [x2FuncLB, x2FuncUB], [x3FuncLB, x3FuncUB], [x4FuncLB, x4FuncUB]]
     return bounds 
 end
@@ -179,57 +183,65 @@ query = GraphPolyQuery(
 #####################
 #Test single step concrete reachability
 query1 = deepcopy(query)
-query1.ntime = 1
-@time reachset, boundset = concreach!(query1);
+# query1.ntime = 20
+tstart = Dates.now()
+reachSets, boundSets = multi_step_concreach(query1)
+tend = Dates.now()
+println("##################################################################")
+println("Time taken to compute concrete reach: ", tend-tstart)
+println("##################################################################")
+# #Test multi-step concrete reachability
+# query2 = deepcopy(query)
+# query2.ntime = 20
+# @time reachsets, boundsets = multi_step_concreach(query2);
 
-#Test multi-step concrete reachability
-query2 = deepcopy(query)
-query2.ntime = 20
-@time reachsets, boundsets = multi_step_concreach(query2);
-
-overtSet = Hyperrectangle(low=[
-    -0.34415609789501067
- -1.070147842066413
- -0.020800937713150447
-  0.13458397572173186
-],
-high=[
-    -0.0723092674737037
- -0.7876645636084808
-  0.2220092844249411
-  0.4163216175335922
-])
+# overtSet = Hyperrectangle(low=[
+#     -0.34415609789501067
+#  -1.070147842066413
+#  -0.020800937713150447
+#   0.13458397572173186
+# ],
+# high=[
+#     -0.0723092674737037
+#  -0.7876645636084808
+#   0.2220092844249411
+#   0.4163216175335922
+# ])
 
 
-t = 20
-#Comparing to OVERT
-plot(project(reachsets[t+1], [1, 2]), lab="Reach Set", color="lightpink", lw=0.5)
-plot!(project(overtSet, [1, 2]), lab="OVERT Set", color="lightblue", lw=0.5)
+# t = 20
+# #Comparing to OVERT
+# plot(project(reachsets[t+1], [1, 2]), lab="Reach Set", color="lightpink", lw=0.5)
+# plot!(project(overtSet, [1, 2]), lab="OVERT Set", color="lightblue", lw=0.5)
 
-plot(project(reachsets[t+1], [3, 4]), lab="Reach Set", color="lightpink", lw=0.5)
-plot!(project(overtSet, [3, 4]), lab="OVERT Set", color="lightblue", lw=0.5)
+# plot(project(reachsets[t+1], [3, 4]), lab="Reach Set", color="lightpink", lw=0.5)
+# plot!(project(overtSet, [3, 4]), lab="OVERT Set", color="lightblue", lw=0.5)
 #checking the property 
+tstart = Dates.now()
 safeSet = Hyperrectangle(low=[-2, -2, -2, -2], high=[2, 2, 2, 2])
-
-
-overtSet
-reachsets[t+1]
-
-
+vioFlag = false
 for (i, reachset) in enumerate(reachsets)
     if !(LazySets.issubset(reachset, safeSet))
         println("Property is violated at time $i")
+        vioFlag = true
     end
 end
 
-p = plot(project(safeSet, [1, 2]), lab="Safe Set", color="lightblue", lw=0.5)
-for reachset in reachsets
-    plot!(project(reachset, [1, 2]), color="lightpink", lw=0.5)
+if !vioFlag
+    println("Property is satisfied")
 end
-display(p)
+tend = Dates.now()
+println("##################################################################")
+println("Time taken to verify property: ", tend-tstart)
+println("##################################################################")
+# p = plot(project(safeSet, [1, 2]), lab="Safe Set", color="lightblue", lw=0.5)
+# for reachset in reachsets
+#     plot!(project(reachset, [1, 2]), color="lightpink", lw=0.5)
+# end
+# display(p)
 
-q = plot(project(safeSet, [3, 4]), lab="Safe Set", color="lightblue", lw=0.5)
-for reachset in reachsets
-    plot!(project(reachset, [3, 4]), color="lightpink", lw=0.5)
-end
-display(q)
+# q = plot(project(safeSet, [3, 4]), lab="Safe Set", color="lightblue", lw=0.5)
+# for reachset in reachsets
+#     plot!(project(reachset, [3, 4]), color="lightpink", lw=0.5)
+# end
+# display(q)

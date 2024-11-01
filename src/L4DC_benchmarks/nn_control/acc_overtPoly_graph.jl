@@ -288,37 +288,42 @@ query = GraphPolyQuery(
     3, #case (x, dx, ddx)
 )
 
-###################
-query0 = deepcopy(query)
-@time reachSets, boundSets = concreach!(query0);
+# ###################
+# query0 = deepcopy(query)
+# tstart = 
+# @time reachSets, boundSets = concreach!(query0);
 #########################
 query1 = deepcopy(query)
 query1.ntime = 50
-@time reachSets, boundSets = multi_step_concreach(query1);
 
+tstart = Dates.now()
+reachSets, boundSets = multi_step_concreach(query1)
+tend = Dates.now()
+println("##################################################################")
+println("Time taken to compute concrete reach: ", tend-tstart)
+println("##################################################################")
 
+# t = 50
+# #Lead
+# plot(project(reachSets[t], [1,2]), label="GraphReach")
+# plot!(project(reachsets[t], [1,2]), label="FlatReach")
+# #plot!(project(overtSet, [1,2]), label="OVERT")
 
-t = 50
-#Lead
-plot(project(reachSets[t], [1,2]), label="GraphReach")
-plot!(project(reachsets[t], [1,2]), label="FlatReach")
-#plot!(project(overtSet, [1,2]), label="OVERT")
+# plot(project(reachSets[t], [2,3]), label="GraphReach")
+# plot!(project(reachsets[t], [2,3]), label="FlatReach")
+# #plot!(project(overtSet, [2,3]), label="OVERT")
 
-plot(project(reachSets[t], [2,3]), label="GraphReach")
-plot!(project(reachsets[t], [2,3]), label="FlatReach")
-#plot!(project(overtSet, [2,3]), label="OVERT")
+# #Ego
+# plot(project(reachSets[t], [4,5]), label="GraphReach")
+# plot!(project(reachsets[t], [4,5]), label="FlatReach")
+# #plot!(project(overtSet, [4,5]), label="OVERT")
 
-#Ego
-plot(project(reachSets[t], [4,5]), label="GraphReach")
-plot!(project(reachsets[t], [4,5]), label="FlatReach")
-#plot!(project(overtSet, [4,5]), label="OVERT")
-
-plot(project(reachSets[t], [5,6]), label="GraphReach")
-plot!(project(reachsets[t], [5,6]), label="FlatReach")
+# plot(project(reachSets[t], [5,6]), label="GraphReach")
+# plot!(project(reachsets[t], [5,6]), label="FlatReach")
 #plot!(project(overtSet, [5,6]), label="OVERT")
 #Verifying the property
 
-
+tstart = Dates.now()
 dRel = Any[]
 dSafe = Any[]
 for reachset in reachsets
@@ -338,7 +343,7 @@ end
 
 (extrema(dRel[end])[2] - extrema(dRel[end])[1])[1]
 
-tstart = Dates.now()
+
 veriFlag = true
 
 for i = 1:51
@@ -352,4 +357,6 @@ for i = 1:51
     end
 end
 tend = Dates.now()
-println("Verification time: $(tend-tstart)")
+println("##################################################################")
+println("Time taken to verify property: ", tend-tstart)
+println("##################################################################")

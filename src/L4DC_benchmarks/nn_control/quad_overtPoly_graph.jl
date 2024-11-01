@@ -196,22 +196,10 @@ query = GraphPolyQuery(
 
 # #############################################
 # encode_control!(query)
-@time concreach!(query)
-#############################
-#Testing high dimensional triangulation
-query.problem.bounds = query.problem.bound_func(query.problem)
-
-query.problem.bounds[1][1]
-
-using Quickhull
-
-#Compare Quickhull to MiniQhull
-maximum([length(query.problem.bounds[i][1]) for i = 1:12])
-Bound = query.problem.bounds[2][1]
-Dom = [tup[1:end-1] for tup in Bound]
-
-@time Tri = MiniQhull.delaunay(Dom)
-Tri2 = Quickhull.delaunay(Dom)
-vecVecs = sort([[col...] for col in eachcol(Tri)])
-
-sanityFlag = true
+query1 = deepcopy(query)
+tstart = Dates.now()
+reachSets, boundSets = multi_step_concreach(query1)
+tend = Dates.now()
+println("##################################################################")
+println("Time taken to compute concrete reach: ", tend-tstart)
+println("##################################################################")

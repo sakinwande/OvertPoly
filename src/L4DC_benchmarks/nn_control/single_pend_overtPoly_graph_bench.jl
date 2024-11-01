@@ -10,7 +10,7 @@ using Plasmo
 
 #Define problem parameters
 pend_mass, pend_len, grav_const, friction = 0.5, 0.5, 1., 0.0
-controller = "Networks/ARCH-COMP-2023/nnet/controllerSinglePendulum.nnet"
+controller = "../../../Networks/ARCH-COMP-2023/nnet/controllerSinglePendulum.nnet"
 expr = [:($(grav_const/pend_len) * sin(x1) + $(1/(pend_mass*pend_len^2)) * u1 - $(friction/(pend_mass*pend_len^2)) * x2)]
 control_coef = [[0], [1/(pend_mass*pend_len^2)]]
 # control_coef = [[0], [0]]
@@ -214,12 +214,12 @@ query = GraphPolyQuery(
 #Use concrete reachability to trace out the trajectory
 query1 = deepcopy(query)
 query1.ntime = 20
-
 tstart = Dates.now()
 reachSets, boundSets = multi_step_concreach(query1)
 tend = Dates.now()
+println("##################################################################")
 println("Time taken to compute concrete reach: ", tend-tstart)
-
+println("##################################################################")
 #Verify the property
 safe_hyp = Hyperrectangle(low=[0], high=[1])
 project(reachSets[10], [1]) ⊆ safe_hyp
@@ -233,8 +233,9 @@ for i=10:20
     end
 end
 tend = Dates.now()
+println("##################################################################")
 println("Time taken to verify property: ", tend-tstart)
-    
+println("##################################################################")
 ######Testing the sym reach################
 symQuery = deepcopy(query)
 symQuery.problem.bounds = boundSets
@@ -246,7 +247,9 @@ t_sym = 10
 tstart = Dates.now()
 sym_set = symreach(symQuery, depMat, t_sym)
 tend = Dates.now()
+println("##################################################################")
 println("Time taken to compute symbolic reach at time step $(t_sym): ", tend-tstart)
+println("##################################################################")
 
 ######Testing hyb reach################
 # hybQuery = deepcopy(query)

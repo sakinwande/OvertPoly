@@ -34,7 +34,7 @@ function unicycle_control(input_set)
 end
 
 dt = 0.2
-numSteps = 10
+numSteps = 2
 w = 1e-4
 domain = Hyperrectangle(low=[9.5,-4.5,2.1,1.5], high = [9.55,-4.45,2.11,1.51])
 depMat = [[1,0,1,1],[0,1,1,1], [0,0,1,0], [0,0,0,1]]
@@ -55,13 +55,13 @@ function bound_unicycle(Unicycle; plotFlag=false)
 
     #First bound x4
     x1FuncSub_1 = :(1*x4)
-    x1FuncSub_1LB, x1FuncSub_1UB = interpol(bound_univariate(x1FuncSub_1, lb_x4, ub_x4)...)
+    x1FuncSub_1LB, x1FuncSub_1UB = interpol_nd(bound_univariate(x1FuncSub_1, lb_x4, ub_x4)...)
     
     #Also bound cos(x3)
     lb_x3 = lbs[3]
     ub_x3 = ubs[3]
     x1FuncSub_2 = :(cos(x3))
-    x1FuncSub_2LB, x1FuncSub_2UB = interpol(bound_univariate(x1FuncSub_2, lb_x3, ub_x3)...)
+    x1FuncSub_2LB, x1FuncSub_2UB = interpol_nd(bound_univariate(x1FuncSub_2, lb_x3, ub_x3)...)
 
     #Find how much to shift log x4 by 
     sx4 = inpShiftLog(lb_x4, ub_x4, bounds=x1FuncSub_1LB)
@@ -133,11 +133,11 @@ function bound_unicycle(Unicycle; plotFlag=false)
     #############Next, bound dx2 (dx2 = x4*sin(x3))#####
     #Bound first component of dx2 (x4)
     x2FuncSub1 = :(1*x4)
-    x2FuncSub1LB, x2FuncSub1UB = interpol(bound_univariate(x2FuncSub1, lb_x4, ub_x4)...)
+    x2FuncSub1LB, x2FuncSub1UB = interpol_nd(bound_univariate(x2FuncSub1, lb_x4, ub_x4)...)
 
     #Bound second component of dx2 (sin(x3))
     x2FuncSub2 = :(sin(x3))
-    x2FuncSub2LB, x2FuncSub2UB = interpol(bound_univariate(x2FuncSub2, lb_x3, ub_x3)...)
+    x2FuncSub2LB, x2FuncSub2UB = interpol_nd(bound_univariate(x2FuncSub2, lb_x3, ub_x3)...)
 
     #Find how much to shift log x4 by
     sx4 = inpShiftLog(lb_x4, ub_x4, bounds=x2FuncSub1LB)
@@ -319,228 +319,53 @@ query = GraphPolyQuery(
 )
 
 
-#Next, test multi-step concrete reachability
-query1 = deepcopy(query)
-query1.ntime = 1
-@time reachSet, boundSet = concreach!(query1);
+# #Next, test multi-step concrete reachability
+# query1 = deepcopy(query)
+# query1.ntime = 1
+# @time reachSet, boundSet = concreach!(query1);
 
 #Next, test multi-step concrete reachability
+tstart = Dates.now()
 query2 = deepcopy(query)
-query2.ntime = 10
+query2.ntime = numSteps
 @time reachSets, boundSets = multi_step_concreach(query2);
+tend = Dates.now()
+println("##################################################################")
+println("Time taken to compute concrete reach: ", tend-tstart)
+println("##################################################################")
 
 #Next, test direct symreach 
+tstart = Dates.now()
 query3 = deepcopy(query)
 query3.problem.bounds = boundSets
-@time symReach = symreach(query3, depMat, 10)
+@time symReach = symreach(query3, depMat, numSteps)
+tend = Dates.now()
+##################################################################")
+println("Time taken to compute symbolic reach at time step $(t_sym): ", tend-tstart)
+println("##################################################################")
 
-#Test hybrid reachability
-
-t_sym = 10
-concInt = [2,2,2,2,2]
-query4 = deepcopy(query)
-query4.ntime = t_sym
-#@time reachSets = multi_step_hybreach(query3, depMat, concInt)
-@time reach_set = hybreach(query3, depMat, t_sym)
+# t_sym = 10
+# concInt = [2,2,2,2,2]
+# query4 = deepcopy(query)
+# query4.ntime = t_sym
+# #@time reachSets = multi_step_hybreach(query3, depMat, concInt)
+# @time reach_set = hybreach(query3, depMat, t_sym)
 
 
 #############################
 
 goalSet = Hyperrectangle(low = [-0.6, -0.2, -0.06, -0.3], high=[0.6, 0.2, 0.06, 0.3])
 
-plot(project(reachSets[end], [1,2]), lab="Reachable Set", color="lightblue", lw=0.5)
-plot!(project(goalSet, [1,2]), lab="Goal Set", color="red", lw=0.5)
+# plot(project(reachSets[end], [1,2]), lab="Reachable Set", color="lightblue", lw=0.5)
+# plot!(project(goalSet, [1,2]), lab="Goal Set", color="red", lw=0.5)
 
 
-plot(project(reachSets[end], [3,4]))
-plot!(project(goalSet, [3,4]))
+# plot(project(reachSets[end], [3,4]))
+# plot!(project(goalSet, [3,4]))
 
-symQuery = deepcopy(query)
-symQuery.problem.bounds = boundSets
-reachSets[end]
+# symQuery = deepcopy(query)
+# symQuery.problem.bounds = boundSets
+# reachSets[end]
 
-# # reachSets[1]
-# query.problem.bound_func(query.problem; plotFlag=true)
-
-##################################################
-#######Sketching out sym reach###################
-symQuery.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
-symQuery.mod_dict = Dict{Symbol,Any}()
-
-############Sketching out encode_sym_dynamics
-#####Inputs to encode sym dynamics 
-x_dim = length(symQuery.problem.varList) #state dimension
-
-function encode_sym_dynamics!(symQuery, x_dim)
-    """
-    Method to encode symbolic dynamics. Takes symQuery as input
-    """
-    symGraph = OptiGraph()
-    #####Enter time loop######
-    for t_ind = 1:symQuery.ntime
-        x_ind = 0
-        #Create a new set of nodes for each time step
-        dynNodes = @optinode(symGraph, nodes[1:x_dim])
-        #####Enter Symbol loop####
-        for sym in symQuery.problem.varList
-            sym_t = Meta.parse("$(sym)_$(t_ind)")
-            x_ind += 1
-            #Get lower and upper bounds for first variable in first time step
-            LB, UB = symQuery.problem.bounds[t_ind][x_ind]
-            Tri = OA2PWA(LB)
-            xS = [(tup[1:end-1]) for tup in LB]
-            yUB = [tup[end] for tup in UB]
-            yLB = [tup[end] for tup in LB]
-
-            ccEncoding!(xS, yLB, yUB, Tri, symQuery, sym_t, x_ind, dynNodes[x_ind])
-        end
-
-        f_t = Meta.parse("f_$(t_ind)")
-        symQuery.mod_dict[f_t] = dynNodes
-    end
-    symQuery.mod_dict[:graph] = symGraph
-end
-
-encode_sym_dynamics!(symQuery, x_dim)
-
-######Sketching out Encode Sym Control####
-function encode_sym_control!(symQuery)
-    """
-    Method to encode symbolic control. Takes symQuery as input
-    """
-    network_file = symQuery.network_file
-    neurList = []
-    for t_ind = 1:symQuery.ntime
-        input_set = reachSets[t_ind]
-        network_file = symQuery.network_file
-        netModel = @optinode(symQuery.mod_dict[:graph])
-        neurons = add_controller_constraints!(netModel, network_file, input_set, Id())
-        u_ind = Meta.parse("u_$(t_ind)")
-        symQuery.mod_dict[u_ind] = netModel
-        push!(neurList, neurons)
-    end
-    return neurList
-end
-########################################
-neurList = encode_sym_control!(symQuery)
-
-
-#########Sketching out time encoding with dynamics/control link######
-function encode_time(symQuery, neurList)
-    for t_ind = 1:symQuery.ntime
-        symGraph = symQuery.mod_dict[:graph]
-        dynModel = symQuery.mod_dict[Meta.parse("f_$(t_ind)")]
-        netModel = symQuery.mod_dict[Meta.parse("u_$(t_ind)")]
-
-        #Link the dynamics and control first 
-        symQuery.problem.link_func(symQuery, neurList[t_ind], symGraph, dynModel, netModel, t_ind)
-    end
-
-    #Next link time steps
-    symGraph = symQuery.mod_dict[:graph]
-    #######Enter time loop######
-    #TEST: Entering time loop manually
-    # t_ind = 1
-    for t_ind = 1:symQuery.ntime-1
-        currDyn = symQuery.mod_dict[Meta.parse("f_$(t_ind)")]
-        nextDyn = symQuery.mod_dict[Meta.parse("f_$(t_ind+1)")]
-        #Iterate through models and link pertinent variables 
-        x_ind = 1
-        #TEST: Entering the loop manually
-        # sym = symQuery.problem.varList[x_ind]
-        for sym in symQuery.problem.varList
-            currModel = currDyn[x_ind]
-            currSym = Meta.parse("$(sym)_$(t_ind)")
-            nextModel = nextDyn[x_ind]
-            nextSym = Meta.parse("$(sym)_$(t_ind+1)")
-
-            xNow = symQuery.var_dict[currSym][end][1] 
-            yNow = symQuery.var_dict[currSym][2][1]
-            xNext = symQuery.var_dict[nextSym][end][1]
-
-            @linkconstraint(symGraph, xNext == xNow + symQuery.dt*yNow)
-            x_ind += 1
-        end
-    end
-end
-
-###########################
-encode_time(symQuery, neurList)
-
-##############################
-#inputs to sym reach solve 
-t_sym = symQuery.ntime
-#######Next define Sym Reach Solve###########
-function sym_reach_solve(symQuery, t_sym)
-    #Ensure that the time step is within bounds
-    @assert t_sym <= symQuery.ntime
-    #Akin to conc_reach_solve
-    max_query = deepcopy(symQuery)
-    min_query = deepcopy(symQuery)
-    lows = Array{Float64}(undef, 0)
-    highs = Array{Float64}(undef, 0)
-    f_sym = Meta.parse("f_$(t_sym)")
-    min_dynModel = min_query.mod_dict[f_sym]
-    minGraph = min_query.mod_dict[:graph]
-    i = 0
-
-    #Compute lower bounds
-    for sym in min_query.problem.varList
-        sym_t = Meta.parse("$(sym)_$(t_sym)") 
-        i += 1
-        model = min_dynModel[i]
-        v = min_query.var_dict[sym_t][end][1]
-        dv = min_query.var_dict[sym_t][2][1]
-        @variable(model, next_v)
-        @constraint(model, next_v == v + query.dt*dv)
-        @objective(model, Min, next_v)
-    end
-
-    set_optimizer(minGraph, Gurobi.Optimizer)
-    optimize!(minGraph)
-    @assert termination_status(minGraph) == MOI.OPTIMAL
-    i = 0
-    for _ in symQuery.problem.varList
-        i += 1
-        push!(lows, value(min_dynModel[i][:next_v]))
-    end
-
-
-    #Compute upper bounds
-    max_dynModel = max_query.mod_dict[f_sym]
-    maxGraph = max_query.mod_dict[:graph]
-    i = 0
-    for sym in query.problem.varList 
-        sym_t = Meta.parse("$(sym)_$(t_sym)") 
-        i += 1
-        model = max_dynModel[i]
-        v = max_query.var_dict[sym_t][end][1]
-        dv = max_query.var_dict[sym_t][2][1]
-        @variable(model, next_v)
-        @constraint(model, next_v == v + max_query.dt*dv)
-        @objective(model, Max, next_v)
-    end
-
-    set_optimizer(maxGraph, Gurobi.Optimizer)
-    optimize!(maxGraph)
-    i = 0
-    for _ in query.problem.varList
-        i += 1
-        push!(highs, value(max_dynModel[i][:next_v]))
-    end
-    reach_set = Hyperrectangle(low=lows, high=highs)
-    return reach_set
-end
-
-
-@time sym_hyp = sym_reach_solve(symQuery, t_sym)
-
-sym_hyp
-reachSets[end]
-
-
-plot(reachSets[end][3,4])
-plot!(sym_hyp)
-
-plot(project(reachSets[end], [3,4]))
-plot!(project(sym_hyp, [3,4]))
+# # # reachSets[1]
+# # query.problem.bound_func(query.problem; plotFlag=true)
