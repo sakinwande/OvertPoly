@@ -42,7 +42,7 @@ depMat = [[1,0,1,1],[0,1,1,1], [0,0,1,0], [0,0,0,1]]
 ########TEST: Debugging Bound Unicycle#########
 # lbs, ubs = extrema(domain)
 # plotFlag = true
-#######################################
+######################################
 
 ###Define Bound Unicycle########
 function bound_unicycle(Unicycle; plotFlag=false)
@@ -51,6 +51,7 @@ function bound_unicycle(Unicycle; plotFlag=false)
     ##Bound initial state variable (dx1 = x4*cos(x3))#####
     #K-A Decomposition exp(ln(x4) + ln(cos(x3)))
     #Bound ln(x4)
+    #Weird behavior with Hyperrectangle
     lb_x4 = lbs[4]
     ub_x4 = ubs[4]
 
@@ -97,9 +98,15 @@ function bound_unicycle(Unicycle; plotFlag=false)
     for tup in x1FuncLB_s
         #First find the corresponding f(x) and f(y) values
         #NOTE: Round to avoid floating point errors
-        xInd = findall(x->x[1] == round(tup[1], digits=5), x1FuncSub_2LB)[1]
-        yInd = findall(y->y[1] == round(tup[2], digits=5), x1FuncSub_1LB)[1]
+        # xInd = findall(x->x[1] == round(tup[1], digits=5), x1FuncSub_2LB)[1]
+        # yInd = findall(y->y[1] == round(tup[2], digits=5), x1FuncSub_1LB)[1]
+
+        xInd = findall(x->x[1] == tup[1], x1FuncSub_2LB)[1]
+        yInd = findall(y->y[1] == tup[2], x1FuncSub_1LB)[1]
+
         
+        
+
         #Quadratic shift down
         #NOTE: You care about function value, not index value ;)
         #NOTE: Interval subtraction 
@@ -108,10 +115,14 @@ function bound_unicycle(Unicycle; plotFlag=false)
         push!(x1FuncLB, (tup[1:end-1]..., newXY))
     end
 
+
     for tup in x1FuncUB_s
         #First find the corresponding f(x) and f(y) values
-        xInd = findall(x->x[1] == round(tup[1], digits=5), x1FuncSub_2LB)[1]
-        yInd = findall(y->y[1] == round(tup[2], digits=5), x1FuncSub_1LB)[1]
+        # xInd = findall(x->x[1] == round(tup[1], digits=5), x1FuncSub_2LB)[1]
+        # yInd = findall(y->y[1] == round(tup[2], digits=5), x1FuncSub_1LB)[1]
+
+        xInd = findall(x->x[1] == tup[1], x1FuncSub_2LB)[1]
+        yInd = findall(y->y[1] == tup[2], x1FuncSub_1LB)[1]
         
         #Quadratic shift down
         #NOTE: Interval subtraction
@@ -172,8 +183,10 @@ function bound_unicycle(Unicycle; plotFlag=false)
 
     for tup in x2FuncLB_s
         #First find the corresponding f(x) and f(y) values
-        xInd = findall(x->x[1] == round(tup[1], digits=5), x2FuncSub2LB)
-        yInd = findall(y->y[1] == round(tup[2], digits=5), x2FuncSub1LB)
+        # xInd = findall(x->x[1] == round(tup[1], digits=5), x2FuncSub2LB)
+        # yInd = findall(y->y[1] == round(tup[2], digits=5), x2FuncSub1LB)
+        xInd = findall(x->x[1] == tup[1], x2FuncSub2LB)
+        yInd = findall(y->y[1] == tup[2], x2FuncSub1LB)
 
         #Quadratic shift down
         newXY = tup[end] - sx3 * x2FuncSub1UB[yInd][1][end] - sx4 * x2FuncSub2UB[xInd][1][end] - sx3*sx4
@@ -183,8 +196,11 @@ function bound_unicycle(Unicycle; plotFlag=false)
 
     for tup in x2FuncUB_s
         #First find the corresponding f(x) and f(y) values
-        xInd = findall(x->x[1] == round(tup[1], digits=5), x2FuncSub2LB)
-        yInd = findall(y->y[1] == round(tup[2], digits=5), x2FuncSub1LB)
+        # xInd = findall(x->x[1] == round(tup[1], digits=5), x2FuncSub2LB)
+        # yInd = findall(y->y[1] == round(tup[2], digits=5), x2FuncSub1LB)
+
+        xInd = findall(x->x[1] == tup[1], x2FuncSub2LB)
+        yInd = findall(y->y[1] == tup[2], x2FuncSub1LB)
 
         #Quadratic shift down
         newXY = tup[end] - sx3 * x2FuncSub1LB[yInd][1][end] - sx4 * x2FuncSub2LB[xInd][1][end] - sx3*sx4
@@ -209,7 +225,7 @@ function bound_unicycle(Unicycle; plotFlag=false)
    emptyList = [1]
    currList = [2,3]
    
-   #Retcon x1FuncLB and x1FuncUB to be unlifted 
+    #Retcon x1FuncLB and x1FuncUB to be unlifted 
     x1FuncLB_u = deepcopy(x1FuncLB)
     x1FuncUB_u = deepcopy(x1FuncUB)
 
@@ -233,12 +249,12 @@ function bound_unicycle(Unicycle; plotFlag=false)
     #############Next, bound dx3 (dx3 = u[2])#####
     #Since dx3 is solely a function of u[2], just use a constant
     x3Func = :(0*x3)
-    x3FuncLB, x3FuncUB = interpol(bound_univariate(x3Func, lb_x3, ub_x3)...)
+    x3FuncLB, x3FuncUB = interpol_nd(bound_univariate(x3Func, lb_x3, ub_x3)...)
 
     #############Finally, bound dx4 (dx4 = u[1] + w)#####
     #Here, dx4 is a function of u[1] and a disturbance term. Treat disturbance as a zero mean constant 
     x4Func = :(0*x4)
-    x4FuncLB, x4FuncUB = interpol(bound_univariate(x4Func, lb_x4, ub_x4, ϵ = w)...)
+    x4FuncLB, x4FuncUB = interpol_nd(bound_univariate(x4Func, lb_x4, ub_x4, ϵ = w)...)
 
     bounds = [[x1FuncLB, x1FuncUB], [x2FuncLB, x2FuncUB], [x3FuncLB, x3FuncUB], [x4FuncLB, x4FuncUB]]
 
@@ -246,7 +262,7 @@ function bound_unicycle(Unicycle; plotFlag=false)
 end
 
 ###Next Define function to link control and relevant dynamics###
-function unicycle_dyn_con_link!(query, neurons, graph, dynModel, netModel, t_ind=nothing)
+function unicycle_dyn_con_link!(query, neurons, graph, dynModel, netModel, t_ind=nothing)s
 
     #Define variables that are inputs to the network model
     @variable(netModel, x1)

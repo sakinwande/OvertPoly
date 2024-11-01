@@ -3,7 +3,7 @@ using IntervalRootFinding, IntervalArithmetic
 # using MacroTools: prewalk, postwalk
 using Interpolations
 using OVERT: bound, find_variables, to_pairs 
-using Plots; plotly()
+#using Plots; plotly()
 global NPLOTS = 0
 # using CSV
 
