@@ -8,11 +8,13 @@ using LazySets
 using Dates
 using Plasmo
 
+
+print("Running TORA Benchmark")
 #NOTE: Controller used is unclear :(. Start w. small controller to be safe 
 #NOTE: Now we know, it's the large network :|
 #NOTE: Focus onk spec. 1 since it seems to be the one relevant to ReLU net
 control_coef = [[0],[0],[0],[1]]
-controller = "Networks/ARCH-COMP-2023/nnet/controllerTORA.nnet"
+controller = "../../../Networks/ARCH-COMP-2023/nnet/controllerTORA.nnet"
 exprList = [:(1*x2), :(-x1 + 0.1*sin(x3)), :(1*x4), :(1*u)]
 
 ##Define TORA Dynamics#####
@@ -187,9 +189,9 @@ query1 = deepcopy(query)
 tstart = Dates.now()
 reachSets, boundSets = multi_step_concreach(query1)
 tend = Dates.now()
-println("##################################################################")
+println("##########################################################################################")
 println("Time taken to compute concrete reach: ", tend-tstart)
-println("##################################################################")
+println("#####################################################################################")
 # #Test multi-step concrete reachability
 # query2 = deepcopy(query)
 # query2.ntime = 20
@@ -231,9 +233,9 @@ if !vioFlag
     println("Property is satisfied")
 end
 tend = Dates.now()
-println("##################################################################")
+println("########################################################################################")
 println("Time taken to verify property: ", tend-tstart)
-println("##################################################################")
+println("######################################################################################")
 # p = plot(project(safeSet, [1, 2]), lab="Safe Set", color="lightblue", lw=0.5)
 # for reachset in reachsets
 #     plot!(project(reachset, [1, 2]), color="lightpink", lw=0.5)

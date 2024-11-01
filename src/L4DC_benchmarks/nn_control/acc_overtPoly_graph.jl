@@ -8,11 +8,13 @@ using LazySets
 using Dates
 using Plasmo
 
+
+println("Running ACC Benchmark")
 ac_lead = -2.0
 mu = 0.0001
 control_coef = [[0],[0], [0], [0], [0],[2]]
 exprList = [:(- $mu*x2^2 + -2*x3 + 2*$ac_lead ), :(- $mu*x5^2 -2*x6)]
-controller = "Networks/ARCH-COMP-2023/nnet/controllerACC.nnet"
+controller = "../../../Networks/ARCH-COMP-2023/nnet/controllerACC.nnet"
 
 
 vSet = 30.0
@@ -299,9 +301,9 @@ query1.ntime = 50
 tstart = Dates.now()
 reachSets, boundSets = multi_step_concreach(query1)
 tend = Dates.now()
-println("##################################################################")
+println("####################################################################################")
 println("Time taken to compute concrete reach: ", tend-tstart)
-println("##################################################################")
+println("####################################################################################")
 
 # t = 50
 # #Lead
@@ -357,6 +359,6 @@ for i = 1:51
     end
 end
 tend = Dates.now()
-println("##################################################################")
+println("###################################################################################")
 println("Time taken to verify property: ", tend-tstart)
-println("##################################################################")
+println("####################################################################################")

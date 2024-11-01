@@ -9,7 +9,8 @@ using Dates
 using Plasmo
 control_coef = [[0],[0],[1],[1]]
 
-controller = "Networks/ARCH-COMP-2023/nnet/controllerUnicycle.nnet"
+println("Running Unicycle Benchmark")
+controller = "../../../Networks/ARCH-COMP-2023/nnet/controllerUnicycle.nnet"
 exprList = [:(cos(x3)*x4), :(sin(x3)*x4), :(0*x3), :(0*x4)]
 
 ##Define Unicycle Dynamics#####

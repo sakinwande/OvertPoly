@@ -8,6 +8,7 @@ using LazySets
 using Dates
 using Plasmo
 
+println("Running SinglePendulum Benchmark")
 #Define problem parameters
 pend_mass, pend_len, grav_const, friction = 0.5, 0.5, 1., 0.0
 controller = "../../../Networks/ARCH-COMP-2023/nnet/controllerSinglePendulum.nnet"
@@ -217,25 +218,25 @@ query1.ntime = 20
 tstart = Dates.now()
 reachSets, boundSets = multi_step_concreach(query1)
 tend = Dates.now()
-println("##################################################################")
+println("#############################################################################################")
 println("Time taken to compute concrete reach: ", tend-tstart)
-println("##################################################################")
+println("###################################################################################")
 #Verify the property
 safe_hyp = Hyperrectangle(low=[0], high=[1])
 project(reachSets[10], [1]) ⊆ safe_hyp
-safeFlag = true
+veriFlag = true
 tstart = Dates.now()
 for i=10:20
     if !(project(reachSets[i], [1]) ⊆ safe_hyp)
         print("Property violated at time step: ", i)
-        safeFlag = false
+        veriFlag = false
         break
     end
 end
 tend = Dates.now()
-println("##################################################################")
+println("######################################################################################")
 println("Time taken to verify property: ", tend-tstart)
-println("##################################################################")
+println("######################################################################################")
 ######Testing the sym reach################
 symQuery = deepcopy(query)
 symQuery.problem.bounds = boundSets
@@ -247,9 +248,9 @@ t_sym = 10
 tstart = Dates.now()
 sym_set = symreach(symQuery, depMat, t_sym)
 tend = Dates.now()
-println("##################################################################")
+println("######################################################################################")
 println("Time taken to compute symbolic reach at time step $(t_sym): ", tend-tstart)
-println("##################################################################")
+println("#######################################################################################")
 
 ######Testing hyb reach################
 # hybQuery = deepcopy(query)

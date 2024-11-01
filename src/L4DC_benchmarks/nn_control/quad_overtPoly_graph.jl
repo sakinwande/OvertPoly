@@ -9,6 +9,7 @@ using LazySets
 using Dates
 using Plasmo
 
+println("Running quad benchmark")
 #Define constants for the quadrotor
 g = 9.81
 m = 1.4
@@ -20,7 +21,7 @@ Jz = 0.104
 #Define the control coefficients for each axis
 control_coef = [[0], [0], [0],[0], [0], [-1/m],[0], [0], [0],[1/Jx], [1/Jy], [0]]
 exprList = [] #Empty bc what's the point? We can't plot anyway
-controller = "Networks/ARCH-COMP-2023/nnet/controllerQuad.nnet"
+controller = "../../../Networks/ARCH-COMP-2023/nnet/controllerQuad.nnet"
 #TEST: Controller 
 #controller = "Networks/ARCH-COMP-2023/nnet/controllerACC.nnet"
 
@@ -200,6 +201,6 @@ query1 = deepcopy(query)
 tstart = Dates.now()
 reachSets, boundSets = multi_step_concreach(query1)
 tend = Dates.now()
-println("##################################################################")
+println("##########################################################################################")
 println("Time taken to compute concrete reach: ", tend-tstart)
-println("##################################################################")
+println("########################################################################################")
