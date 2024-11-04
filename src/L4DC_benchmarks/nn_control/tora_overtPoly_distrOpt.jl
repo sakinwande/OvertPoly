@@ -39,6 +39,7 @@ function tora_control(input_set)
 end
 domain = Hyperrectangle(low=[0.6, -0.7, -0.4, 0.5], high = [0.7, -0.6, -0.3, 0.6])
 #TODO: Decide on step size needed to make discrete time reachability reasonable
+#20 s works bc continuous time controller is sampled 20 times, over the specified interval
 numSteps = 20
 dt = 0.05
 
@@ -180,14 +181,17 @@ query = GraphPolyQuery(
 )
 
 
-
-#########Debug Bound TORA#############
-#####################
-#Test single step concrete reachability
+# ###################
+#Warm up run (not timed)
+query0 = deepcopy(query)
+query0.ntime = 2
+reachSets, boundSets = multi_step_concreach(query0);
+#########################
+#Timed run
 query1 = deepcopy(query)
 # query1.ntime = 20
 tstart = Dates.now()
-reachSets, boundSets = multi_step_concreach(query1)
+@time reachSets, boundSets = multi_step_concreach(query1)
 tend = Dates.now()
 println("##########################################################################################")
 println("Time taken to compute concrete reach: ", tend-tstart)
@@ -222,7 +226,7 @@ println("#######################################################################
 tstart = Dates.now()
 safeSet = Hyperrectangle(low=[-2, -2, -2, -2], high=[2, 2, 2, 2])
 vioFlag = false
-for (i, reachset) in enumerate(reachsets)
+for (i, reachset) in enumerate(reachSets)
     if !(LazySets.issubset(reachset, safeSet))
         println("Property is violated at time $i")
         vioFlag = true

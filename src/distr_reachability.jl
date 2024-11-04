@@ -333,7 +333,7 @@ function hybreach(symQuery::GraphPolyQuery, depMat, t_sym, boundSets=nothing)
 
     if isnothing(boundSets)
         concQuery = deepcopy(symQuery)
-        boundSets = multi_step_concreach(concQuery)[2]
+        _,boundSets = multi_step_concreach(concQuery)
     end
     symQuery.problem.bounds = boundSets
     sym_set = symreach(symQuery, depMat, t_sym)
@@ -346,6 +346,7 @@ function multi_step_hybreach(symQuery, depMat, concInt)
     """
     hyb_reachSets = [symQuery.problem.domain]
     for int in concInt
+        println(int)
         hyQuery = deepcopy(symQuery)
         hyQuery.ntime = int
         hyQuery.problem.domain = hyb_reachSets[end]

@@ -188,18 +188,16 @@ query = GraphPolyQuery(
     2
 )
 
-# #############################
-# query.var_dict = Dict{Symbol,Any}()
-# query.mod_dict = Dict{Symbol,Any}()
-# graph = OptiGraph()
-# query.mod_dict[:graph] = graph
-
-
-# #############################################
-# encode_control!(query)
+# ###################
+#Warm up run (not timed)
+query0 = deepcopy(query)
+query0.ntime = 2
+reachSets, boundSets = multi_step_concreach(query0);
+#########################
+#Timed run
 query1 = deepcopy(query)
 tstart = Dates.now()
-reachSets, boundSets = multi_step_concreach(query1)
+@time reachSets, boundSets = multi_step_concreach(query1)
 tend = Dates.now()
 println("##########################################################################################")
 println("Time taken to compute concrete reach: ", tend-tstart)

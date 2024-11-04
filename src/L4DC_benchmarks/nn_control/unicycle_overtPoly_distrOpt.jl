@@ -35,7 +35,8 @@ function unicycle_control(input_set)
 end
 
 dt = 0.2
-numSteps = 2
+#This should really be 50 steps to recover 10 seconds in discrete time 
+numSteps = 20
 w = 1e-4
 domain = Hyperrectangle(low=[9.5,-4.5,2.1,1.5], high = [9.55,-4.45,2.11,1.51])
 depMat = [[1,0,1,1],[0,1,1,1], [0,0,1,0], [0,0,0,1]]
@@ -262,7 +263,7 @@ function bound_unicycle(Unicycle; plotFlag=false)
 end
 
 ###Next Define function to link control and relevant dynamics###
-function unicycle_dyn_con_link!(query, neurons, graph, dynModel, netModel, t_ind=nothing)s
+function unicycle_dyn_con_link!(query, neurons, graph, dynModel, netModel, t_ind=nothing)
 
     #Define variables that are inputs to the network model
     @variable(netModel, x1)
@@ -336,12 +337,13 @@ query = GraphPolyQuery(
 )
 
 
-# #Next, test multi-step concrete reachability
-# query1 = deepcopy(query)
-# query1.ntime = 1
-# @time reachSet, boundSet = concreach!(query1);
-
-#Next, test multi-step concrete reachability
+# ###################
+#Warm up run (not timed)
+query0 = deepcopy(query)
+query0.ntime = 2
+reachSets, boundSets = multi_step_concreach(query0);
+#########################
+#Timed run
 tstart = Dates.now()
 query2 = deepcopy(query)
 query2.ntime = numSteps
@@ -352,37 +354,23 @@ println("Time taken to compute concrete reach: ", tend-tstart)
 println("##################################################################")
 
 #Next, test direct symreach 
+# ###################
+#Warm up run (not timed)
+query0 = deepcopy(query)
+query0.ntime = 2
+query0.problem.bounds = boundSets
+symReach = symreach(query0, depMat, 2)
+#########################
+#Timed run
 tstart = Dates.now()
 query3 = deepcopy(query)
 query3.problem.bounds = boundSets
 @time symReach = symreach(query3, depMat, numSteps)
 tend = Dates.now()
-##################################################################")
-println("Time taken to compute symbolic reach at time step $(t_sym): ", tend-tstart)
+
+println("##################################################################")
+println("Time taken to compute symbolic reach at time step $(numSteps): ", tend-tstart)
 println("##################################################################")
 
-# t_sym = 10
-# concInt = [2,2,2,2,2]
-# query4 = deepcopy(query)
-# query4.ntime = t_sym
-# #@time reachSets = multi_step_hybreach(query3, depMat, concInt)
-# @time reach_set = hybreach(query3, depMat, t_sym)
+# goalSet = Hyperrectangle(low = [-0.6, -0.2, -0.06, -0.3], high=[0.6, 0.2, 0.06, 0.3])
 
-
-#############################
-
-goalSet = Hyperrectangle(low = [-0.6, -0.2, -0.06, -0.3], high=[0.6, 0.2, 0.06, 0.3])
-
-# plot(project(reachSets[end], [1,2]), lab="Reachable Set", color="lightblue", lw=0.5)
-# plot!(project(goalSet, [1,2]), lab="Goal Set", color="red", lw=0.5)
-
-
-# plot(project(reachSets[end], [3,4]))
-# plot!(project(goalSet, [3,4]))
-
-# symQuery = deepcopy(query)
-# symQuery.problem.bounds = boundSets
-# reachSets[end]
-
-# # # reachSets[1]
-# # query.problem.bound_func(query.problem; plotFlag=true)

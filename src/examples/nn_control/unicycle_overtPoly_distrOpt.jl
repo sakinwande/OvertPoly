@@ -34,6 +34,7 @@ function unicycle_control(input_set)
 end
 
 dt = 0.2
+#Should be 50?
 numSteps = 10
 w = 1e-4
 domain = Hyperrectangle(low=[9.5,-4.5,2.1,1.5], high = [9.55,-4.45,2.11,1.51])
@@ -50,18 +51,19 @@ function bound_unicycle(Unicycle; plotFlag=false)
     ##Bound initial state variable (dx1 = x4*cos(x3))#####
     #K-A Decomposition exp(ln(x4) + ln(cos(x3)))
     #Bound ln(x4)
+    #Weird behavior with Hyperrectangle
     lb_x4 = lbs[4]
     ub_x4 = ubs[4]
 
     #First bound x4
     x1FuncSub_1 = :(1*x4)
-    x1FuncSub_1LB, x1FuncSub_1UB = interpol(bound_univariate(x1FuncSub_1, lb_x4, ub_x4)...)
+    x1FuncSub_1LB, x1FuncSub_1UB = interpol_nd(bound_univariate(x1FuncSub_1, lb_x4, ub_x4)...)
     
     #Also bound cos(x3)
     lb_x3 = lbs[3]
     ub_x3 = ubs[3]
     x1FuncSub_2 = :(cos(x3))
-    x1FuncSub_2LB, x1FuncSub_2UB = interpol(bound_univariate(x1FuncSub_2, lb_x3, ub_x3)...)
+    x1FuncSub_2LB, x1FuncSub_2UB = interpol_nd(bound_univariate(x1FuncSub_2, lb_x3, ub_x3)...)
 
     #Find how much to shift log x4 by 
     sx4 = inpShiftLog(lb_x4, ub_x4, bounds=x1FuncSub_1LB)
@@ -96,9 +98,15 @@ function bound_unicycle(Unicycle; plotFlag=false)
     for tup in x1FuncLB_s
         #First find the corresponding f(x) and f(y) values
         #NOTE: Round to avoid floating point errors
-        xInd = findall(x->x[1] == round(tup[1], digits=5), x1FuncSub_2LB)[1]
-        yInd = findall(y->y[1] == round(tup[2], digits=5), x1FuncSub_1LB)[1]
+        # xInd = findall(x->x[1] == round(tup[1], digits=5), x1FuncSub_2LB)[1]
+        # yInd = findall(y->y[1] == round(tup[2], digits=5), x1FuncSub_1LB)[1]
+
+        xInd = findall(x->x[1] == tup[1], x1FuncSub_2LB)[1]
+        yInd = findall(y->y[1] == tup[2], x1FuncSub_1LB)[1]
+
         
+        
+
         #Quadratic shift down
         #NOTE: You care about function value, not index value ;)
         #NOTE: Interval subtraction 
@@ -107,10 +115,14 @@ function bound_unicycle(Unicycle; plotFlag=false)
         push!(x1FuncLB, (tup[1:end-1]..., newXY))
     end
 
+
     for tup in x1FuncUB_s
         #First find the corresponding f(x) and f(y) values
-        xInd = findall(x->x[1] == round(tup[1], digits=5), x1FuncSub_2LB)[1]
-        yInd = findall(y->y[1] == round(tup[2], digits=5), x1FuncSub_1LB)[1]
+        # xInd = findall(x->x[1] == round(tup[1], digits=5), x1FuncSub_2LB)[1]
+        # yInd = findall(y->y[1] == round(tup[2], digits=5), x1FuncSub_1LB)[1]
+
+        xInd = findall(x->x[1] == tup[1], x1FuncSub_2LB)[1]
+        yInd = findall(y->y[1] == tup[2], x1FuncSub_1LB)[1]
         
         #Quadratic shift down
         #NOTE: Interval subtraction
@@ -133,11 +145,11 @@ function bound_unicycle(Unicycle; plotFlag=false)
     #############Next, bound dx2 (dx2 = x4*sin(x3))#####
     #Bound first component of dx2 (x4)
     x2FuncSub1 = :(1*x4)
-    x2FuncSub1LB, x2FuncSub1UB = interpol(bound_univariate(x2FuncSub1, lb_x4, ub_x4)...)
+    x2FuncSub1LB, x2FuncSub1UB = interpol_nd(bound_univariate(x2FuncSub1, lb_x4, ub_x4)...)
 
     #Bound second component of dx2 (sin(x3))
     x2FuncSub2 = :(sin(x3))
-    x2FuncSub2LB, x2FuncSub2UB = interpol(bound_univariate(x2FuncSub2, lb_x3, ub_x3)...)
+    x2FuncSub2LB, x2FuncSub2UB = interpol_nd(bound_univariate(x2FuncSub2, lb_x3, ub_x3)...)
 
     #Find how much to shift log x4 by
     sx4 = inpShiftLog(lb_x4, ub_x4, bounds=x2FuncSub1LB)
@@ -171,8 +183,10 @@ function bound_unicycle(Unicycle; plotFlag=false)
 
     for tup in x2FuncLB_s
         #First find the corresponding f(x) and f(y) values
-        xInd = findall(x->x[1] == round(tup[1], digits=5), x2FuncSub2LB)
-        yInd = findall(y->y[1] == round(tup[2], digits=5), x2FuncSub1LB)
+        # xInd = findall(x->x[1] == round(tup[1], digits=5), x2FuncSub2LB)
+        # yInd = findall(y->y[1] == round(tup[2], digits=5), x2FuncSub1LB)
+        xInd = findall(x->x[1] == tup[1], x2FuncSub2LB)
+        yInd = findall(y->y[1] == tup[2], x2FuncSub1LB)
 
         #Quadratic shift down
         newXY = tup[end] - sx3 * x2FuncSub1UB[yInd][1][end] - sx4 * x2FuncSub2UB[xInd][1][end] - sx3*sx4
@@ -182,8 +196,11 @@ function bound_unicycle(Unicycle; plotFlag=false)
 
     for tup in x2FuncUB_s
         #First find the corresponding f(x) and f(y) values
-        xInd = findall(x->x[1] == round(tup[1], digits=5), x2FuncSub2LB)
-        yInd = findall(y->y[1] == round(tup[2], digits=5), x2FuncSub1LB)
+        # xInd = findall(x->x[1] == round(tup[1], digits=5), x2FuncSub2LB)
+        # yInd = findall(y->y[1] == round(tup[2], digits=5), x2FuncSub1LB)
+
+        xInd = findall(x->x[1] == tup[1], x2FuncSub2LB)
+        yInd = findall(y->y[1] == tup[2], x2FuncSub1LB)
 
         #Quadratic shift down
         newXY = tup[end] - sx3 * x2FuncSub1LB[yInd][1][end] - sx4 * x2FuncSub2LB[xInd][1][end] - sx3*sx4
@@ -208,7 +225,7 @@ function bound_unicycle(Unicycle; plotFlag=false)
    emptyList = [1]
    currList = [2,3]
    
-   #Retcon x1FuncLB and x1FuncUB to be unlifted 
+    #Retcon x1FuncLB and x1FuncUB to be unlifted 
     x1FuncLB_u = deepcopy(x1FuncLB)
     x1FuncUB_u = deepcopy(x1FuncUB)
 
@@ -232,12 +249,12 @@ function bound_unicycle(Unicycle; plotFlag=false)
     #############Next, bound dx3 (dx3 = u[2])#####
     #Since dx3 is solely a function of u[2], just use a constant
     x3Func = :(0*x3)
-    x3FuncLB, x3FuncUB = interpol(bound_univariate(x3Func, lb_x3, ub_x3)...)
+    x3FuncLB, x3FuncUB = interpol_nd(bound_univariate(x3Func, lb_x3, ub_x3)...)
 
     #############Finally, bound dx4 (dx4 = u[1] + w)#####
     #Here, dx4 is a function of u[1] and a disturbance term. Treat disturbance as a zero mean constant 
     x4Func = :(0*x4)
-    x4FuncLB, x4FuncUB = interpol(bound_univariate(x4Func, lb_x4, ub_x4, ϵ = w)...)
+    x4FuncLB, x4FuncUB = interpol_nd(bound_univariate(x4Func, lb_x4, ub_x4, ϵ = w)...)
 
     bounds = [[x1FuncLB, x1FuncUB], [x2FuncLB, x2FuncUB], [x3FuncLB, x3FuncUB], [x4FuncLB, x4FuncUB]]
 
@@ -326,24 +343,29 @@ query1.ntime = 1
 
 #Next, test multi-step concrete reachability
 query2 = deepcopy(query)
-query2.ntime = 10
+query2.ntime = 2
 @time reachSets, boundSets = multi_step_concreach(query2);
 
 #Next, test direct symreach 
 query3 = deepcopy(query)
 query3.problem.bounds = boundSets
-@time symReach = symreach(query3, depMat, 10)
+query3.ntime = 2
+@time symReach = symreach(query3, depMat, 2)
+
+query.problem.varList
+boundSets[2]
 
 #Test hybrid reachability
 
-t_sym = 10
-concInt = [2,2,2,2,2]
+t_sym = 2
+concInt = [2,2]
 query4 = deepcopy(query)
+query4.problem.domain = reach_set
 query4.ntime = t_sym
-#@time reachSets = multi_step_hybreach(query3, depMat, concInt)
-@time reach_set = hybreach(query3, depMat, t_sym)
+# @time reachSets = multi_step_hybreach(query4, depMat, concInt)
+@time reach_set = hybreach(query4, depMat, t_sym)
 
-
+query.problem.domain
 #############################
 
 goalSet = Hyperrectangle(low = [-0.6, -0.2, -0.06, -0.3], high=[0.6, 0.2, 0.06, 0.3])

@@ -78,6 +78,7 @@ end
 #Some issues with starting at zero, start with eps
 ϵ = 1e-8
 domain = Hyperrectangle(low=[90,32,-ϵ,10,30,-ϵ], high=[110,32.2,ϵ,11,30.2,ϵ])
+#50 steps because controller is sampled 50 times in the given interval
 numSteps = 50
 dt = 0.1
 
@@ -291,15 +292,16 @@ query = GraphPolyQuery(
 )
 
 # ###################
-# query0 = deepcopy(query)
-# tstart = 
-# @time reachSets, boundSets = concreach!(query0);
+#Warm up run (not timed)
+query0 = deepcopy(query)
+query0.ntime = 50
+@time reachSets, boundSets = multi_step_concreach(query0);
 #########################
+#Timed run
 query1 = deepcopy(query)
 query1.ntime = 50
-
 tstart = Dates.now()
-reachSets, boundSets = multi_step_concreach(query1)
+@time reachSets, boundSets = multi_step_concreach(query1)
 tend = Dates.now()
 println("####################################################################################")
 println("Time taken to compute concrete reach: ", tend-tstart)
@@ -328,7 +330,7 @@ println("#######################################################################
 tstart = Dates.now()
 dRel = Any[]
 dSafe = Any[]
-for reachset in reachsets
+for reachset in reachSets
     reachInts = extrema(reachset)
     dRel_min = minimum([reachInts[1][1] - reachInts[1][4], reachInts[1][1] - reachInts[2][4], reachInts[2][1] - reachInts[1][4], reachInts[2][1] - reachInts[2][4]])
     dRel_max = maximum([reachInts[1][1] - reachInts[1][4], reachInts[1][1] - reachInts[2][4], reachInts[2][1] - reachInts[1][4], reachInts[2][1] - reachInts[2][4]])

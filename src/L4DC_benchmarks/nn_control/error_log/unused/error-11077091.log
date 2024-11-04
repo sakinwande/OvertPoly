@@ -1,0 +1,15 @@
+slurmstepd-barrett6: error: Unable to create TMPDIR [/tmp/user/22848]: Permission denied
+slurmstepd-barrett6: error: Setting TMPDIR to /tmp
+ERROR: LoadError: UndefVarError: `s` not defined
+Stacktrace:
+ [1] unicycle_dyn_con_link!(query::GraphPolyQuery, neurons::Vector{Vector{NodeVariableRef}}, graph::OptiGraph, dynModel::Vector{OptiNode{OptiGraph}}, netModel::OptiNode{OptiGraph}, t_ind::Nothing)
+   @ Main /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/unicycle_overtPoly_distrOpt.jl:265
+ [2] concreach!(query::GraphPolyQuery)
+   @ Main /barrett/scratch/akinwande/OvertPoly/src/distr_reachability.jl:107
+ [3] multi_step_concreach(query::GraphPolyQuery)
+   @ Main /barrett/scratch/akinwande/OvertPoly/src/distr_reachability.jl:125
+ [4] macro expansion
+   @ ./timing.jl:279 [inlined]
+ [5] top-level scope
+   @ /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/unicycle_overtPoly_distrOpt.jl:269
+in expression starting at /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/unicycle_overtPoly_distrOpt.jl:341
