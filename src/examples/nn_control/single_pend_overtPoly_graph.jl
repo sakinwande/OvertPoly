@@ -249,41 +249,11 @@ tend = Dates.now()
 println("Time taken to compute symbolic reach at time step $(t_sym): ", tend-tstart)
 
 ######Testing hyb reach################
-# hybQuery = deepcopy(query)
-# @time reach_set = hybreach(hybQuery, depMat, t_sym)
+hybQuery = deepcopy(query)
+@time reach_set = hybreach(hybQuery, depMat, t_sym)
 
-# flatSymSet = Hyperrectangle(
-#     low = [
-#         0.8323742932387463
-#         -0.6302351824245467
-#     ], 
-#     high = [
-#         1.0268472978166947
-#         -0.505587007485772
-#     ]
-# )
-
-# overtSet = Hyperrectangle(
-#     low = [
-#         0.5847570086650844
-#         -0.5585916762507483
-#     ], 
-#     high = [
-#         0.7180602781315164
-#         -0.4481785064124533
-#     ]
-# )
-
-#plot(reachSets[end],title="Comparing Concrete and Hyb Reach_$(symQuery.ntime)", label="Concrete Reach Set", legend = :bottomright)
-#plot!(sym_set, label="Hyb Reach Set")
-
-#Verify the property
-# plot(reachSets[11], title="Comparing Concrete and Hyb Reach_$(symQuery.ntime)", label="Concrete Reach Set", legend = :bottomright, color="lightpink", lw=0.5)
-# plot!(sym_set, label="Hyb Reach Set", color="lightblue", lw=0.5)
-
-# safe_hyp = Hyperrectangle(low=[0], high=[1])
-# project(sym_set, [1]) ⊆ safe_hyp
-# extrema(sym_set)
-
-# plot(sym_set, label="Graph Sym Set", color="lightblue", lw=0.5)
-# plot!(overtSet, label="Flat Sym Set", color="lightpink", lw=0.5)
+#####Testing multi step hyb reach################
+hybQuery2 = deepcopy(query)
+conc_int = [10,5,5]
+@time reach_set2 = multi_step_hybreach(hybQuery2, depMat, conc_int)
+################################################

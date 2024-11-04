@@ -340,21 +340,54 @@ function hybreach(symQuery::GraphPolyQuery, depMat, t_sym, boundSets=nothing)
     return sym_set
 end
 
-function multi_step_hybreach(symQuery, depMat, concInt)
+# function multi_step_hybreach(symQuery, depMat, concInt)
+#     """
+#     Hybrid symbolic reachability. Requires concretization intervals 
+#     """
+#     hyb_reachSets = [symQuery.problem.domain]
+#     for int in concInt
+#         symQuery.ntime = int
+#         symQuery.problem.domain = hyb_reachSets[end]
+#         hySet = hybreach(symQuery, depMat, int) 
+#         push!(hyb_reachSets, hySet)
+#     end
+#     return hyb_reachSets
+# end
+
+function multi_step_hybreach(hybQuery, depMat, concInt)
     """
     Hybrid symbolic reachability. Requires concretization intervals 
     """
-    hyb_reachSets = [symQuery.problem.domain]
+
+    hyb_reachSets = [hybQuery.problem.domain]
+    hyb_boundSets = []
+    hyInt = 0    
     for int in concInt
+<<<<<<< HEAD
         println(int)
         hyQuery = deepcopy(symQuery)
         hyQuery.ntime = int
         hyQuery.problem.domain = hyb_reachSets[end]
         hySet = hybreach(hyQuery, depMat, int) 
+=======
+        #Update time horizon
+        hybQuery.ntime = int
+        #Copy corresponding concrete and hybrid queries
+        hyQ1 = deepcopy(hybQuery)
+        concQuery = deepcopy(hybQuery)
+        #Bound the function over the desired interval
+        _,boundSets = multi_step_concreach(concQuery)
+        push!(hyb_boundSets, boundSets...)
+        hyInt += int
+        hyQ1.ntime = hyInt
+        hySet = hybreach(hyQ1, depMat,hyInt,hyb_boundSets) 
+>>>>>>> 3e11ca4b2850ca6245d482e6fd61f054025d96e8
         push!(hyb_reachSets, hySet)
+        hybQuery.problem.domain = hySet
     end
     return hyb_reachSets
 end
+
 ###############Implementing Backwards Reachability####################
 function breach_solve(bquery, t_idx::Union{Nothing,Int64}=nothing)
     """
@@ -594,8 +627,6 @@ function breach_refine_inner_opt(bquery, btarget, method=:UniBisection)
     end
     return bestBreach
 end
-
-
 function multi_step_breach(bquery, btarget, method=:Outer)
     """
     Compute the multi-step backwards reachable set for a given query and target set
