@@ -160,7 +160,7 @@ function encode_sym_dynamics!(symQuery::GraphPolyQuery, x_dim)
     symQuery.mod_dict[:graph] = symGraph
 end
 
-function encode_sym_control!(symQuery::GraphPolyQuery)
+function encode_sym_control!(symQuery::GraphPolyQuery, reachSets)
     """
     Method to encode symbolic control. Takes symQuery as input
     """
@@ -305,7 +305,7 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym)
     return reach_set
 end
 
-function symreach(symQuery::GraphPolyQuery, depMat,t_sym)
+function symreach(symQuery::GraphPolyQuery,reachSets, depMat,t_sym)
     """
     Method to symbolically solve the reachability problem. Agnostic to how the boundSets are computed
 
@@ -319,24 +319,24 @@ function symreach(symQuery::GraphPolyQuery, depMat,t_sym)
 
     x_dim = length(symQuery.problem.varList) #state dimension
     encode_sym_dynamics!(symQuery, x_dim)
-    neurList = encode_sym_control!(symQuery)
+    neurList = encode_sym_control!(symQuery, reachSets)
     sym_link(symQuery, neurList, depMat)
 
     sym_set = sym_reach_solve(symQuery, t_sym)
     return sym_set
 end
 
-function hybreach(symQuery::GraphPolyQuery, depMat, t_sym, boundSets=nothing)
+function hybreach(symQuery::GraphPolyQuery, depMat, t_sym, reachSets = nothing, boundSets=nothing)
     """
     Hybrid symbolic method to compute reachable sets. Uses concrete reachability to compute the bounds and then uses symbolic reachability to compute the reach set
     """
 
     if isnothing(boundSets)
         concQuery = deepcopy(symQuery)
-        _,boundSets = multi_step_concreach(concQuery)
+        reachSets,boundSets = multi_step_concreach(concQuery)
     end
     symQuery.problem.bounds = boundSets
-    sym_set = symreach(symQuery, depMat, t_sym)
+    sym_set = symreach(symQuery, reachSets, depMat, t_sym)
     return sym_set
 end
 
@@ -346,7 +346,8 @@ function multi_step_hybreach(hybQuery, depMat, concInt)
     """
 
     hyb_reachSets = [hybQuery.problem.domain]
-    hyb_boundSets = []
+    conc_boundSets = []
+    conc_reachSets = [hybQuery.problem.domain]
     hyInt = 0    
     for int in concInt
         #Update time horizon
@@ -355,11 +356,12 @@ function multi_step_hybreach(hybQuery, depMat, concInt)
         hyQ1 = deepcopy(hybQuery)
         concQuery = deepcopy(hybQuery)
         #Bound the function over the desired interval
-        _,boundSets = multi_step_concreach(concQuery)
-        push!(hyb_boundSets, boundSets...)
+        reachSets,boundSets = multi_step_concreach(concQuery)
+        push!(conc_boundSets, boundSets...)
+        push!(conc_reachSets, reachSets[2:end]...)
         hyInt += int
         hyQ1.ntime = hyInt
-        hySet = hybreach(hyQ1, depMat,hyInt,hyb_boundSets) 
+        hySet = hybreach(hyQ1, depMat,hyInt,conc_reachSets,conc_boundSets) 
         push!(hyb_reachSets, hySet)
         hybQuery.problem.domain = hySet
     end

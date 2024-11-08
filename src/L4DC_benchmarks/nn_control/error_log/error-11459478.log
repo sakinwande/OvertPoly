@@ -1,0 +1,3 @@
+slurmstepd-barrett5: error: Unable to create TMPDIR [/tmp/user/22848]: Permission denied
+slurmstepd-barrett5: error: Setting TMPDIR to /tmp
+/var/spool/slurm-llnl/slurmd/job11459478/slurm_script: line 13: 1614102 Killed                  julia --startup-file=no --project=/barrett/scratch/akinwande/OvertPoly/Project.toml quad_overtPoly_graph.jl

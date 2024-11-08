@@ -350,23 +350,14 @@ query2.ntime = 2
 query3 = deepcopy(query)
 query3.problem.bounds = boundSets
 query3.ntime = 2
-@time symReach = symreach(query3, depMat, 2)
+@time symReach = symreach(query3,reachSets, depMat,2)
 
-query.problem.varList
-boundSets[2]
 
 #Test hybrid reachability
-
-t_sym = 2
-concInt = [2,2]
+concInt = [2,2,2,2,2]
 query4 = deepcopy(query)
-query4.problem.domain = reach_set
-query4.ntime = t_sym
-# @time reachSets = multi_step_hybreach(query4, depMat, concInt)
-@time reach_set = hybreach(query4, depMat, t_sym)
+@time reachSets = multi_step_hybreach(query4, depMat, concInt)
 
-query.problem.domain
-#############################
 
 goalSet = Hyperrectangle(low = [-0.6, -0.2, -0.06, -0.3], high=[0.6, 0.2, 0.06, 0.3])
 

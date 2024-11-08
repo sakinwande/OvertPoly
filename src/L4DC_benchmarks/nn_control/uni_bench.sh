@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH --time=02:00:00
-#SBATCH --qos=max2
+#SBATCH --time=48:00:00
+#SBATCH --qos=max2d
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=32G
 #SBATCH --partition=quad

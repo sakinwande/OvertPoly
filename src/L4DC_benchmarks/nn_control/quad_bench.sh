@@ -2,7 +2,7 @@
 
 #SBATCH --time=48:00:00
 #SBATCH --qos=max2d
-#SBATCH --cpus-per-task=2
+#SBATCH --cpus-per-task=10
 #SBATCH --mem=32G
 #SBATCH --partition=quad
 #SBATCH --chdir /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/

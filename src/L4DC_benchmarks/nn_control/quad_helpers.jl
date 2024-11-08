@@ -1144,7 +1144,7 @@ function bound_quadx3(Quad, plotFlag = false, sanityFlag = true, npoint=1)
     return x3_p4_LB_l, x3_p4_UB_l
 end
 
-function bound_quadx4(Quad, plotFlag = false, sanityFlag = true, npoint=2)
+function bound_quadx4(Quad, plotFlag = false, sanityFlag = true, npoint=1)
     lbs, ubs = extrema(Quad.domain)
 
     #Bounding x₅*x₁₂ -x₆*x₁₁ - g*sin(x₈)
@@ -1234,7 +1234,8 @@ function bound_quadx4(Quad, plotFlag = false, sanityFlag = true, npoint=2)
         ubs[8] = ub_x4_p3
     end
 
-    x4_p3_LB, x4_p3_UB = interpol_nd(bound_univariate(x4_p3,lb_x4_p3,ub_x4_p3, npoint=npoint)...)
+    #NOTE:Artifically intervene
+    x4_p3_LB, x4_p3_UB = interpol_nd(bound_univariate(x4_p3,lb_x4_p3,ub_x4_p3)...)
     
     #Recover complete bounds by combining each set of bounds 
     #Complete bounds are f(x₅,x₆,x₈,x₁₁,x₁₂) = x₅*x₁₂ -x₆*x₁₁ - g*sin(x₈)
@@ -1278,7 +1279,7 @@ function bound_quadx4(Quad, plotFlag = false, sanityFlag = true, npoint=2)
     return x4_LB_l, x4_UB_l
 end
 
-function bound_quadx5(Quad, plotFlag = false, sanityFlag = true, npoint=2)
+function bound_quadx5(Quad, plotFlag = false, sanityFlag = true, npoint=1)
     lbs, ubs = extrema(Quad.domain)
 
     #Bounding x₆*x₁₀ - x₄*x₁₂ + g*sin(x₇)*cos(x₈)
@@ -1368,7 +1369,7 @@ function bound_quadx5(Quad, plotFlag = false, sanityFlag = true, npoint=2)
         ubs[7] = ub_x5_p3_sp1
     end
 
-    x5_p3_sp1_LB, x5_p3_sp1_UB = interpol_nd(bound_univariate(x5_p3_sp1, lb_x5_p3_sp1, ub_x5_p3_sp1, npoint=npoint)...)
+    x5_p3_sp1_LB, x5_p3_sp1_UB = interpol_nd(bound_univariate(x5_p3_sp1, lb_x5_p3_sp1, ub_x5_p3_sp1)...)
 
     #Sub-part 2: cos(x₈)
     x5_p3_sp2 = :(cos(x))
@@ -1445,7 +1446,7 @@ function bound_quadx5(Quad, plotFlag = false, sanityFlag = true, npoint=2)
     return x5_LB_l, x5_UB_l
 end
 
-function bound_quadx6(Quad, plotFlag, sanityFlag = true, npoint=2)
+function bound_quadx6(Quad, plotFlag, sanityFlag = true, npoint=1)
     lbs, ubs = extrema(Quad.domain)
 
     #Bounding x₄*x₁₁ - x₅*x₁₀ + g*cos(x₇)*cos(x₈) - g
@@ -1787,7 +1788,7 @@ function bound_quadx7(Quad, plotFlag, sanityFlag = true, npoint=1)
     return x7_LB, x7_UB
 end
 
-function bound_quadx8(Quad, plotFlag, sanityFlag = true, npoint=2)
+function bound_quadx8(Quad, plotFlag, sanityFlag = true, npoint=1)
     lbs, ubs = extrema(Quad.domain)
 
     #Bounding cos(x₇)*x₁₁ - sin(x₇)*x₁₂
@@ -1911,7 +1912,7 @@ function bound_quadx8(Quad, plotFlag, sanityFlag = true, npoint=2)
     return x8_LB_l, x8_UB_l
 end
 
-function bound_quadx9(Quad, plotFlag, sanityFlag = true, npoint=2)
+function bound_quadx9(Quad, plotFlag, sanityFlag = true, npoint=1)
     lbs, ubs = extrema(Quad.domain)
 
     #Bounding (sin(x₇)/cos(x₈))*x₁₁ - (cos(x₇)/cos(x₈))*x₁₂
@@ -2104,7 +2105,7 @@ function bound_quadx9(Quad, plotFlag, sanityFlag = true, npoint=2)
     return x9_LB_l, x9_UB_l
 end
 
-function bound_quadx10(Quad, plotFlag, sanityFlag = true, npoint=2)
+function bound_quadx10(Quad, plotFlag, sanityFlag = true, npoint=1)
     lbs, ubs = extrema(Quad.domain)
 
     #Bounding ((Jy - Jz)/Jx)*x₁₁*x₁₂
@@ -2154,7 +2155,7 @@ function bound_quadx10(Quad, plotFlag, sanityFlag = true, npoint=2)
     return x10_LB, x10_UB
 end
 
-function bound_quadx11(Quad, plotFlag, sanityFlag = true, npoint=2)
+function bound_quadx11(Quad, plotFlag, sanityFlag = true, npoint=1)
     lbs, ubs = extrema(Quad.domain)
 
     #Bounding ((Jz - Jx)/Jy)*x₁₀*x₁₂
@@ -2203,7 +2204,7 @@ function bound_quadx11(Quad, plotFlag, sanityFlag = true, npoint=2)
     return x11_LB, x11_UB
 end
 
-function bound_quadx12(Quad, plotFlag, sanityFlag = true, npoint=2)
+function bound_quadx12(Quad, plotFlag, sanityFlag = true, npoint=1)
     lbs, ubs = extrema(Quad.domain)
 
     #Bounding ((Jx - Jy)/Jz)*x₁₀*x₁₁

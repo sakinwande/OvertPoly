@@ -36,7 +36,7 @@ end
 
 dt = 0.2
 #This should really be 50 steps to recover 10 seconds in discrete time 
-numSteps = 20
+numSteps = 50
 w = 1e-4
 domain = Hyperrectangle(low=[9.5,-4.5,2.1,1.5], high = [9.55,-4.45,2.11,1.51])
 depMat = [[1,0,1,1],[0,1,1,1], [0,0,1,0], [0,0,0,1]]
@@ -340,37 +340,19 @@ query = GraphPolyQuery(
 # ###################
 #Warm up run (not timed)
 query0 = deepcopy(query)
-query0.ntime = 2
-reachSets, boundSets = multi_step_concreach(query0);
+concInt = [2,2,2]
+query0.ntime = 6
+reachSets, boundSets = multi_step_hybreach(query0, depMat, concInt)
 #########################
 #Timed run
 tstart = Dates.now()
-query2 = deepcopy(query)
-query2.ntime = numSteps
-@time reachSets, boundSets = multi_step_concreach(query2);
+query1 = deepcopy(query)
+query1.ntime = numSteps
+concInt = [5,5,5,5,5,5,5,5,5,5]
+@time reachSets, boundSets = multi_step_hybreach(query1, depMat, concInt)
 tend = Dates.now()
 println("##################################################################")
 println("Time taken to compute concrete reach: ", tend-tstart)
 println("##################################################################")
 
-#Next, test direct symreach 
-# ###################
-#Warm up run (not timed)
-query0 = deepcopy(query)
-query0.ntime = 2
-query0.problem.bounds = boundSets
-symReach = symreach(query0, depMat, 2)
-#########################
-#Timed run
-tstart = Dates.now()
-query3 = deepcopy(query)
-query3.problem.bounds = boundSets
-@time symReach = symreach(query3, depMat, numSteps)
-tend = Dates.now()
-
-println("##################################################################")
-println("Time taken to compute symbolic reach at time step $(numSteps): ", tend-tstart)
-println("##################################################################")
-
-# goalSet = Hyperrectangle(low = [-0.6, -0.2, -0.06, -0.3], high=[0.6, 0.2, 0.06, 0.3])
 
