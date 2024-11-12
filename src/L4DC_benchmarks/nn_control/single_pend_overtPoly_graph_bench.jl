@@ -151,15 +151,18 @@ query = GraphPolyQuery(
 )
 
 # ###################
-#Warm up run (not timed)
-query0 = deepcopy(query)
-reachSets, boundSets = multi_step_concreach(query0);
+# #Warm up run (not timed)
+# query0 = deepcopy(query)
+# reachSets, boundSets = multi_step_concreach(query0);
 #########################
 #Timed run
 query1 = deepcopy(query)
 query1.ntime = 20
 tstart = Dates.now()
-@time reachSets, boundSets = multi_step_concreach(query1)
+@time reachSets, boundSets = multi_step_concreach(query1);
+
+reachSets[11]
+volume(reachSets[11])
 tend = Dates.now()
 println("#############################################################################################")
 println("Time taken to compute concrete reach: ", tend-tstart)

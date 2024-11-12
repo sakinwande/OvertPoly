@@ -220,20 +220,20 @@ reachSets, boundSets = multi_step_concreach(query1)
 tend = Dates.now()
 println("Time taken to compute concrete reach: ", tend-tstart)
 
-#Verify the property
-safe_hyp = Hyperrectangle(low=[0], high=[1])
-project(reachSets[10], [1]) ⊆ safe_hyp
-safeFlag = true
-tstart = Dates.now()
-for i=10:20
-    if !(project(reachSets[i], [1]) ⊆ safe_hyp)
-        print("Property violated at time step: ", i)
-        safeFlag = false
-        break
-    end
-end
-tend = Dates.now()
-println("Time taken to verify property: ", tend-tstart)
+# #Verify the property
+# safe_hyp = Hyperrectangle(low=[0], high=[1])
+# project(reachSets[10], [1]) ⊆ safe_hyp
+# safeFlag = true
+# tstart = Dates.now()
+# for i=10:20
+#     if !(project(reachSets[i], [1]) ⊆ safe_hyp)
+#         print("Property violated at time step: ", i)
+#         safeFlag = false
+#         break
+#     end
+# end
+# tend = Dates.now()
+# println("Time taken to verify property: ", tend-tstart)
     
 ######Testing the sym reach################
 symQuery = deepcopy(query)
@@ -244,13 +244,14 @@ depMat = [[1,1], [1,1]]
 t_sym = 10
 
 tstart = Dates.now()
-sym_set = symreach(symQuery, depMat, t_sym)
+sym_set = symreach(symQuery, reachSets, depMat, t_sym)
 tend = Dates.now()
 println("Time taken to compute symbolic reach at time step $(t_sym): ", tend-tstart)
 
+sym_set ⊆ reachSets[t_sym + 1]
 ######Testing hyb reach################
 hybQuery = deepcopy(query)
-@time reach_set = hybreach(hybQuery, depMat, t_sym)
+@time reach_set = hybreach(hybQuery, depMat, t_sym, reachSets, boundSets)
 
 #####Testing multi step hyb reach################
 hybQuery2 = deepcopy(query)

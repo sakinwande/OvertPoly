@@ -45,7 +45,7 @@ function JuMP.objective_bound(graph::OptiGraph)
     return MOI.get(graph, MOI.ObjectiveBound())
 end
 
-function conc_reach_solve(query)
+function conc_reach_solve(query;threads=0)
     lows = Array{Float64}(undef, 0)
     highs = Array{Float64}(undef, 0)
 
@@ -55,7 +55,8 @@ function conc_reach_solve(query)
     min_netModel = query.mod_dict[:u]
     i = 0
     #Compute lower bounds
-    set_optimizer(minGraph, Gurobi.Optimizer)
+    # set_optimizer(minGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0, "Threads" => threads))
+    set_optimizer(minGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0))
     #NOTE: Optimize each variable separately
     for sym in query.problem.varList 
         v = query.var_dict[sym][end][1]
@@ -73,7 +74,8 @@ function conc_reach_solve(query)
     max_dynModel = query.mod_dict[:f]
     maxGraph = query.mod_dict[:graph]
     max_netModel = query.mod_dict[:u]
-    set_optimizer(maxGraph, Gurobi.Optimizer)
+    # set_optimizer(maxGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0, "Threads" => threads))
+    set_optimizer(maxGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0))
     for sym in query.problem.varList 
         v = query.var_dict[sym][end][1]
         dv = query.var_dict[sym][2][1]
@@ -261,7 +263,7 @@ function sym_link(symQuery::GraphPolyQuery, neurList, depMat)
     end
 end
 
-function sym_reach_solve(symQuery::GraphPolyQuery, t_sym)
+function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0)
     #Ensure that the time step is within bounds
     @assert t_sym <= symQuery.ntime
     #Akin to conc_reach_solve
@@ -271,7 +273,8 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym)
     i = 0
 
     #Compute lower bounds
-    set_optimizer(minGraph, Gurobi.Optimizer)
+    set_optimizer(minGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0, "Threads" => threads))
+    # set_optimizer(minGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0))
     #NOTE: Optimize each variable separately 
     for sym in symQuery.problem.varList
         sym_t = Meta.parse("$(sym)_$(t_sym)") 
@@ -288,7 +291,8 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym)
 
     #Compute upper bounds
     maxGraph = symQuery.mod_dict[:graph]
-    set_optimizer(maxGraph, Gurobi.Optimizer)
+    set_optimizer(maxGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0, "Threads" => threads))
+    # set_optimizer(maxGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0))
     #NOTE: Optimize each variable separately
     for sym in query.problem.varList 
         sym_t = Meta.parse("$(sym)_$(t_sym)") 
@@ -318,7 +322,7 @@ function symreach(symQuery::GraphPolyQuery,reachSets, depMat,t_sym)
     symQuery.mod_dict = Dict{Symbol,Any}()
 
     x_dim = length(symQuery.problem.varList) #state dimension
-    encode_sym_dynamics!(symQuery, x_dim)
+    @time encode_sym_dynamics!(symQuery, x_dim)
     neurList = encode_sym_control!(symQuery, reachSets)
     sym_link(symQuery, neurList, depMat)
 

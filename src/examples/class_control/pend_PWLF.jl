@@ -16,16 +16,16 @@ domain = Hyperrectangle(low=[0, 0], high=[pi2_round, pi2_round])
 # domain2 = Hyperrectangle(low=[0, 0], high=[pi2_round, pi2_round])
 npoint=2
 #Bounding the pendulum. Break into smaller chunks
-# function bound_pend(npoint) 
+function bound_pend(npoint) 
     lbs, ubs = extrema(domain)
     #Part 1: Bound the sin(x1) term
     p1 = :(sin(x))
-    p1_LB_1_1, p1_UB_1_1 = interpol(bound_univariate(p1, lbs[1], ubs[1],npoint=npoint)...)
+    p1_LB_1_1, p1_UB_1_1 = bound_univariate(p1, lbs[1], ubs[1],npoint=npoint)
     # p1_LB_1_2, p1_UB_1_2 = interpol(bound_univariate(p1, lbs2[1], ubs2[1],npoint=npoint)...)
 
     #Part 2: Bound the x2 term
     p2 = :(1*x)
-    p2_LB_1_1, p2_UB_1_1 = interpol(bound_univariate(p2, lbs[2], ubs[2],npoint=npoint)...)
+    p2_LB_1_1, p2_UB_1_1 = bound_univariate(p2, lbs[2], ubs[2],npoint=npoint)
     # p2_LB_1_2, p2_UB_1_2 = interpol(bound_univariate(p2, lbs2[2], ubs2[2],npoint=npoint)...)
 
 
@@ -61,10 +61,10 @@ npoint=2
     # yS = unique([tup[2] for tup in LB_1])
     # surfDim = (length(yS), length(xS))
 
-    plotSurf(baseFunc, LB_1, UB_1, surfDim, xS, yS, true)
+    # plotSurf(baseFunc, LB_1, UB_1, surfDim, xS, yS, true)
 
     LB_1_inps = [tup[1:end-1] for tup in LB_1]
-    LB_1_Tri = OA2PWA(LB_1)
+    # LB_1_Tri = OA2PWA(LB_1)
 
     #Write to file 
     open("pend_n$(npoint)_bounds.txt", "w") do file 
@@ -73,14 +73,14 @@ npoint=2
         end
     end
 
-    open("pend_n$(npoint)_tri.txt", "w") do file 
-        for tup in LB_1_Tri
-            write(file, string(tup[1], ",", tup[2], ",", tup[3], "\n"))
-        end
-    end
+    # open("pend_n$(npoint)_tri.txt", "w") do file 
+    #     for tup in LB_1_Tri
+    #         write(file, string(tup[1], ",", tup[2], ",", tup[3], "\n"))
+    #     end
+    # end
 
     return validBounds(:(sin(x1) - x2), [:x1, :x2],LB_1, UB_1, true)
-# end
+end
 
 #n = 2
 bound_pend(2)

@@ -41,7 +41,7 @@ domain = Hyperrectangle(low=[0.6, -0.7, -0.4, 0.5], high = [0.7, -0.6, -0.3, 0.6
 #TODO: Decide on step size needed to make discrete time reachability reasonable
 #20 s works bc continuous time controller is sampled 20 times, over the specified interval
 numSteps = 20
-dt = 0.05
+dt = 0.1
 
 
 ####Define Bound TORA########
@@ -183,15 +183,17 @@ query = GraphPolyQuery(
 
 # ###################
 #Warm up run (not timed)
-query0 = deepcopy(query)
-query0.ntime = 2
-reachSets, boundSets = multi_step_concreach(query0);
+# query0 = deepcopy(query)
+# query0.ntime = 2
+# reachSets, boundSets = multi_step_concreach(query0);
 #########################
 #Timed run
 query1 = deepcopy(query)
-# query1.ntime = 20
+query1.ntime = 20
 tstart = Dates.now()
-@time reachSets, boundSets = multi_step_concreach(query1)
+@time reachSets, boundSets = multi_step_concreach(query1);
+reachSets[end]
+volume(reachSets[end])
 tend = Dates.now()
 println("##########################################################################################")
 println("Time taken to compute concrete reach: ", tend-tstart)

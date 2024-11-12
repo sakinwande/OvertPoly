@@ -34,7 +34,7 @@ function unicycle_control(input_set)
     return con_inp_set
 end
 
-dt = 0.2
+dt = 0.1
 #This should really be 50 steps to recover 10 seconds in discrete time 
 numSteps = 50
 w = 1e-4
@@ -336,23 +336,107 @@ query = GraphPolyQuery(
     2 #case. Delete this param
 )
 
-
 # ###################
 #Warm up run (not timed)
-query0 = deepcopy(query)
-concInt = [2,2,2]
-query0.ntime = 6
-reachSets, boundSets = multi_step_hybreach(query0, depMat, concInt)
+# query0 = deepcopy(query)
+# concInt = [2,2,2]
+# query0.ntime = 6
+# reachSets, boundSets = multi_step_hybreach(query0, depMat, concInt)
 #########################
 #Timed run
+cquery = deepcopy(query)
+squery = deepcopy(query)
+cquery.ntime = 5
+squery.ntime = 5
+t_sym = 5
+# concInt = [5,5,5,5]
+# # concInt = [5,5,5,5,5,5,5,5,5,5]
+# @time reachSets = multi_step_hybreach(query1, depMat, concInt);  
+# @time reachSets, boundSets = multi_step_concreach(query1)
+# reachSets[end]
 tstart = Dates.now()
-query1 = deepcopy(query)
-query1.ntime = numSteps
-concInt = [5,5,5,5,5,5,5,5,5,5]
-@time reachSets, boundSets = multi_step_hybreach(query1, depMat, concInt)
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
+cquery.problem.domain = sym_set
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
 tend = Dates.now()
 println("##################################################################")
-println("Time taken to compute concrete reach: ", tend-tstart)
+println("Time taken to compute hybrid reach: ", tend-tstart)
 println("##################################################################")
+sym_set
 
 
