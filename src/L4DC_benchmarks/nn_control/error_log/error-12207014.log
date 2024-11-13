@@ -1,0 +1,2 @@
+slurmstepd-barrett8: error: Unable to create TMPDIR [/tmp/user/22848]: Permission denied
+slurmstepd-barrett8: error: Setting TMPDIR to /tmp
