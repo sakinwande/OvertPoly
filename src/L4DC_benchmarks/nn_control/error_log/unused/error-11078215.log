@@ -1,4 +1,0 @@
-slurmstepd-barrett3: error: Unable to create TMPDIR [/tmp/user/22848]: Permission denied
-slurmstepd-barrett3: error: Setting TMPDIR to /tmp
-┌ Warning: Assignment to `veriFlag` in soft scope is ambiguous because a global variable by the same name exists: `veriFlag` will be treated as a new local. Disambiguate by using `local veriFlag` to suppress this warning or `global veriFlag` to assign to the existing global variable.
-└ @ /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/acc_overtPoly_graph.jl:354

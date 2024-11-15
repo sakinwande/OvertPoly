@@ -353,12 +353,13 @@ concReachSets, BoundSets = multi_step_concreach(cquery);
 squery.problem.bounds = BoundSets
 sym_set = symreach(squery, concReachSets, depMat, t_sym);
 cquery.problem.domain = sym_set
+print(sym_set)
 #Timed run
 cquery = deepcopy(query)
 squery = deepcopy(query)
-cquery.ntime = 5
-squery.ntime = 5
-t_sym = 5
+cquery.ntime = 10
+squery.ntime = 10
+t_sym = 10
 # concInt = [5,5,5,5]
 # # concInt = [5,5,5,5,5,5,5,5,5,5]
 # @time reachSets = multi_step_hybreach(query1, depMat, concInt);  
@@ -368,50 +369,52 @@ tstart = Dates.now()
 concReachSets, BoundSets = multi_step_concreach(cquery);
 squery.problem.bounds = BoundSets
 sym_set = symreach(squery, concReachSets, depMat, t_sym);
-cquery.problem.domain = sym_set
-concReachSets, BoundSets = multi_step_concreach(cquery);
-squery.problem.bounds = BoundSets
-sym_set = symreach(squery, concReachSets, depMat, t_sym);
+# cquery.problem.domain = sym_set
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# squery.problem.bounds = BoundSets
+# sym_set = symreach(squery, concReachSets, depMat, t_sym)
 tend1 = Dates.now()
 println("Time to compute 10 hybrid reach sets: ", tend1-tstart)
+# cquery.problem.domain = sym_set
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# squery.problem.bounds = BoundSets
+# sym_set = symreach(squery, concReachSets, depMat, t_sym);
 cquery.problem.domain = sym_set
 concReachSets, BoundSets = multi_step_concreach(cquery);
 squery.problem.bounds = BoundSets
-sym_set = symreach(squery, concReachSets, depMat, t_sym);
-cquery.problem.domain = sym_set
-concReachSets, BoundSets = multi_step_concreach(cquery);
-squery.problem.bounds = BoundSets
-sym_set = symreach(squery, concReachSets, depMat, t_sym);
+sym_set = symreach(squery, concReachSets, depMat, t_sym)
 tend2 = Dates.now()
-println("Time to compute 20 hybrid reach sets: ", tend2-tend1)
+println("Time to compute 20 hybrid reach sets: ", tend2-tstart)
+# cquery.problem.domain = sym_set
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# squery.problem.bounds = BoundSets
+# sym_set = symreach(squery, concReachSets, depMat, t_sym);
 cquery.problem.domain = sym_set
 concReachSets, BoundSets = multi_step_concreach(cquery);
 squery.problem.bounds = BoundSets
-sym_set = symreach(squery, concReachSets, depMat, t_sym);
-cquery.problem.domain = sym_set
-concReachSets, BoundSets = multi_step_concreach(cquery);
-squery.problem.bounds = BoundSets
-sym_set = symreach(squery, concReachSets, depMat, t_sym);
+sym_set = symreach(squery, concReachSets, depMat, t_sym)
 tend3 = Dates.now()
-println("Time to compute 30 hybrid reach sets: ", tend3-tend2)
+println("Time to compute 30 hybrid reach sets: ", tend3-tstart)
+# cquery.problem.domain = sym_set
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# squery.problem.bounds = BoundSets
+# sym_set = symreach(squery, concReachSets, depMat, t_sym);
 cquery.problem.domain = sym_set
 concReachSets, BoundSets = multi_step_concreach(cquery);
 squery.problem.bounds = BoundSets
-sym_set = symreach(squery, concReachSets, depMat, t_sym);
-cquery.problem.domain = sym_set
-concReachSets, BoundSets = multi_step_concreach(cquery);
-squery.problem.bounds = BoundSets
-sym_set = symreach(squery, concReachSets, depMat, t_sym);
+sym_set = symreach(squery, concReachSets, depMat, t_sym)
 tend4 = Dates.now()
-println("Time to compute 40 hybrid reach sets: ", tend4-tend3)
+println("Time to compute 40 hybrid reach sets: ", tend4-tstart)
+# cquery.problem.domain = sym_set
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# squery.problem.bounds = BoundSets
+# sym_set = symreach(squery, concReachSets, depMat, t_sym);
 cquery.problem.domain = sym_set
 concReachSets, BoundSets = multi_step_concreach(cquery);
 squery.problem.bounds = BoundSets
-sym_set = symreach(squery, concReachSets, depMat, t_sym);
-cquery.problem.domain = sym_set
-concReachSets, BoundSets = multi_step_concreach(cquery);
-squery.problem.bounds = BoundSets
-sym_set = symreach(squery, concReachSets, depMat, t_sym);
+sym_set = symreach(squery, concReachSets, depMat, t_sym)
+println(volume(sym_set))
+println(extrema(sym_set))
 # concReachSets, BoundSets = multi_step_concreach(cquery);
 # squery.problem.bounds = BouZZZZZZZndSets
 # sym_set = symreach(squery, concReachSets, depMat, t_sym);

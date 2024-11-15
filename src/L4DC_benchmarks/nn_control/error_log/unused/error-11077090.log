@@ -1,9 +1,0 @@
-slurmstepd-barrett5: error: Unable to create TMPDIR [/tmp/user/22848]: Permission denied
-slurmstepd-barrett5: error: Setting TMPDIR to /tmp
-┌ Warning: Assignment to `vioFlag` in soft scope is ambiguous because a global variable by the same name exists: `vioFlag` will be treated as a new local. Disambiguate by using `local vioFlag` to suppress this warning or `global vioFlag` to assign to the existing global variable.
-└ @ /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/tora_overtPoly_distrOpt.jl:230
-ERROR: LoadError: UndefVarError: `reachsets` not defined
-Stacktrace:
- [1] top-level scope
-   @ /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/tora_overtPoly_distrOpt.jl:227
-in expression starting at /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/tora_overtPoly_distrOpt.jl:227

@@ -151,18 +151,16 @@ query = GraphPolyQuery(
 )
 
 # ###################
-# #Warm up run (not timed)
-# query0 = deepcopy(query)
-# reachSets, boundSets = multi_step_concreach(query0);
+#Warm up run (not timed)
+query1 = deepcopy(query)
+reachSets, boundSets = multi_step_concreach(query1);
 #########################
 #Timed run
 query1 = deepcopy(query)
 query1.ntime = 20
 tstart = Dates.now()
 @time reachSets, boundSets = multi_step_concreach(query1);
-
-reachSets[11]
-volume(reachSets[11])
+println(volume(reachSets[11]))
 tend = Dates.now()
 println("#############################################################################################")
 println("Time taken to compute concrete reach: ", tend-tstart)
@@ -184,19 +182,19 @@ println("#######################################################################
 println("Time taken to verify property: ", tend-tstart)
 println("######################################################################################")
 ######Testing the sym reach################
-symQuery = deepcopy(query)
-symQuery.problem.bounds = boundSets
+# symQuery = deepcopy(query)
+# symQuery.problem.bounds = boundSets
 
-#Define variable dependency matrix. A vector of vectors 
-depMat = [[1,1], [1,1]]
-t_sym = 10
+# #Define variable dependency matrix. A vector of vectors 
+# depMat = [[1,1], [1,1]]
+# t_sym = 10
 
-tstart = Dates.now()
-sym_set = symreach(symQuery, depMat, t_sym)
-tend = Dates.now()
-println("######################################################################################")
-println("Time taken to compute symbolic reach at time step $(t_sym): ", tend-tstart)
-println("#######################################################################################")
+# tstart = Dates.now()
+# sym_set = symreach(symQuery, depMat, t_sym)
+# tend = Dates.now()
+# println("######################################################################################")
+# println("Time taken to compute symbolic reach at time step $(t_sym): ", tend-tstart)
+# println("#######################################################################################")
 
 ######Testing hyb reach################
 # hybQuery = deepcopy(query)

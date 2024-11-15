@@ -1,9 +1,0 @@
-slurmstepd-barrett7: error: Unable to create TMPDIR [/tmp/user/22848]: Permission denied
-slurmstepd-barrett7: error: Setting TMPDIR to /tmp
-ERROR: LoadError: type GraphPolyQuery has no field time
-Stacktrace:
- [1] setproperty!(x::GraphPolyQuery, f::Symbol, v::Int64)
-   @ Base ./Base.jl:39
- [2] top-level scope
-   @ /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/unicycle_overtPoly_distrOpt.jl:359
-in expression starting at /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/unicycle_overtPoly_distrOpt.jl:359
