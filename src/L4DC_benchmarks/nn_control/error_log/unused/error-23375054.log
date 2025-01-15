@@ -1,0 +1,3 @@
+slurmstepd-barrett4: error: Unable to create TMPDIR [/tmp/user/22848]: Permission denied
+slurmstepd-barrett4: error: Setting TMPDIR to /tmp
+slurmstepd-barrett4: error: *** JOB 23375054 ON barrett4 CANCELLED AT 2024-12-23T15:29:19 ***

@@ -1,0 +1,25 @@
+slurmstepd-barrett3: error: Unable to create TMPDIR [/tmp/user/22848]: Permission denied
+slurmstepd-barrett3: error: Setting TMPDIR to /tmp
+ERROR: LoadError: MethodError: no method matching push!(::Vector{Vector{NodeVariableRef}}; high::Vector{NodeVariableRef})
+
+Closest candidates are:
+  push!(::Vector{T}, !Matched::Any) where T got unsupported keyword argument "high"
+   @ Base array.jl:1116
+  push!(::AbstractVector, Any...) got unsupported keyword argument "high"
+   @ Base array.jl:1188
+  push!(::Any, !Matched::Any, !Matched::Any) got unsupported keyword argument "high"
+   @ Base abstractarray.jl:3414
+  ...
+
+Stacktrace:
+ [1] unicycle_dyn_con_link!(query::GraphPolyQuery, neurons::Vector{Vector{NodeVariableRef}}, graph::OptiGraph, dynModel::Vector{OptiNode{OptiGraph}}, netModel::OptiNode{OptiGraph}, t_ind::Nothing)
+   @ Main /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/unicycle_overtPoly_distrOpt.jl:308
+ [2] unicycle_dyn_con_link!(query::GraphPolyQuery, neurons::Vector{Vector{NodeVariableRef}}, graph::OptiGraph, dynModel::Vector{OptiNode{OptiGraph}}, netModel::OptiNode{OptiGraph})
+   @ Main /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/unicycle_overtPoly_distrOpt.jl:269
+ [3] concreach!(query::GraphPolyQuery)
+   @ Main /barrett/scratch/akinwande/OvertPoly/src/distr_reachability.jl:109
+ [4] multi_step_concreach(query::GraphPolyQuery)
+   @ Main /barrett/scratch/akinwande/OvertPoly/src/distr_reachability.jl:127
+ [5] top-level scope
+   @ /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/unicycle_overtPoly_distrOpt.jl:353
+in expression starting at /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/unicycle_overtPoly_distrOpt.jl:353

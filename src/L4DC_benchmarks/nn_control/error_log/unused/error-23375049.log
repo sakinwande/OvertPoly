@@ -1,0 +1,7 @@
+slurmstepd-barrett3: error: Unable to create TMPDIR [/tmp/user/22848]: Permission denied
+slurmstepd-barrett3: error: Setting TMPDIR to /tmp
+ERROR: LoadError: syntax: misplaced assignment statement in "[[1, 0, 1, 1], [0, 1, 1, 1], high = [0, 0, 1, 0], high = [0, 0, 0, 1]]" around /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/unicycle_overtPoly_distrOpt.jl:42
+Stacktrace:
+ [1] top-level scope
+   @ /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/unicycle_overtPoly_distrOpt.jl:42
+in expression starting at /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/unicycle_overtPoly_distrOpt.jl:42

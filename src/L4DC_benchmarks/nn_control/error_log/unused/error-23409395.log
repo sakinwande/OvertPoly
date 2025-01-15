@@ -1,0 +1,17 @@
+slurmstepd-barrett3: error: Unable to create TMPDIR [/tmp/user/22848]: Permission denied
+slurmstepd-barrett3: error: Setting TMPDIR to /tmp
+ERROR: LoadError: BoundsError: attempt to access 10-element Vector{Any} at index [11]
+Stacktrace:
+ [1] getindex(A::Vector{Any}, i1::Int64)
+   @ Base ./essentials.jl:13
+ [2] encode_sym_dynamics!(symQuery::GraphPolyQuery, x_dim::Int64)
+   @ Main /barrett/scratch/akinwande/OvertPoly/src/distr_reachability.jl:150
+ [3] macro expansion
+   @ ./timing.jl:279 [inlined]
+ [4] symreach(symQuery::GraphPolyQuery, reachSets::Vector{Hyperrectangle{Float64, Vector{Float64}, Vector{Float64}}}, depMat::Vector{Vector{Int64}}, t_sym::Int64)
+   @ Main /barrett/scratch/akinwande/OvertPoly/src/distr_reachability.jl:325
+ [5] macro expansion
+   @ ./timing.jl:279 [inlined]
+ [6] top-level scope
+   @ /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/unicycle_overtPoly_distrOpt.jl:269
+in expression starting at /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/unicycle_overtPoly_distrOpt.jl:416
