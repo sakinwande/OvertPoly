@@ -1,1 +1,1 @@
-# OvertPoly algorithm
+# OvertPoly
