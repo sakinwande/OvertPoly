@@ -14,7 +14,6 @@ controller = "Networks/ARCH-COMP-2023/nnet/controllerSinglePendulum.nnet"
 expr = [:($(grav_const/pend_len) * sin(x1) + $(1/(pend_mass*pend_len^2)) * u1 - $(friction/(pend_mass*pend_len^2)) * x2)]
 control_coef = [[0], [1/(pend_mass*pend_len^2)]]
 # control_coef = [[0], [0]]
-
 domain = Hyperrectangle(low=[1., 0.], high=[1.2, 0.2])
 # domain = Hyperrectangle(low=[0., -0.1], high=[1, 0.1])
 dt = 0.05
@@ -220,6 +219,11 @@ reachSets, boundSets = multi_step_concreach(query1)
 tend = Dates.now()
 println("Time taken to compute concrete reach: ", tend-tstart)
 
+using Plots
+plot(reachSets)
+
+extrema(reachSets[2])
+extrema(reachSets[1])
 # #Verify the property
 # safe_hyp = Hyperrectangle(low=[0], high=[1])
 # project(reachSets[10], [1]) ⊆ safe_hyp
