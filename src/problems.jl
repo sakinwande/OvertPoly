@@ -44,7 +44,7 @@ mutable struct GraphPolyProblem
 	expr
 	dec_expr
 	control_coef
-    domain::Hyperrectangle
+    domain
 	varList #List of variables that have OVERT bounds
     bounds #List of bounds in the same order as varList
 	dynamics::Function 
