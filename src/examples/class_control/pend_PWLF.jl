@@ -11,7 +11,7 @@ using Plasmo
 #Define problem parameters
 expr = [:(x2), :(sin(x1) - x2)]
 pi2_round = ceil(pi/2, digits=6)
-domain = Hyperrectangle(low=[0, 0], high=[pi2_round, pi2_round])
+domain = Hyperrectangle(low=[-pi2_round, -pi2_round], high=[pi2_round, pi2_round])
 # domain1 = Hyperrectangle(low=[-pi2_round, -pi2_round], high=[0, 0])
 # domain2 = Hyperrectangle(low=[0, 0], high=[pi2_round, pi2_round])
 npoint=2
