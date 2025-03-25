@@ -14,9 +14,11 @@ npoint = 1
 function bound_att1(ATT, plotFlag = false, sanityFlag = true, npoint=1)
     """
         Function to bound ̇x₁ = 0.5 * (x₅*(x₁² + x₂² + x₃² - x₃) + x₆*(x₁² + x₂² + x₂ + x₃²) + x₄*(x₁² + x₂² + x₃² +1))
+
+        Domain is a subset of (x₁, x₂, x₃, x₄, x₅, x₆)
     """
     #Divide and conquer
-    lbs, ubs = extrema(ATT.problem.domain)
+    lbs, ubs = extrema(ATT.domain)
     #Part 1: Bound the x₅*(x₁² + x₂² + x₃² - x₃) term
     #Sub-part 1: Bound x₁²
 
@@ -176,10 +178,12 @@ end
 function bound_att2(ATT, plotFlag = false, santityFlag = true, npoint=1)
     """
         Function to bound ̇x₂ = 0.5 * (x₄*(x₁² + x₂² + x₃² + x₃) + x₆*(x₁² - x₁+ x₂² + x₃²) + x₅*(x₁² + x₂² + x₃² +1))
+
+        Domain is a subset of (x₁, x₂, x₃, x₄, x₅, x₆)
     """
 
     #Divide and conquer
-    lbs, ubs = extrema(ATT.problem.domain)
+    lbs, ubs = extrema(ATT.domain)
 
     #Part 1: Bound the x₄*(x₁² + x₂² + x₃² + x₃) term
 
@@ -344,10 +348,12 @@ end
 function bound_att3(ATT, plotFlag = false, sanityFlag = true, npoint=1)
     """
         Function to bound ̇x₃ = 0.5 * (x₄*(x₁² + x₂² - x₂ + x₃²) + x₅*(x₁² + x₁ + x₂² + x₃²) + x₆*(x₁² + x₂² + x₃² +1))
+
+        Domain is a subset of (x₁, x₂, x₃, x₄, x₅, x₆)
     """
 
     #Divide and conquer
-    lbs, ubs = extrema(ATT.problem.domain)
+    lbs, ubs = extrema(ATT.domain)
 
     #Part 1: Bound the x₄*(x₁² + x₂² - x₂ + x₃²) term
 
@@ -512,10 +518,12 @@ end
 function bound_att4(ATT, plotFlag = false, sanityFlag = true, npoint=1)
     """
         Function to bound  ̇x₄ = 0.25*x₅*x₆
+
+        Domain is a subset of (x₄, x₅, x₆)
     """
 
     #Divide and conquer
-    lbs, ubs = extrema(domain)
+    lbs, ubs = extrema(ATT.domain)
 
     #Part 1: Bound x₅
     p1 = :(0.25*x)
@@ -532,12 +540,12 @@ function bound_att4(ATT, plotFlag = false, sanityFlag = true, npoint=1)
     #Combine bounds using multiplication
     #First, lift each bound to space of (x₅, x₆)
 
-    lbs_l = [lbs[5], lbs[6]]
-    ubs_l = [ubs[5], ubs[6]]
+    lbs_l = [lbs[4:6]...]
+    ubs_l = [ubs[4:6]...]
 
-    p1_LB_lifted, p1_UB_lifted = lift_OA([2], [1], p1_LB, p1_UB, lbs_l, ubs_l)
+    p1_LB_lifted, p1_UB_lifted = lift_OA([1,3], [2], p1_LB, p1_UB, lbs_l, ubs_l)
 
-    p2_LB_lifted, p2_UB_lifted = lift_OA([1], [2], p2_LB, p2_UB, lbs_l, ubs_l)
+    p2_LB_lifted, p2_UB_lifted = lift_OA([1,2], [3], p2_LB, p2_UB, lbs_l, ubs_l)
 
     p3_LB, p3_UB = prodBounds(p1_LB_lifted, p1_UB_lifted, p2_LB_lifted, p2_UB_lifted)
 
@@ -547,10 +555,12 @@ end
 function bound_att5(ATT, plotFlag = false, sanityFlag = true, npoint=1)
     """
         Function to bound ̇x₅ = -1.5*x₄*x₆
+
+        Domain is a subset of (x₄, x₅, x₆)
     """
 
     #Divide and conquer
-    lbs, ubs = extrema(domain)
+    lbs, ubs = extrema(ATT.domain)
 
     #Part 1: Bound x₄
     p1 = :(-1.5*x)
@@ -567,12 +577,12 @@ function bound_att5(ATT, plotFlag = false, sanityFlag = true, npoint=1)
     #Combine bounds using multiplication
     #First, lift each bound to space of (x₄, x₆)
 
-    lbs_l = [lbs[4], lbs[6]]
-    ubs_l = [ubs[4], ubs[6]]
+    lbs_l = [lbs[4:6]...]
+    ubs_l = [ubs[4:6]...]
 
-    p1_LB_lifted, p1_UB_lifted = lift_OA([2], [1], p1_LB, p1_UB, lbs_l, ubs_l)
+    p1_LB_lifted, p1_UB_lifted = lift_OA([2,3], [1], p1_LB, p1_UB, lbs_l, ubs_l)
 
-    p2_LB_lifted, p2_UB_lifted = lift_OA([1], [2], p2_LB, p2_UB, lbs_l, ubs_l)
+    p2_LB_lifted, p2_UB_lifted = lift_OA([1,2], [3], p2_LB, p2_UB, lbs_l, ubs_l)
 
     p3_LB, p3_UB = prodBounds(p1_LB_lifted, p1_UB_lifted, p2_LB_lifted, p2_UB_lifted)
 
@@ -583,10 +593,12 @@ end
 function bound_att6(ATT, plotFlag = false, sanityFlag = true, npoint=1)
     """
         Function to bound ̇x₆ = 2*x₄*x₅
+
+        Domain is a subset of (x₄, x₅, x₆)
     """
 
     #Divide and conquer
-    lbs, ubs = extrema(domain)
+    lbs, ubs = extrema(ATT.domain)
 
     #Part 1: Bound x₄
     p1 = :(2*x)
@@ -603,12 +615,12 @@ function bound_att6(ATT, plotFlag = false, sanityFlag = true, npoint=1)
     #Combine bounds using multiplication
     #First, lift each bound to space of (x₄, x₅)
 
-    lbs_l = [lbs[4], lbs[5]]
-    ubs_l = [ubs[4], ubs[5]]
+    lbs_l = [lbs[4:6]...]
+    ubs_l = [ubs[4:6]...]
 
-    p1_LB_lifted, p1_UB_lifted = lift_OA([2], [1], p1_LB, p1_UB, lbs_l, ubs_l)
+    p1_LB_lifted, p1_UB_lifted = lift_OA([2,3], [1], p1_LB, p1_UB, lbs_l, ubs_l)
 
-    p2_LB_lifted, p2_UB_lifted = lift_OA([1], [2], p2_LB, p2_UB, lbs_l, ubs_l)
+    p2_LB_lifted, p2_UB_lifted = lift_OA([1,3], [2], p2_LB, p2_UB, lbs_l, ubs_l)
 
     p3_LB, p3_UB = prodBounds(p1_LB_lifted, p1_UB_lifted, p2_LB_lifted, p2_UB_lifted)
 
