@@ -13,17 +13,30 @@ domain = Hyperrectangle(low=[-0.6, -0.6], high=[0.6, 0.6])
 
 npoint = 2
 
+J1_1= -0.6360
+J1_2 = 0.7717
+
+J2_1 = -0.8337
+J2_2 = 0.5523
+
+J3_1 = -0.363
+J3_2 = -0.9311
+J3_3 = -0.035
+
+Jp_1 = -0.8957
+Jp_2 = -0.4447
+
 function bound_func(npoint)
     domain = Hyperrectangle(low=[-1, -1], high=[1, 1])
     lbs, ubs = extrema(domain)
     #Function to bound: -sin(x1) + 0.5(x1)^3 - 0.5x2
     #Part 1: Bound the -sin(x1) + 0.5(x1)^3 term
-    p1 = :(-sin(x) - 0.5*(x)^3)
+    p1 = :($(J1_1)*sin(x) + $(J1_2) * 0.5*(x)^3)
     
     p1_LB_1_1, p1_UB_1_1 = bound_univariate(p1, lbs[1], ubs[1], npoint=npoint)
 
     #Part 2: Bound the -0.5x2 term
-    p2 = :(-0.5*x)
+    p2 = :($(J1_1) * 0.5*x)
     p2_LB_1_2, p2_UB_1_2 = bound_univariate(p2, lbs[2], ubs[2], npoint=npoint)
 
     #Lift bounds to space of (x₁, x₂)
@@ -53,11 +66,11 @@ function bound_func2(npoint)
     lbs, ubs = extrema(domain)
     #Function to bound: -sin(x1) + 0.5(x1)^3 - x1 + (x2)^2 - sin(x2)
     #Part 1: Bound the -sin(x1) - 0.5(x1)^3 term
-    p1 = :(-sin(x) - 0.5*(x)^3 - x)
+    p1 = :($(J2_1)*-sin(x) + $(J2_2) - 0.5*(x)^3 + $(J2_2) -x)
     p1_LB_1_1, p1_UB_1_1 = bound_univariate(p1, lbs[1], ubs[1], npoint=npoint)
 
     #Part 2: Bound the (x2)^2 - sin(x2) term
-    p2 = :(x^2 - sin(x))
+    p2 = :($(J2_1) * x^2 + $(J2_2) - sin(x))
     p2_LB_1_2, p2_UB_1_2 = bound_univariate(p2, lbs[2], ubs[2], npoint=npoint)
 
     #Lift bounds to space of (x₁, x₂)
@@ -87,11 +100,11 @@ function bound_pend(npoint)
     ubs = [π/2, π/2]
 
     #Part 1: Bound the -0.5x2 term
-    p1 = :(-0.5*x)
+    p1 = :($(Jp_1)*-0.5*x)
     p1_LB_1_1, p1_UB_1_1 = bound_univariate(p1, lbs[2], ubs[2], npoint=npoint)
 
     #Part 2: Bound the -0.5sin(x1) term
-    p2 = :(0.5*sin(x))
+    p2 = :($(Jp_1)*0.5*sin(x))
     p2_LB_1_2, p2_UB_1_2 = bound_univariate(p2, lbs[1], ubs[1], npoint=npoint)
 
     #Lift bounds to space of (x₁, x₂)
@@ -123,7 +136,7 @@ function bound_func3(npoint)
     p1_sp1 = :(1*x)
     p1_sp1_LB, p1_sp1_UB = bound_univariate(p1_sp1, lbs[3], ubs[3], npoint=npoint)
 
-    p1_sp2 = :(x^2)
+    p1_sp2 = :($(J3_1)*x^2)
     p1_sp2_LB, p1_sp2_UB = bound_univariate(p1_sp2, lbs[2], ubs[2], npoint=npoint)
 
     #Lift bounds to space of (x₂, x₃)
@@ -134,10 +147,10 @@ function bound_func3(npoint)
     LB_1, UB_1 = sumBounds(l_p1_LB_1, l_p1_UB_1, l_p1_LB_2, l_p1_UB_2, false)
 
     #Part 2: Bound the x2x3^2 term
-    p2_sp1 = :(1*x)
+    p2_sp1 = :(-1*x)
     p2_sp1_LB, p2_sp1_UB = bound_univariate(p2_sp1, lbs[2], ubs[2], npoint=npoint)
 
-    p2_sp2 = :(x^2)
+    p2_sp2 = :($(J3_1)*x^2)
     p2_sp2_LB, p2_sp2_UB = bound_univariate(p2_sp2, lbs[3], ubs[3], npoint=npoint)
 
     #Lift bounds to space of (x₂, x₃)
@@ -151,7 +164,7 @@ function bound_func3(npoint)
     p3_sp1 = :(1*x)
     p3_sp1_LB, p3_sp1_UB = bound_univariate(p3_sp1, lbs[1], ubs[1], npoint=npoint)
 
-    p3_sp2 = :(x^2)
+    p3_sp2 = :($(J3_3)*x^2)
     p3_sp2_LB, p3_sp2_UB = bound_univariate(p3_sp2, lbs[2], ubs[2], npoint=npoint)
 
     #Lift bounds to space of (x₁, x₂)
@@ -198,11 +211,6 @@ bound_func2(2)
 bound_func2(3)
 bound_func2(4)
 bound_func2(5)
-bound_func2(6)
-bound_func2(7)
-bound_func2(8)
-bound_func2(9)
-
 
 bound_pend(1)
 bound_pend(2)
