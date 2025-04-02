@@ -8,7 +8,11 @@ using LazySets
 using Dates
 using Plasmo
 
-domain  = Hyperrectangle(low=[-0.75, 0.85, -0.65, -0.45, -0.55, 0.65], high=[-0.74, 0.86, -0.64, -0.44, -0.54, 0.66])
+# domain  = Hyperrectangle(low=[-0.75, 0.85, -0.65, -0.45, -0.55, 0.65], high=[-0.74, 0.86, -0.64, -0.44, -0.54, 0.66])
+# domain  = Hyperrectangle(low=[-0.25,-0.25,-0.25,-0.25,-0.25,-0.25], high=[0.25,0.25,0.25,0.25,0.25,0.25])
+lowVec = -1*ones(6)
+highVec = 1*ones(6)
+domain  = Hyperrectangle(low=lowVec, high=highVec)
 npoint = 1
 
 function bound_att1(plotFlag = false, sanityFlag = true, npoint=1)
