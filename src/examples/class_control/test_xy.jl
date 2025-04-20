@@ -18,24 +18,14 @@ npoint=1
 function bound_xy_ia(npoint) 
     lbs, ubs = extrema(domain)
     p1 = :(x*cos(x))
-    p1_LB_1_1, p1_UB_1_1 = bound_univariate(p1, lbs[1], ubs[1],npoint=npoint)
+    p1_LB_1_1, p1_UB_1_1 = interpol_nd(bound_univariate(p1, lbs[1], ubs[1],npoint=npoint)...)
     p2 = :(y*sin(y))
-    p2_LB_1_1, p2_UB_1_1 = bound_univariate(p2, lbs[2], ubs[2],npoint=npoint)
+    p2_LB_1_1, p2_UB_1_1 = interpol_nd(bound_univariate(p2, lbs[2], ubs[2],npoint=npoint)...)
 
     l_p1_LB_11, l_p1_UB_11 = lift_OA([2], [1], p1_LB_1_1, p1_UB_1_1, lbs, ubs) 
-
     l_p2_LB_11, l_p2_UB_11 = lift_OA([1], [2], p2_LB_1_1, p2_UB_1_1, lbs, ubs)
-
-    #Sum the bounds to recover 2d bounds 
-    LB_1, UB_1 = prodBounds(l_p1_LB_11, l_p1_UB_11, l_p2_LB_11, l_p2_UB_11)
-    #plotSurf(:(x*y), LB_1, UB_1, (2, 2), [0, 1], [0, 1], true)
-
     return l_p1_LB_11, l_p1_UB_11, l_p2_LB_11, l_p2_UB_11
 end
 
 lb1, ub1, lb2, ub2 = bound_xy_ia(1)
 
-
-xyLB, xyUB = prodBounds(lb1, ub1, lb2, ub2)
-
-xyLB
