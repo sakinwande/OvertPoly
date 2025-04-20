@@ -32,7 +32,7 @@ function single_pend_dynamics(x, u, dt)
 end
 
 #NOTE Debugging the bounds for the single pendulum
-function bound_pend(SinglePendulum; plotFlag=false)
+function bound_pend_old(SinglePendulum; plotFlag=false)
     #Define the true dynamics
     # single_pend_θ_doubledot = :($(grav_const/pend_len) * sin(x1) + $(1/(pend_mass*pend_len^2)) * u1 - $(friction/(pend_mass*pend_len^2)) * x2)
 
@@ -84,6 +84,62 @@ function bound_pend(SinglePendulum; plotFlag=false)
     bounds = [[θ_dot_lb, θ_dot_ub],[bF1LB, bF1UB]]
     return bounds
 end
+
+function bound_pend(SinglePendulum; plotFlag=false)
+    #Define the true dynamics
+    # single_pend_θ_doubledot = :($(grav_const/pend_len) * sin(x1) + $(1/(pend_mass*pend_len^2)) * u1 - $(friction/(pend_mass*pend_len^2)) * x2)
+
+    #get input bounds 
+    lbs, ubs = extrema(SinglePendulum.domain)
+
+    #Bound f(x1)
+    lb1 = lbs[1]
+    ub1 = ubs[1]
+    bF1sub1 = :($(grav_const/pend_len) * sin(x1))
+    bF1s1LB, bF1s1UB = interpol_nd(bound_univariate(bF1sub1, lb1, ub1, plotflag = plotFlag)...) 
+
+    #Bound f(x2)
+    lb2 = lbs[2]
+    ub2 = ubs[2]
+    bF1sub2 = :($((friction)/((pend_mass)*(pend_len)^2)) *-x2)
+    bF1s2LB, bF1s2UB = interpol_nd(bound_univariate(bF1sub2, lb2, ub2, plotflag = plotFlag)...)
+
+    #Lift bounds to same space
+    emptyList = [2] #f(x1) missing theta_dot
+    currList = [1]
+    l_bF1s1LB, l_bF1s1UB = lift_OA(emptyList, currList, bF1s1LB, bF1s1UB, lbs, ubs)
+
+    #Lift f2
+    emptyList = [1] #f(x2) missing theta
+    currList = [2]
+    l_bF1s2LB, l_bF1s2UB = lift_OA(emptyList, currList, bF1s2LB, bF1s2UB, lbs, ubs)
+
+    #Combine to get f(x1) + f(x2)
+    bF1LB, bF1UB = sumBounds(l_bF1s1LB, l_bF1s1UB, l_bF1s2LB, l_bF1s2UB, false)
+
+    #Bound angle dynamics 
+    lb_θ = lbs[2]
+    ub_θ = ubs[2]
+    θ_dot = :(1*x2)
+    θ_dot_lb_u, θ_dot_ub_u = interpol_nd(bound_univariate(θ_dot, lb_θ, ub_θ, plotflag = plotFlag)...)
+    #NOTE: Angle needs to be a function of angle as well as angular velocity
+    emptyList = [1]
+    currList = [2]
+    lb_θ_empty = lbs[1]
+    ub_θ_empty = ubs[1]
+    θ_dot_lb, θ_dot_ub = lift_OA(emptyList, currList, θ_dot_lb_u, θ_dot_ub_u, lb_θ_empty, ub_θ_empty)
+    
+    if plotFlag
+        xS = Any[tup[1] for tup in bF1s1LB]
+        yS = Any[tup[1] for tup in bF1s2LB]
+        surfDim = (size(yS)[1],size(xS)[1])
+        exp2Plot = :($(grav_const/pend_len) * sin(x1) - $(friction/(pend_mass*pend_len^2)) * x2)
+        plotSurf(exp2Plot, bF1LB, bF1UB, surfDim, xS, yS, true)
+    end
+    bounds = [[θ_dot_lb, θ_dot_ub],[bF1LB, bF1UB]]
+    return bounds
+end
+
 
 function single_pend_control(input_set)
     con_inp_set = input_set
@@ -147,69 +203,7 @@ query = GraphPolyQuery(
     nothing,         # mod_dict
     2                # case
 )
-######################################
-# plotFlag = false
-# function bound_pend2(SinglePendulum; plotFlag=false)
-#     #Define the true dynamics
-#     # single_pend_θ_doubledot = :($(grav_const/pend_len) * sin(x1) + $(1/(pend_mass*pend_len^2)) * u1 - $(friction/(pend_mass*pend_len^2)) * x2)
 
-#     #get input bounds 
-#     lbs, ubs = extrema(SinglePendulum.domain)
-
-#     #Bound f(x1)
-#     lb1 = lbs[1]
-#     ub1 = ubs[1]
-#     bF1sub1 = :($(grav_const/pend_len) * sin(x1))
-#     bF1s1LB, bF1s1UB = interpol_nd(bound_univariate(bF1sub1, lb1, ub1, plotflag = plotFlag)...) 
-
-#     #Bound f(x2)
-#     lb2 = lbs[2]
-#     ub2 = ubs[2]
-#     bF1sub2 = :($((friction)/((pend_mass)*(pend_len)^2)) *-x2)
-#     bF1s2LB, bF1s2UB = interpol_nd(bound_univariate(bF1sub2, lb2, ub2, plotflag = plotFlag)...)
-
-#     #Lift bounds to same space 
-#     emptyList = [2] #f(x1) missing theta_dot
-#     currList = [1]
-
-#     l_bF1s1LB, l_bF1s1UB = lift_OA(emptyList, currList, bF1s1LB, bF1s1UB, lbs, ubs)
-    
-#     #Lift f2
-#     emptyList = [1] #f(x2) missing theta
-#     currList = [2]
-
-#     l_bF1s2LB, l_bF1s2UB = lift_OA(emptyList, currList, bF1s2LB, bF1s2UB, lbs, ubs)
-
-#     #Combine to get f(x1) + f(x2)
-#     bF1LB, bF1UB = sumBounds(l_bF1s1LB, l_bF1s1UB, l_bF1s2LB, l_bF1s2UB, false)
-#     #Bound angle dynamics 
-#     lb_θ = lbs[2]
-#     ub_θ = ubs[2]
-#     θ_dot = :(1*x2)
-#     θ_dot_lb_u, θ_dot_ub_u = interpol_nd(bound_univariate(θ_dot, lb_θ, ub_θ, plotflag = plotFlag)...)
-#     #NOTE: Angle needs to be a function of angle as well as angular velocity
-#     emptyList = [1]
-#     currList = [2]
-#     lb_θ_empty = lbs[1]
-#     ub_θ_empty = ubs[1]
-#     θ_dot_lb, θ_dot_ub = lift_OA(emptyList, currList, θ_dot_lb_u, θ_dot_ub_u, lb_θ_empty, ub_θ_empty)
-    
-#     if plotFlag
-#         xS = Any[tup[1] for tup in bF1s1LB]
-#         yS = Any[tup[1] for tup in bF1s2LB]
-#         surfDim = (size(yS)[1],size(xS)[1])
-#         exp2Plot = :($(grav_const/pend_len) * sin(x1) - $(friction/(pend_mass*pend_len^2)) * x2)
-#         plotSurf(exp2Plot, bF1LB, bF1UB, surfDim, xS, yS, true)
-#     end
-#     bounds = [[θ_dot_lb, θ_dot_ub],[bF1LB, bF1UB]]
-#     return bounds
-# end
-
-# bound_pend(SinglePendulum, plotFlag=false)
-# bound_pend2(SinglePendulum, plotFlag=false)
-#######################################
-
-########################################
 #Use concrete reachability to trace out the trajectory
 query1 = deepcopy(query)
 query1.ntime = 20
@@ -218,26 +212,6 @@ tstart = Dates.now()
 reachSets, boundSets = multi_step_concreach(query1)
 tend = Dates.now()
 println("Time taken to compute concrete reach: ", tend-tstart)
-
-using Plots
-plot(reachSets)
-
-extrema(reachSets[2])
-extrema(reachSets[1])
-# #Verify the property
-# safe_hyp = Hyperrectangle(low=[0], high=[1])
-# project(reachSets[10], [1]) ⊆ safe_hyp
-# safeFlag = true
-# tstart = Dates.now()
-# for i=10:20
-#     if !(project(reachSets[i], [1]) ⊆ safe_hyp)
-#         print("Property violated at time step: ", i)
-#         safeFlag = false
-#         break
-#     end
-# end
-# tend = Dates.now()
-# println("Time taken to verify property: ", tend-tstart)
     
 ######Testing the sym reach################
 symQuery = deepcopy(query)

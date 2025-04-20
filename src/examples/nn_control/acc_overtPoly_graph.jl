@@ -80,7 +80,7 @@ numSteps = 50
 dt = 0.1
 
 ########Define Bound ACC Dynamics#######
-function bound_acc(ACC; plotFlag = false)
+function bound_acc_old(ACC; plotFlag = false)
     lbs, ubs = extrema(ACC.domain)
 
     ##Bound Lead Car Dynamics#####
@@ -165,6 +165,140 @@ function bound_acc(ACC; plotFlag = false)
     #NOTE: Unique flag added to eliminate duplicate points
     aegoLB = unique(MinkSum(aegoSub1LB_l, aegoSub2LB_l))
     aegoUB = unique(MinkSum(aegoSub1UB_l, aegoSub2UB_l))
+
+    #Bound ego velocity dynamics
+    lb_v_ego = lbs[6]
+    ub_v_ego = ubs[6]
+    vEgo = :(1*x6)
+    vEgoLB_u, vEgoUB_u = bound_univariate(vEgo, lb_v_ego, ub_v_ego, plotflag = plotFlag)
+    ##NOTE: Velocity needs to be a function of velocity as well. Use lifting to achieve this
+    emptyList = [1]
+    currList = [2]
+    #Bounds of velocity value
+    lbs_v_ego_empty = lbs[5]
+    ubs_v_ego_empty = ubs[5]
+    vEgoLB, vEgoUB = lift_OA(emptyList, currList, vEgoLB_u, vEgoUB_u, lbs_v_ego_empty, ubs_v_ego_empty)
+
+    #Bound ego position dynamics
+    lb_p_ego = lbs[5]
+    ub_p_ego = ubs[5]
+    pEgo = :(1*x5)
+    pEgoLB_u, pEgoUB_u = bound_univariate(pEgo, lb_p_ego, ub_p_ego, plotflag = plotFlag)
+    ##NOTE: Position needs to be a function of position as well. Use lifting to achieve this
+    emptyList = [1]
+    currList = [2]
+    #Bounds of position value
+    lbs_p_ego_empty = lbs[4]
+    ubs_p_ego_empty = ubs[4]
+    pEgoLB, pEgoUB = lift_OA(emptyList, currList, pEgoLB_u, pEgoUB_u, lbs_p_ego_empty, ubs_p_ego_empty)
+    
+    if plotFlag
+        xS_L = unique(Any[tup[1] for tup in aleadSub1LB])
+        yS_L = unique(Any[tup[1] for tup in aleadSub2LB])
+        xS_E = unique(Any[tup[1] for tup in aegoSub1LB])
+        yS_E = unique(Any[tup[1] for tup in aegoSub2LB])
+
+        surfDim_L = (size(yS_L)[1], size(xS_L)[1])
+        surfDim_E = (size(yS_E)[1], size(xS_E)[1])
+
+        leadExpr = exprList[1]
+        egoExpr = exprList[2]
+        plotSurf(leadExpr, aleadLB, aleadUB, surfDim_L, xS_L, yS_L, plotFlag)
+        plotSurf(egoExpr, aegoLB, aegoUB, surfDim_E, xS_E, yS_E, plotFlag)
+    end
+
+    #Return bounds in variable order 
+    bounds = [[pLeadLB, pLeadUB], [vLeadLB, vLeadUB], [aleadLB, aleadUB], [pEgoLB, pEgoUB], [vEgoLB, vEgoUB], [aegoLB, aegoUB]]
+    return bounds
+end
+
+function bound_acc(ACC; plotFlag = false)
+    lbs, ubs = extrema(ACC.domain)
+
+    ##Bound Lead Car Dynamics#####
+    #Bound first component of lead acceleration dynamics
+    lb_a_Lead_sub1 = lbs[2]
+    ub_a_Lead_sub1 = ubs[2]
+    aleadSub1 = :(2*$ac_lead - $mu*x2^2)
+    #The interpolation is to ensure upper and lower bounds are over the same set of points 
+    aleadSub1LB, aleadSub1UB = interpol_nd(bound_univariate(aleadSub1, lb_a_Lead_sub1, ub_a_Lead_sub1, plotflag = plotFlag)...)
+
+    # #######################
+    #Bound second component of lead acceleration dynamics
+    lb_a_Lead_sub2 = lbs[3]
+    ub_a_Lead_sub2 = ubs[3]
+    aleadSub2 = :(-2*x3)
+    #Set number of digits for this one to avoid rounding out the points 
+    aleadSub2LB, aleadSub2UB = interpol_nd(bound_univariate(aleadSub2, lb_a_Lead_sub2, ub_a_Lead_sub2, plotflag = plotFlag)...)
+
+    #Lift bounds to same space
+    emptyList = [2] #f(x1) missing v
+    currList = [1]
+    l_aleadSub1LB, l_aleadSub1UB = lift_OA(emptyList, currList, aleadSub1LB, aleadSub1UB, lbs[2:3], ubs[2:3])
+
+    #Lift f2
+    emptyList = [1] #f(x2) missing x
+    currList = [2]
+    l_aleadSub2LB, l_aleadSub2UB = lift_OA(emptyList, currList, aleadSub2LB, aleadSub2UB, lbs[2:3], ubs[2:3])
+
+    #Combine to get f(x1) + f(x2)
+    aleadLB, aleadUB = sumBounds(l_aleadSub1LB, l_aleadSub1UB, l_aleadSub2LB, l_aleadSub2UB, false)
+    
+    #Bound lead veclocity dynamics 
+    #Note that velocity dynamics are just acceleration
+    lb_v_lead = lbs[3]
+    ub_v_lead = ubs[3]
+    vLead = :(1*x3)
+    vLeadLB_u, vLeadUB_u = bound_univariate(vLead, lb_v_lead, ub_v_lead, plotflag = plotFlag)
+    ##NOTE: Velocity needs to be a function of velocity as well. Use lifting to achieve this 
+    emptyList = [1]
+    currList = [2]
+    #Bounds of velocity value 
+    lbs_v_lead_empty = lbs[2]
+    ubs_v_lead_empty = ubs[2]
+    vLeadLB, vLeadUB = lift_OA(emptyList, currList, vLeadLB_u, vLeadUB_u, lbs_v_lead_empty, ubs_v_lead_empty)
+    
+    #Bound lead position dynamics
+    lb_p_lead = lbs[2]
+    ub_p_lead = ubs[2]
+    pLead = :(1*x2)
+    pLeadLB_u, pLeadUB_u = bound_univariate(pLead, lb_p_lead, ub_p_lead, plotflag = plotFlag)
+    ##NOTE: Position needs to be a function of position as well. Use lifting to achieve this
+    emptyList = [1]
+    currList = [2]
+    #Bounds of position value
+    lbs_p_lead_empty = lbs[1]
+    ubs_p_lead_empty = ubs[1]
+    pLeadLB, pLeadUB = lift_OA(emptyList, currList, pLeadLB_u, pLeadUB_u, lbs_p_lead_empty, ubs_p_lead_empty)
+    
+
+    ###Bound Ego Car Dynamics#####
+    #Bound first component of ego dynamics
+    lb_a_Ego_sub1 = lbs[5]
+    ub_a_Ego_sub1 = ubs[5]
+    aegoSub1 = :(-$mu*x5^2)
+    #NOTE: Interpol is to ensure that the bounds are defined over same set of points
+    aegoSub1LB, aegoSub1UB = interpol_nd(bound_univariate(aegoSub1, lb_a_Ego_sub1, ub_a_Ego_sub1, plotflag = plotFlag)...)
+
+    #Bound second component of ego dynamics
+    lb_a_Ego_sub2 = lbs[6]
+    ub_a_Ego_sub2 = ubs[6]
+    aegoSub2 = :(-2*x6)
+    #Set number of digits to be 9 bc we're dealing with very small numbers here
+    aegoSub2LB, aegoSub2UB = interpol_nd(bound_univariate(aegoSub2, lb_a_Ego_sub2, ub_a_Ego_sub2, plotflag = plotFlag)...)
+
+    #Lift bounds to same space
+    emptyList = [2] #f(x1) missing v
+    currList = [1]
+    l_aegoSub1LB, l_aegoSub1UB = lift_OA(emptyList, currList, aegoSub1LB, aegoSub1UB, lbs[5:6], ubs[5:6])
+
+    #Lift f2
+    emptyList = [1] #f(x2) missing x
+    currList = [2]
+    l_aegoSub2LB, l_aegoSub2UB = lift_OA(emptyList, currList, aegoSub2LB, aegoSub2UB, lbs[5:6], ubs[5:6])
+
+    #Combine to get f(x1) + f(x2)
+    aegoLB, aegoUB = sumBounds(l_aegoSub1LB, l_aegoSub1UB, l_aegoSub2LB, l_aegoSub2UB, false)
 
     #Bound ego velocity dynamics
     lb_v_ego = lbs[6]
@@ -297,7 +431,7 @@ query1.ntime = 50
 @time reachSets, boundSets = multi_step_concreach(query1);
 
 
-
+volume(reachSets[end])
 t = 50
 #Lead
 plot(project(reachSets[t], [1,2]), label="GraphReach")

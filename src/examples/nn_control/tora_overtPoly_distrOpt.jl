@@ -38,11 +38,11 @@ end
 domain = Hyperrectangle(low=[0.6, -0.7, -0.4, 0.5], high = [0.7, -0.6, -0.3, 0.6])
 #TODO: Decide on step size needed to make discrete time reachability reasonable
 numSteps = 20
-dt = 0.05
+dt = 0.1
 
 
 ####Define Bound TORA########
-function bound_tora(TORA; plotFlag=false)
+function bound_tora_old(TORA; plotFlag=false)
     lbs, ubs = extrema(TORA.domain)
 
     ##Bound initial state variable (dx1 = x2)
@@ -105,6 +105,73 @@ function bound_tora(TORA; plotFlag=false)
     bounds = [[x1FuncLB, x1FuncUB], [x2FuncLB, x2FuncUB], [x3FuncLB, x3FuncUB], [x4FuncLB, x4FuncUB]]
     return bounds 
 end
+
+function bound_tora(TORA; plotFlag=false)
+    lbs, ubs = extrema(TORA.domain)
+
+    ##Bound initial state variable (dx1 = x2)
+    lb_x2 = lbs[2]
+    ub_x2 = ubs[2]
+    x1Func = :(1*x2)
+    x1FuncLB_u, x1FuncUB_u = interpol_nd(bound_univariate(x1Func, lb_x2, ub_x2, plotflag = plotFlag)...)
+    #NOTE: dx1 needs to be a function of x1 as well, use lifting to achieve
+    emptyList = [1]
+    currList = [2]
+    #Bounds of x1
+    lb_x1 = lbs[1]
+    ub_x1 = ubs[1]
+    x1FuncLB, x1FuncUB = lift_OA(emptyList, currList, x1FuncLB_u, x1FuncLB_u, lb_x1, ub_x1)
+
+    #Next, bound dx2 (dx2 = -x1 + 0.1*sin(x3))
+    #Bound first component of dx2 (-x1)
+    x2FuncSub1 = :(-1*x1)
+    x2FuncSub1LB, x2FuncSub1UB = interpol_nd(bound_univariate(x2FuncSub1, lb_x1, ub_x1, plotflag = plotFlag)...)
+
+    #Bound second component of dx2 (0.1*sin(x3))
+    lb_x3 = lbs[3]
+    ub_x3 = ubs[3]
+    x2FuncSub2 = :(0.1*sin(x3))
+    x2FuncSub2LB, x2FuncSub2UB = interpol_nd(bound_univariate(x2FuncSub2, lb_x3, ub_x3, plotflag=plotFlag)...)
+
+    #Lift the bounds to the same space 
+    #First lift the first component of dx2
+    emptyList = [2]
+    currList = [1]
+    l_x2FuncSub1LB, l_x2FuncSub1UB = lift_OA(emptyList, currList, x2FuncSub1LB, x2FuncSub1UB, [lbs[1], lbs[3]], [ubs[1], ubs[3]])
+
+    #Next lift the second component of dx2
+    emptyList = [1]
+    currList = [2]
+    l_x2FuncSub2LB, l_x2FuncSub2UB = lift_OA(emptyList, currList, x2FuncSub2LB, x2FuncSub2UB, [lbs[1], lbs[3]], [ubs[1], ubs[3]])
+
+    #Combine the two components to get dx2
+    x2FuncLB_u, x2FuncUB_u = sumBounds(l_x2FuncSub1LB, l_x2FuncSub1UB, l_x2FuncSub2LB, l_x2FuncSub2UB, false)
+
+    #Finally, dx2 must be a function of x2
+    emptyList = [2]
+    currList = [1,3]
+    x2FuncLB, x2FuncUB = lift_OA(emptyList, currList, x2FuncLB_u, x2FuncUB_u, lbs, ubs)
+
+    #Next, bound dx3 (dx3 = x4)
+    lb_x4 = lbs[4]
+    ub_x4 = ubs[4]
+    x3Func = :(1*x4)
+    x3FuncLB_u, x3FuncUB_u = interpol_nd(bound_univariate(x3Func, lb_x4, ub_x4, plotflag = plotFlag)...)
+    #NOTE: dx3 needs to be a function of x3 as well, use lifting to achieve
+    emptyList = [1]
+    currList = [2]
+    x3FuncLB, x3FuncUB = lift_OA(emptyList, currList, x3FuncLB_u, x3FuncUB_u, lb_x3, ub_x3)
+
+    #Finally, bound dx4 (dx4 = u)
+    #Here, since dx4 is directly a function of u, just use a constant 
+    κ = 1e-8
+    # x4Func = :($κ*x4)
+    x4Func = :(0*x4)
+    x4FuncLB, x4FuncUB = interpol_nd(bound_univariate(x4Func, lb_x4, ub_x4, plotflag = plotFlag)...)
+    bounds = [[x1FuncLB, x1FuncUB], [x2FuncLB, x2FuncUB], [x3FuncLB, x3FuncUB], [x4FuncLB, x4FuncUB]]
+    return bounds 
+end
+
 
 ####Next Define function to link control and relevant dynamics###
 function tora_dyn_con_link!(query, neurons, graph, dynModel, netModel)
