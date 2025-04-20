@@ -212,7 +212,9 @@ tstart = Dates.now()
 reachSets, boundSets = multi_step_concreach(query1)
 tend = Dates.now()
 println("Time taken to compute concrete reach: ", tend-tstart)
-    
+
+extrema(reachSets[11])
+volume(reachSets[11])
 ######Testing the sym reach################
 symQuery = deepcopy(query)
 symQuery.problem.bounds = boundSets

@@ -69,26 +69,24 @@ function bound_tora(TORA; plotFlag=false)
     #Bound second component of dx2 (0.1*sin(x3))
     lb_x3 = lbs[3]
     ub_x3 = ubs[3]
-    x2FuncSub2 = :(sin(x3))
+    x2FuncSub2 = :(0.1*sin(x3))
     x2FuncSub2LB, x2FuncSub2UB = interpol_nd(bound_univariate(x2FuncSub2, lb_x3, ub_x3, plotflag=plotFlag)...)
 
-    x2FuncSub2LB = [(tup[1:end-1]..., 0.1*tup[end]) for tup in x2FuncSub2LB]
-    x2FuncSub2UB = [(tup[1:end-1]..., 0.1*tup[end]) for tup in x2FuncSub2UB]
+    #Lift the bounds to the same space 
+    #First lift the first component of dx2
+    emptyList = [2]
+    currList = [1]
+    l_x2FuncSub1LB, l_x2FuncSub1UB = lift_OA(emptyList, currList, x2FuncSub1LB, x2FuncSub1UB, [lbs[1], lbs[3]], [ubs[1], ubs[3]])
 
+    #Next lift the second component of dx2
+    emptyList = [1]
+    currList = [2]
+    l_x2FuncSub2LB, l_x2FuncSub2UB = lift_OA(emptyList, currList, x2FuncSub2LB, x2FuncSub2UB, [lbs[1], lbs[3]], [ubs[1], ubs[3]])
 
-    #NOTE: I checked, bounds appear valid :)
-    #Add a dimension to prepare for Minkowski sum 
-    x2FuncSub1LB_l = addDim(x2FuncSub1LB, 2)
-    x2FuncSub1UB_l = addDim(x2FuncSub1UB, 2)
+    #Combine the two components to get dx2
+    x2FuncLB_u, x2FuncUB_u = sumBounds(l_x2FuncSub1LB, l_x2FuncSub1UB, l_x2FuncSub2LB, l_x2FuncSub2UB, false)
 
-    x2FuncSub2LB_l = addDim(x2FuncSub2LB, 1)
-    x2FuncSub2UB_l = addDim(x2FuncSub2UB, 1)
-
-    #Take the Minkowski sum of the bounds 
-    x2FuncLB_u = unique(MinkSum(x2FuncSub1LB_l, x2FuncSub2LB_l))
-    x2FuncUB_u = unique(MinkSum(x2FuncSub1UB_l, x2FuncSub2UB_l))
-
-    #Finally, dx3 must be a function of x3
+    #Finally, dx2 must be a function of x2
     emptyList = [2]
     currList = [1,3]
     x2FuncLB, x2FuncUB = lift_OA(emptyList, currList, x2FuncLB_u, x2FuncUB_u, lbs, ubs)
@@ -112,7 +110,6 @@ function bound_tora(TORA; plotFlag=false)
     bounds = [[x1FuncLB, x1FuncUB], [x2FuncLB, x2FuncUB], [x3FuncLB, x3FuncUB], [x4FuncLB, x4FuncUB]]
     return bounds 
 end
-
 ####Next Define function to link control and relevant dynamics###
 function tora_dyn_con_link!(query, neurons, graph, dynModel, netModel)
     #Define variables that are inputs to the network model 

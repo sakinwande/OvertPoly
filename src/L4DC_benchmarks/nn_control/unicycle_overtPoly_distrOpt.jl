@@ -50,8 +50,6 @@ function bound_unicycle(Unicycle; plotFlag=false)
     lbs, ubs = extrema(Unicycle.domain)
 
     ##Bound initial state variable (dx1 = x4*cos(x3))#####
-    #K-A Decomposition exp(ln(x4) + ln(cos(x3)))
-    #Bound ln(x4)
     #Weird behavior with Hyperrectangle
     lb_x4 = lbs[4]
     ub_x4 = ubs[4]
@@ -66,71 +64,19 @@ function bound_unicycle(Unicycle; plotFlag=false)
     x1FuncSub_2 = :(cos(x3))
     x1FuncSub_2LB, x1FuncSub_2UB = interpol_nd(bound_univariate(x1FuncSub_2, lb_x3, ub_x3)...)
 
-    #Find how much to shift log x4 by 
-    sx4 = inpShiftLog(lb_x4, ub_x4, bounds=x1FuncSub_1LB)
-    sx3 = inpShiftLog(lb_x3, ub_x3, bounds=x1FuncSub_2LB)
+    #Lift the bounds to the same space
+    #First lift the first component of dx1
+    emptyList = [1]
+    currList = [2]
+    l_x1FuncSub_1LB, l_x1FuncSub_1UB = lift_OA(emptyList, currList, x1FuncSub_1LB, x1FuncSub_1UB, lbs[3:4], ubs[3:4])
 
-    #Apply log 
-    x1FuncSub_1LB_l = [(tup[1:end-1]..., log(tup[end] + sx4)) for tup in x1FuncSub_1LB]
-    x1FuncSub_1UB_l = [(tup[1:end-1]..., log(tup[end] + sx4)) for tup in x1FuncSub_1UB]
+    #Next lift the second component of dx1
+    emptyList = [2]
+    currList = [1]
+    l_x1FuncSub_2LB, l_x1FuncSub_2UB = lift_OA(emptyList, currList, x1FuncSub_2LB, x1FuncSub_2UB, lbs[3:4], ubs[3:4])
 
-    x1FuncSub_2LB_l = [(tup[1:end-1]..., log(tup[end] + sx3)) for tup in x1FuncSub_2LB]
-    x1FuncSub_2UB_l = [(tup[1:end-1]..., log(tup[end] + sx3)) for tup in x1FuncSub_2UB]
-
-    #Add a dimension to prepare for Minkowski sum. Put x3 before x4 :)
-    x1FuncSub_1LB_ll = addDim(x1FuncSub_1LB_l, 1)
-    x1FuncSub_1UB_ll = addDim(x1FuncSub_1UB_l, 1)
-    
-    x1FuncSub_2LB_ll = addDim(x1FuncSub_2LB_l, 2)
-    x1FuncSub_2UB_ll = addDim(x1FuncSub_2UB_l, 2)
-
-    #Combine to get log(x4*cos(x3))
-    x1FuncLB_l = MinkSum(x1FuncSub_1LB_ll, x1FuncSub_2LB_ll)
-    x1FuncUB_l = MinkSum(x1FuncSub_1UB_ll, x1FuncSub_2UB_ll)
-    
     #Combine to get x4*cos(x3)
-    x1FuncLB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in x1FuncLB_l]
-    x1FuncUB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in x1FuncUB_l]
-    
-    #Account for the shift
-    x1FuncLB = Any[]
-    x1FuncUB = Any[]
-    
-    for tup in x1FuncLB_s
-        #First find the corresponding f(x) and f(y) values
-        #NOTE: Round to avoid floating point errors
-        # xInd = findall(x->x[1] == round(tup[1], digits=5), x1FuncSub_2LB)[1]
-        # yInd = findall(y->y[1] == round(tup[2], digits=5), x1FuncSub_1LB)[1]
-
-        xInd = findall(x->x[1] == tup[1], x1FuncSub_2LB)[1]
-        yInd = findall(y->y[1] == tup[2], x1FuncSub_1LB)[1]
-
-        
-        
-
-        #Quadratic shift down
-        #NOTE: You care about function value, not index value ;)
-        #NOTE: Interval subtraction 
-        newXY = tup[end] - sx3 * x1FuncSub_1UB[yInd][end] - sx4 * x1FuncSub_2UB[xInd][end] - sx3*sx4
-        
-        push!(x1FuncLB, (tup[1:end-1]..., newXY))
-    end
-
-
-    for tup in x1FuncUB_s
-        #First find the corresponding f(x) and f(y) values
-        # xInd = findall(x->x[1] == round(tup[1], digits=5), x1FuncSub_2LB)[1]
-        # yInd = findall(y->y[1] == round(tup[2], digits=5), x1FuncSub_1LB)[1]
-
-        xInd = findall(x->x[1] == tup[1], x1FuncSub_2LB)[1]
-        yInd = findall(y->y[1] == tup[2], x1FuncSub_1LB)[1]
-        
-        #Quadratic shift down
-        #NOTE: Interval subtraction
-        newXY = tup[end] - sx3 * x1FuncSub_1LB[yInd][end] - sx4 * x1FuncSub_2LB[xInd][end] - sx3*sx4
-        
-        push!(x1FuncUB, (tup[1:end-1]..., newXY))
-    end
+    x1FuncLB, x1FuncUB = prodBounds(l_x1FuncSub_1LB, l_x1FuncSub_1UB, l_x1FuncSub_2LB, l_x1FuncSub_2UB)
 
     #Check if bounds are valid by plotting the surface
     if plotFlag
@@ -152,63 +98,19 @@ function bound_unicycle(Unicycle; plotFlag=false)
     x2FuncSub2 = :(sin(x3))
     x2FuncSub2LB, x2FuncSub2UB = interpol_nd(bound_univariate(x2FuncSub2, lb_x3, ub_x3)...)
 
-    #Find how much to shift log x4 by
-    sx4 = inpShiftLog(lb_x4, ub_x4, bounds=x2FuncSub1LB)
-    sx3 = inpShiftLog(lb_x3, ub_x3, bounds=x2FuncSub2LB)
+    #Lift the bounds to the same space
+    #First lift the first component of dx2\
+    emptyList = [1]
+    currList = [2]
+    l_x2FuncSub1LB, l_x2FuncSub1UB = lift_OA(emptyList, currList, x2FuncSub1LB, x2FuncSub1UB, lbs[3:4], ubs[3:4])
 
-    #Apply log
-    x2FuncSub1LB_l = [(tup[1:end-1]..., log(tup[end] + sx4)) for tup in x2FuncSub1LB]
-    x2FuncSub1UB_l = [(tup[1:end-1]..., log(tup[end] + sx4)) for tup in x2FuncSub1UB]
-
-    x2FuncSub2LB_l = [(tup[1:end-1]..., log(tup[end] + sx3)) for tup in x2FuncSub2LB]
-    x2FuncSub2UB_l = [(tup[1:end-1]..., log(tup[end] + sx3)) for tup in x2FuncSub2UB]
-
-    #Add a dimension to prepare for Minkowski sum. Put x3 before x4 :)
-    x2FuncSub1LB_ll = addDim(x2FuncSub1LB_l, 1)
-    x2FuncSub1UB_ll = addDim(x2FuncSub1UB_l, 1)
-
-    x2FuncSub2LB_ll = addDim(x2FuncSub2LB_l, 2)
-    x2FuncSub2UB_ll = addDim(x2FuncSub2UB_l, 2)
-
-    #Combine to get log(x4*sin(x3))
-    x2FuncLB_u = unique(MinkSum(x2FuncSub1LB_ll, x2FuncSub2LB_ll))
-    x2FuncUB_u = unique(MinkSum(x2FuncSub1UB_ll, x2FuncSub2UB_ll))
+    #Next lift the second component of dx2
+    emptyList = [2]
+    currList = [1]
+    l_x2FuncSub2LB, l_x2FuncSub2UB = lift_OA(emptyList, currList, x2FuncSub2LB, x2FuncSub2UB, lbs[3:4], ubs[3:4])
 
     #Combine to get x4*sin(x3)
-    x2FuncLB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in x2FuncLB_u]
-    x2FuncUB_s = [(tup[1:end-1]..., exp(tup[end])) for tup in x2FuncUB_u]
-
-    #Account for the shift
-    x2FuncLB = Any[]
-    x2FuncUB = Any[]
-
-    for tup in x2FuncLB_s
-        #First find the corresponding f(x) and f(y) values
-        # xInd = findall(x->x[1] == round(tup[1], digits=5), x2FuncSub2LB)
-        # yInd = findall(y->y[1] == round(tup[2], digits=5), x2FuncSub1LB)
-        xInd = findall(x->x[1] == tup[1], x2FuncSub2LB)
-        yInd = findall(y->y[1] == tup[2], x2FuncSub1LB)
-
-        #Quadratic shift down
-        newXY = tup[end] - sx3 * x2FuncSub1UB[yInd][1][end] - sx4 * x2FuncSub2UB[xInd][1][end] - sx3*sx4
-
-        push!(x2FuncLB, (tup[1:end-1]..., newXY))
-    end
-
-    for tup in x2FuncUB_s
-        #First find the corresponding f(x) and f(y) values
-        # xInd = findall(x->x[1] == round(tup[1], digits=5), x2FuncSub2LB)
-        # yInd = findall(y->y[1] == round(tup[2], digits=5), x2FuncSub1LB)
-
-        xInd = findall(x->x[1] == tup[1], x2FuncSub2LB)
-        yInd = findall(y->y[1] == tup[2], x2FuncSub1LB)
-
-        #Quadratic shift down
-        newXY = tup[end] - sx3 * x2FuncSub1LB[yInd][1][end] - sx4 * x2FuncSub2LB[xInd][1][end] - sx3*sx4
-
-        push!(x2FuncUB, (tup[1:end-1]..., newXY))
-    end
-
+    x2FuncLB, x2FuncUB = prodBounds(l_x2FuncSub1LB, l_x2FuncSub1UB, l_x2FuncSub2LB, l_x2FuncSub2UB)
     #Check if bounds are valid by plotting the surface
     if plotFlag
         xS = unique!(Any[tup[1] for tup in x2FuncLB])
@@ -226,40 +128,40 @@ function bound_unicycle(Unicycle; plotFlag=false)
    emptyList = [1]
    currList = [2,3]
    
-    #Retcon x1FuncLB and x1FuncUB to be unlifted 
-    x1FuncLB_u = deepcopy(x1FuncLB)
-    x1FuncUB_u = deepcopy(x1FuncUB)
-
-    lbs_x1 = [lbs[1]]
-    append!(lbs_x1, lbs[3:4])
-    ubs_x1 = [ubs[1]]
-    append!(ubs_x1, ubs[3:4])
-    x1FuncLB, x1FuncUB = lift_OA(emptyList, currList, x1FuncLB_u, x1FuncUB_u, lbs_x1, ubs_x1)
-
-    emptyList = [1]
-    currList = [2,3]
-
-    #Retcon x2FuncLB and x2FuncUB to be unlifted
-    x2FuncLB_u = deepcopy(x2FuncLB)
-    x2FuncUB_u = deepcopy(x2FuncUB)
-
-    lbs_x2 = lbs[2:4]
-    ubs_x2 = ubs[2:4]
-    x2FuncLB, x2FuncUB = lift_OA(emptyList, currList, x2FuncLB_u, x2FuncUB_u, lbs_x2, ubs_x2)
-
-    #############Next, bound dx3 (dx3 = u[2])#####
-    #Since dx3 is solely a function of u[2], just use a constant
-    x3Func = :(0*x3)
-    x3FuncLB, x3FuncUB = interpol_nd(bound_univariate(x3Func, lb_x3, ub_x3)...)
-
-    #############Finally, bound dx4 (dx4 = u[1] + w)#####
-    #Here, dx4 is a function of u[1] and a disturbance term. Treat disturbance as a zero mean constant 
-    x4Func = :(0*x4)
-    x4FuncLB, x4FuncUB = interpol_nd(bound_univariate(x4Func, lb_x4, ub_x4, ϵ = w)...)
-
-    bounds = [[x1FuncLB, x1FuncUB],[x2FuncLB, x2FuncUB],[x3FuncLB, x3FuncUB],[x4FuncLB, x4FuncUB]]
-
-    return bounds
+   #Retcon x1FuncLB and x1FuncUB to be unlifted 
+   x1FuncUB_u = deepcopy(x1FuncUB)
+   x1FuncLB_u = deepcopy(x1FuncLB)
+   
+   lbs_x1 = [lbs[1]]
+   append!(lbs_x1, lbs[3:4])
+   ubs_x1 = [ubs[1]]
+   append!(ubs_x1, ubs[3:4])
+   x1FuncLB, x1FuncUB = lift_OA(emptyList, currList, x1FuncLB_u, x1FuncUB_u, lbs_x1, ubs_x1)
+   
+   emptyList = [1]
+   currList = [2,3]
+   
+   #Retcon x2FuncLB and x2FuncUB to be unlifted
+   x2FuncLB_u = deepcopy(x2FuncLB)
+   x2FuncUB_u = deepcopy(x2FuncUB)
+   
+   lbs_x2 = lbs[2:4]
+   ubs_x2 = ubs[2:4]
+   x2FuncLB, x2FuncUB = lift_OA(emptyList, currList, x2FuncLB_u, x2FuncUB_u, lbs_x2, ubs_x2)
+   
+   #############Next, bound dx3 (dx3 = u[2])#####
+   #Since dx3 is solely a function of u[2], just use a constant
+   x3Func = :(0*x3)
+   x3FuncLB, x3FuncUB = interpol_nd(bound_univariate(x3Func, lb_x3, ub_x3)...)
+   
+   #############Finally, bound dx4 (dx4 = u[1] + w)#####
+   #Here, dx4 is a function of u[1] and a disturbance term. Treat disturbance as a zero mean constant 
+   x4Func = :(0*x4)
+   x4FuncLB, x4FuncUB = interpol_nd(bound_univariate(x4Func, lb_x4, ub_x4, ϵ = w)...)
+   
+   bounds = [[x1FuncLB, x1FuncUB], [x2FuncLB, x2FuncUB], [x3FuncLB, x3FuncUB], [x4FuncLB, x4FuncUB]]
+   
+   return bounds
 end
 
 ###Next Define function to link control and relevant dynamics###
