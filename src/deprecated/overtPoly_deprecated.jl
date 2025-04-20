@@ -1154,3 +1154,44 @@ end
 #f1/f2 = ((f1 + s1)/(f2 + s2) * (f2 + s2) - s1)/((f2 + s2)/)
 x9_p1_sp4_LB = []
 x9_p1_sp4_UB = []
+
+function prodBounds(lb1, ub1, lb2, ub2)
+    #Vector for outputs
+    prodLB = []
+    prodUB = []
+
+    #Find the union of the inputs 
+    #NOTE: Assumes lb and ub have the same inputs 
+
+    bound1Inps = [tup[1:end-1] for tup in lb1]
+    bound2Inps = [tup[1:end-1] for tup in lb2]
+
+    #Find the union of the inputs
+    unionInps = sort(unique(vcat(bound1Inps, bound2Inps), dims=1))
+
+    #interpolate the bounds to ensure they are defined over the same set of points 
+    lb1_i, lb2_i = interpol_nd(lb1, lb2)
+    ub1_i, ub2_i = interpol_nd(ub1, ub2)
+
+    #Find the bounds of the product
+    for inp in unionInps
+        #Find the bounds of the first function
+        ind1 = findall(x->x[1:end-1] == inp, lb1_i)[1]
+        lb1 = lb1_i[ind1][end]
+        ub1 = ub1_i[ind1][end]
+
+        #Find the bounds of the second function
+        ind2 = findall(x->x[1:end-1] == inp, lb2_i)[1]
+        lb2 = lb2_i[ind2][end]
+        ub2 = ub2_i[ind2][end]
+        
+        #Compute the bounds of the product. Use interval arithmetic
+        lb = min(lb1*lb2, lb1*ub2, ub1*lb2, ub1*ub2)
+        ub = max(lb1*lb2, lb1*ub2, ub1*lb2, ub1*ub2)
+        #Push the bounds to the output list
+        push!(prodLB, (inp..., lb))
+        push!(prodUB, (inp..., ub))
+    end
+
+    return prodLB, prodUB
+end

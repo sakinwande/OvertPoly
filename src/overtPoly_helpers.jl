@@ -3,7 +3,7 @@ using IntervalRootFinding, IntervalArithmetic
 # using MacroTools: prewalk, postwalk
 using Interpolations
 using OVERT: bound, find_variables, to_pairs 
-#using Plots; plotly()
+using Plots; plotly()
 global NPLOTS = 0
 # using CSV
 
@@ -54,6 +54,7 @@ function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-12, npoint=2, rel_error_
     elseif isa(Symbolics.value(df), Number)
         #In this case, the expression is linear
         ϵₗ = ϵ #small parameter to control linear conservativeness
+        ϵₗ = 1e-3
         # step = (ub - lb)/(npoint + 1)
         # subints = [lb + i*step for i in 1:npoint]
         # pts = [lb, subints..., ub]
@@ -367,8 +368,8 @@ function plotSurf(baseFunc, lbVec, ubVec, surfDim, xS, yS, saveFlag=false)
     ubMat = reshape([p[3] for p in sort(ubVec)], surfDim)
 
     sPlot = plot(xC, yC, fun1, st=:surface, camera=(-30,30), color="black", label="function", showscale = false, opacity = 1.0)
-    plot!(sPlot, [p[1] for p in xS], [p[1] for p in yS], lbMat, st=:surface, color="orange", label="lower bound", showscale=false, opacity=1.0)
-    plot!(sPlot, [p[1] for p in xS], [p[1] for p in yS], ubMat, st=:surface, color="blue", label="upper bound", showscale=false,opacity=1.0)
+    plot!(sPlot, [p[1] for p in xS], [p[1] for p in yS], lbMat, st=:mesh, color="orange", label="lower bound", showscale=false, opacity=1.0)
+    # plot!(sPlot, [p[1] for p in xS], [p[1] for p in yS], ubMat, st=:surface, color="blue", label="upper bound", showscale=false,opacity=1.0)
 
     if saveFlag
         global NPLOTS
@@ -1111,47 +1112,6 @@ function floor_n(x, n = 16)
     return floor(x, digits = n)
 end
 
-function prodBounds(lb1, ub1, lb2, ub2)
-    #Vector for outputs
-    prodLB = []
-    prodUB = []
-
-    #Find the union of the inputs 
-    #NOTE: Assumes lb and ub have the same inputs 
-
-    bound1Inps = [tup[1:end-1] for tup in lb1]
-    bound2Inps = [tup[1:end-1] for tup in lb2]
-
-    #Find the union of the inputs
-    unionInps = sort(unique(vcat(bound1Inps, bound2Inps), dims=1))
-
-    #interpolate the bounds to ensure they are defined over the same set of points 
-    lb1_i, lb2_i = interpol_nd(lb1, lb2)
-    ub1_i, ub2_i = interpol_nd(ub1, ub2)
-
-    #Find the bounds of the product
-    for inp in unionInps
-        #Find the bounds of the first function
-        ind1 = findall(x->x[1:end-1] == inp, lb1_i)[1]
-        lb1 = lb1_i[ind1][end]
-        ub1 = ub1_i[ind1][end]
-
-        #Find the bounds of the second function
-        ind2 = findall(x->x[1:end-1] == inp, lb2_i)[1]
-        lb2 = lb2_i[ind2][end]
-        ub2 = ub2_i[ind2][end]
-        
-        #Compute the bounds of the product. Use interval arithmetic
-        lb = min(lb1*lb2, lb1*ub2, ub1*lb2, ub1*ub2)
-        ub = max(lb1*lb2, lb1*ub2, ub1*lb2, ub1*ub2)
-        #Push the bounds to the output list
-        push!(prodLB, (inp..., lb))
-        push!(prodUB, (inp..., ub))
-    end
-
-    return prodLB, prodUB
-end
-
 function divBounds(lb1, ub1, lb2, ub2)
     # """
     # Method to divide bound 1 by bound 2.
@@ -1241,4 +1201,93 @@ function get_tan_regions(a,b)
     else 
         return tan_zeros, nothing # nothing implies mixed convexity 
     end
+end
+
+function get_subgrids(unionInps)
+    """
+    Given a vector of inputs, return the subgrids that are used to define the input space. This is needed to achieve gridded interpolation.
+    """
+    tupList = unionInps
+    if isempty(tupList)
+        throw(ArgumentError("Empty list of tuples"))
+    end
+
+    dim = length(tupList[1])
+
+    #Identify consituent grid elements 
+    sub_grids = [unique(tup[i] for tup in tupList) for i in 1:dim]
+    return sub_grids
+end
+function prodBounds(lb1, ub1, lb2, ub2)
+    #Vector for outputs
+    prodLB = []
+    prodUB = []
+
+    bound1Inps = [tup[1:end-1] for tup in lb1]
+    bound2Inps = [tup[1:end-1] for tup in lb2]
+
+    #Let's do gridded interpolation 
+    vcat(bound1Inps, bound2Inps)
+
+    #Find the union of the inputs
+    #NOTE: Assumes lbs and ubs have same inputs
+    unionInps = sort(unique(vcat(bound1Inps, bound2Inps), dims=1))
+
+    #Find unique elements per dimension
+    subgrids = get_subgrids(unionInps)
+
+    #Gridded interpolators for each function
+    lb1_int = gen_interpol_nd(lb1)
+    ub1_int = gen_interpol_nd(ub1)
+    lb2_int = gen_interpol_nd(lb2)
+    ub2_int = gen_interpol_nd(ub2)
+
+    #Now we're going to hack grid iterations 
+
+    #Number of grid points per dimension
+    subgrid_sizes = [length(subgrid) for subgrid in subgrids]
+    #Number of 1-faces per dimension (#grid points - 1)
+    subgrid_faces = [tuple(collect(1:length(subgrid)-1)...) for subgrid in subgrids]
+
+    #Define array to hold the grid points
+    gridMat = collect(Iterators.product(subgrids...))
+
+    #Define arrays to hold upper and lower bounds
+    lowMat = [(tup..., Inf) for tup in gridMat]
+    highMat = [(tup..., -Inf) for tup in gridMat]
+
+    #Iterate across grid cells 
+    for cell in Iterators.product(subgrid_faces...)
+        #Get vertex indices associated with each face of the cell
+        vertices = [(i, i+1) for i in cell]
+        #Convert these into grid point indices 
+        verts = collect(Iterators.product(vertices...))
+
+        #Get the sub-grids associated with each face of the cell
+        coordinates = [(subgrids[sg][i], subgrids[sg][i+1]) for (sg, i) in enumerate(cell)]
+        #Use the sub-grids to get grid coordinates 
+        coords = collect(Iterators.product(coordinates...))
+
+        #Use pointwise interval arithmetic to get upper and lower bounds
+        LBs = [min(lb1_int(coord...)*lb2_int(coord...), lb1_int(coord...)*ub2_int(coord...), ub1_int(coord...)*lb2_int(coord...), ub1_int(coord...)*ub2_int(coord...)) for coord in coords]
+        UBs = [max(lb1_int(coord...)*lb2_int(coord...), lb1_int(coord...)*ub2_int(coord...), ub1_int(coord...)*lb2_int(coord...), ub1_int(coord...)*ub2_int(coord...)) for coord in coords]
+
+        #Now for soundness, use cell-wise interval arithmetic bounds
+        #TODO: Optimization here for tighter bounds 
+        LBs .= minimum(LBs)
+        UBs .= maximum(UBs)
+
+        #Update the matrix of bounds
+        for (i, vert) in enumerate(verts)
+            pt = lowMat[vert...][1:end-1] 
+            #Update the bounds only if the new bound is looser than the current
+            lowMat[vert...]= (pt...,min(lowMat[vert...][end], LBs[i]))
+            highMat[vert...] = (pt...,max(highMat[vert...][end], UBs[i]))
+        end
+    end
+
+    #Return a list of bounds
+    prodLB = [lowMat...]
+    prodUB = [highMat...]
+    return prodLB, prodUB
 end
