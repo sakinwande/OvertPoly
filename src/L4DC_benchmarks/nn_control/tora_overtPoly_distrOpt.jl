@@ -69,8 +69,12 @@ function bound_tora(TORA; plotFlag=false)
     #Bound second component of dx2 (0.1*sin(x3))
     lb_x3 = lbs[3]
     ub_x3 = ubs[3]
-    x2FuncSub2 = :(0.1*sin(x3))
+    x2FuncSub2 = :(sin(x3))
     x2FuncSub2LB, x2FuncSub2UB = interpol_nd(bound_univariate(x2FuncSub2, lb_x3, ub_x3, plotflag=plotFlag)...)
+
+    #Add the 0.1 scaling to the second component of dx2
+    x2FuncSub2LB = [(tup[1:end-1]..., 0.1*tup[end]) for tup in x2FuncSub2LB]
+    x2FuncSub2UB = [(tup[1:end-1]..., 0.1*tup[end]) for tup in x2FuncSub2UB]
 
     #Lift the bounds to the same space 
     #First lift the first component of dx2
@@ -110,6 +114,7 @@ function bound_tora(TORA; plotFlag=false)
     bounds = [[x1FuncLB, x1FuncUB], [x2FuncLB, x2FuncUB], [x3FuncLB, x3FuncUB], [x4FuncLB, x4FuncUB]]
     return bounds 
 end
+
 ####Next Define function to link control and relevant dynamics###
 function tora_dyn_con_link!(query, neurons, graph, dynModel, netModel)
     #Define variables that are inputs to the network model 

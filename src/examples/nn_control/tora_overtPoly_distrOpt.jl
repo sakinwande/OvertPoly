@@ -130,8 +130,12 @@ function bound_tora(TORA; plotFlag=false)
     #Bound second component of dx2 (0.1*sin(x3))
     lb_x3 = lbs[3]
     ub_x3 = ubs[3]
-    x2FuncSub2 = :(0.1*sin(x3))
+    x2FuncSub2 = :(sin(x3))
     x2FuncSub2LB, x2FuncSub2UB = interpol_nd(bound_univariate(x2FuncSub2, lb_x3, ub_x3, plotflag=plotFlag)...)
+
+    #Add the 0.1 scaling to the second component of dx2
+    x2FuncSub2LB = [(tup[1:end-1]..., 0.1*tup[end]) for tup in x2FuncSub2LB]
+    x2FuncSub2UB = [(tup[1:end-1]..., 0.1*tup[end]) for tup in x2FuncSub2UB]
 
     #Lift the bounds to the same space 
     #First lift the first component of dx2
@@ -251,9 +255,10 @@ query1.ntime = 1
 
 #Test multi-step concrete reachability
 query2 = deepcopy(query)
-query2.ntime = 20
+query2.ntime = 8
 @time reachsets, boundsets = multi_step_concreach(query2);
 
+extrema(reachsets[end])
 overtSet = Hyperrectangle(low=[
     -0.34415609789501067
  -1.070147842066413
