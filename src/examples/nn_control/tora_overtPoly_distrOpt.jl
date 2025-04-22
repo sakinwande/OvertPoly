@@ -49,7 +49,7 @@ function bound_tora_old(TORA; plotFlag=false)
     lb_x2 = lbs[2]
     ub_x2 = ubs[2]
     x1Func = :(1*x2)
-    x1FuncLB_u, x1FuncUB_u = interpol(bound_univariate(x1Func, lb_x2, ub_x2, plotflag = plotFlag)...)
+    x1FuncLB_u, x1FuncUB_u = interpol_nd(bound_univariate(x1Func, lb_x2, ub_x2, plotflag = plotFlag)...)
     #NOTE: dx1 needs to be a function of x1 as well, use lifting to achieve
     emptyList = [1]
     currList = [2]
@@ -61,13 +61,18 @@ function bound_tora_old(TORA; plotFlag=false)
     #Next, bound dx2 (dx2 = -x1 + 0.1*sin(x3))
     #Bound first component of dx2 (-x1)
     x2FuncSub1 = :(-1*x1)
-    x2FuncSub1LB, x2FuncSub1UB = interpol(bound_univariate(x2FuncSub1, lb_x1, ub_x1, plotflag = plotFlag)...)
+    x2FuncSub1LB, x2FuncSub1UB = interpol_nd(bound_univariate(x2FuncSub1, lb_x1, ub_x1, plotflag = plotFlag)...)
 
     #Bound second component of dx2 (0.1*sin(x3))
     lb_x3 = lbs[3]
     ub_x3 = ubs[3]
-    x2FuncSub2 = :(0.1*sin(x3))
-    x2FuncSub2LB, x2FuncSub2UB = interpol(bound_univariate(x2FuncSub2, lb_x3, ub_x3, plotflag=plotFlag)...)
+    x2FuncSub2 = :(sin(x3))
+    #TEST: Debugging 
+    println("lb_x3: $lb_x3, ub_x3: $ub_x3")
+    x2FuncSub2LB, x2FuncSub2UB = interpol_nd(bound_univariate(x2FuncSub2, lb_x3, ub_x3, plotflag=plotFlag)...)
+
+    x2FuncSub2LB = [(tup[1:end-1]..., 0.1*tup[end]) for tup in x2FuncSub2LB]
+    x2FuncSub2UB = [(tup[1:end-1]..., 0.1*tup[end]) for tup in x2FuncSub2UB]
 
     #NOTE: I checked, bounds appear valid :)
     #Add a dimension to prepare for Minkowski sum 
@@ -90,7 +95,7 @@ function bound_tora_old(TORA; plotFlag=false)
     lb_x4 = lbs[4]
     ub_x4 = ubs[4]
     x3Func = :(1*x4)
-    x3FuncLB_u, x3FuncUB_u = interpol(bound_univariate(x3Func, lb_x4, ub_x4, plotflag = plotFlag)...)
+    x3FuncLB_u, x3FuncUB_u = interpol_nd(bound_univariate(x3Func, lb_x4, ub_x4, plotflag = plotFlag)...)
     #NOTE: dx3 needs to be a function of x3 as well, use lifting to achieve
     emptyList = [1]
     currList = [2]
@@ -101,7 +106,7 @@ function bound_tora_old(TORA; plotFlag=false)
     κ = 1e-8
     # x4Func = :($κ*x4)
     x4Func = :(0*x4)
-    x4FuncLB, x4FuncUB = interpol(bound_univariate(x4Func, lb_x4, ub_x4, plotflag = plotFlag)...)
+    x4FuncLB, x4FuncUB = interpol_nd(bound_univariate(x4Func, lb_x4, ub_x4, plotflag = plotFlag)...)
     bounds = [[x1FuncLB, x1FuncUB], [x2FuncLB, x2FuncUB], [x3FuncLB, x3FuncUB], [x4FuncLB, x4FuncUB]]
     return bounds 
 end
@@ -253,12 +258,67 @@ query1 = deepcopy(query)
 query1.ntime = 1
 @time reachset, boundset = concreach!(query1);
 
+query11 = deepcopy(query)
+query11.ntime = 1
+query11.problem.bound_func = bound_tora_old
+@time reachset1, boundset1 = concreach!(query11);
+
+boundLen1 = []
+for bound in boundset 
+    boundVec = []
+    push!(boundVec, length(bound[1]))
+    boundTup = tuple(boundVec...)
+    push!(boundLen1, boundTup)
+end
+
+boundLen2 = []
+for bound in boundset1 
+    boundVec = []
+    push!(boundVec, length(bound[1]))
+    boundTup = tuple(boundVec...)
+    push!(boundLen2, boundTup)
+end
+
+boundLen1
+boundLen2
 #Test multi-step concrete reachability
 query2 = deepcopy(query)
-query2.ntime = 8
+query2.ntime = 20
 @time reachsets, boundsets = multi_step_concreach(query2);
 
+query22 = deepcopy(query)
+query22.ntime = 20
+query22.problem.bound_func = bound_tora_old
+@time reachsets1, boundsets1 = multi_step_concreach(query22);
+
+boundsets[1]
+boundsets1[1]
+
+boundLen1 = []
+for bound in boundsets 
+    boundVec = []
+    for i = 1:length(bound)
+        push!(boundVec, length(bound[i][1]))
+    end
+    boundTup = tuple(boundVec...)
+    push!(boundLen1, boundTup)
+end
+
+boundLen2 = []
+for bound in boundsets1 
+    boundVec = []
+    for i = 1:length(bound)
+        push!(boundVec, length(bound[i][1]))
+    end
+    boundTup = tuple(boundVec...)
+    push!(boundLen2, boundTup)
+end
+
+boundLen1
+boundLen2
+
 extrema(reachsets[end])
+extrema(reachsets1[end])
 overtSet = Hyperrectangle(low=[
     -0.34415609789501067
  -1.070147842066413

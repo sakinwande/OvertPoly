@@ -459,11 +459,46 @@ query1 = deepcopy(query)
 query1.ntime = 1
 @time reachSet, boundSet = concreach!(query1);
 
+query11 = deepcopy(query)
+query11.ntime = 1
+query11.problem.bound_func = bound_unicycle_old
+@time reachSetOld, boundSetOld = concreach!(query11);
 #Next, test multi-step concrete reachability
 query2 = deepcopy(query)
-query2.ntime = 2
+query2.ntime = 5
 @time reachSets, boundSets = multi_step_concreach(query2);
 
+query22 = deepcopy(query)
+query22.ntime = 5
+query22.problem.bound_func = bound_unicycle_old
+@time reachSetsOld, boundSetsOld = multi_step_concreach(query22);
+
+
+boundLen1 = []
+for bound in boundSets 
+    boundVec = []
+    for i = 1:length(bound)
+        push!(boundVec, length(bound[i][1]))
+    end
+    boundTup = tuple(boundVec...)
+    push!(boundLen1, boundTup)
+end
+
+boundLen2 = []
+for bound in boundSetsOld 
+    boundVec = []
+    for i = 1:length(bound)
+        push!(boundVec, length(bound[i][1]))
+    end
+    boundTup = tuple(boundVec...)
+    push!(boundLen2, boundTup)
+end
+
+boundLen1
+boundLen2
+
+extrema(reachSets[end])
+extrema(reachSetsOld[end])
 #Next, test direct symreach 
 query3 = deepcopy(query)
 query3.problem.bounds = boundSets
