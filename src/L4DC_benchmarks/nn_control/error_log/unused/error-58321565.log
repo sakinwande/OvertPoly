@@ -1,0 +1,72 @@
+slurmstepd-barrett4: error: Unable to create TMPDIR [/tmp/user/22848]: Permission denied
+slurmstepd-barrett4: error: Setting TMPDIR to /tmp
+┌ Warning: Failed to load integration with PlotlyBase & PlotlyKaleido.
+│   exception =
+│    ArgumentError: Package PlotlyKaleido not found in current path.
+│    - Run `import Pkg; Pkg.add("PlotlyKaleido")` to install the PlotlyKaleido package.
+│    Stacktrace:
+│      [1] macro expansion
+│        @ ./loading.jl:1772 [inlined]
+│      [2] macro expansion
+│        @ ./lock.jl:267 [inlined]
+│      [3] __require(into::Module, mod::Symbol)
+│        @ Base ./loading.jl:1753
+│      [4] #invoke_in_world#3
+│        @ ./essentials.jl:926 [inlined]
+│      [5] invoke_in_world
+│        @ ./essentials.jl:923 [inlined]
+│      [6] require(into::Module, mod::Symbol)
+│        @ Base ./loading.jl:1746
+│      [7] top-level scope
+│        @ /barrett/scratch/akinwande/.julia/packages/Plots/HyyIK/src/backends.jl:566
+│      [8] eval
+│        @ ./boot.jl:385 [inlined]
+│      [9] _initialize_backend(pkg::Plots.PlotlyBackend)
+│        @ Plots /barrett/scratch/akinwande/.julia/packages/Plots/HyyIK/src/backends.jl:564
+│     [10] backend
+│        @ /barrett/scratch/akinwande/.julia/packages/Plots/HyyIK/src/backends.jl:244 [inlined]
+│     [11] plotly()
+│        @ Plots /barrett/scratch/akinwande/.julia/packages/Plots/HyyIK/src/backends.jl:87
+│     [12] top-level scope
+│        @ /barrett/scratch/akinwande/OvertPoly/src/overtPoly_helpers.jl:5
+│     [13] include(fname::String)
+│        @ Base.MainInclude ./client.jl:494
+│     [14] top-level scope
+│        @ /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/tora_overtPoly_distrOpt.jl:1
+│     [15] include(mod::Module, _path::String)
+│        @ Base ./Base.jl:495
+│     [16] exec_options(opts::Base.JLOptions)
+│        @ Base ./client.jl:323
+│     [17] _start()
+│        @ Base ./client.jl:557
+└ @ Plots /barrett/scratch/akinwande/.julia/packages/Plots/HyyIK/src/backends.jl:574
+ERROR: LoadError: AssertionError: convex == (d2f((aa + bb) / 2) >= 0)
+Stacktrace:
+ [1] bound(f::RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(:xₚ,), Symbolics.var"#_RGF_ModTag", Symbolics.var"#_RGF_ModTag", (0x0faefed1, 0xa3a7fb58, 0x2c28e2bd, 0x69a0d11b, 0x0d936b2d), Expr}, a::Float64, b::Float64, N::Int64; rel_error_tol::Float64, conc_method::String, lowerbound::Bool, df::Function, d2f::RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(:xₚ,), Symbolics.var"#_RGF_ModTag", Symbolics.var"#_RGF_ModTag", (0x60e95e8f, 0x655a3007, 0x86c95b95, 0x8a5f225a, 0x359b0895), Expr}, d2f_zeros::Nothing, convex::Bool, plot::Bool)
+   @ OVERT /barrett/scratch/akinwande/.julia/packages/OVERT/nY5U2/src/overapprox_1d.jl:247
+ [2] bound_univariate(baseExpr::Expr, lb::Float64, ub::Float64; ϵ::Float64, npoint::Int64, rel_error_tol::Float64, plotflag::Bool)
+   @ Main /barrett/scratch/akinwande/OvertPoly/src/overtPoly_helpers.jl:116
+ [3] bound_tora(TORA::GraphPolyProblem; plotFlag::Bool)
+   @ Main /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/tora_overtPoly_distrOpt.jl:73
+ [4] bound_tora(TORA::GraphPolyProblem)
+   @ Main /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/tora_overtPoly_distrOpt.jl:48
+ [5] concreach!(query::GraphPolyQuery)
+   @ Main /barrett/scratch/akinwande/OvertPoly/src/distr_reachability.jl:94
+ [6] multi_step_concreach(query::GraphPolyQuery)
+   @ Main /barrett/scratch/akinwande/OvertPoly/src/distr_reachability.jl:127
+ [7] macro expansion
+   @ ./timing.jl:279 [inlined]
+ [8] top-level scope
+   @ /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/tora_overtPoly_distrOpt.jl:269
+in expression starting at /barrett/scratch/akinwande/OvertPoly/src/L4DC_benchmarks/nn_control/tora_overtPoly_distrOpt.jl:190
+
+caused by: StackOverflowError:
+Stacktrace:
+ [1] Interval
+   @ /barrett/scratch/akinwande/.julia/packages/IntervalArithmetic/EquAX/src/intervals/intervals.jl:37 [inlined]
+ [2] atomic
+   @ /barrett/scratch/akinwande/.julia/packages/IntervalArithmetic/EquAX/src/intervals/conversion.jl:123 [inlined]
+ [3] float
+   @ /barrett/scratch/akinwande/.julia/packages/IntervalArithmetic/EquAX/src/intervals/precision.jl:81 [inlined]
+ [4] sin(x::IntervalArithmetic.Interval{Float64}) (repeats 79984 times)
+   @ NaNMath /barrett/scratch/akinwande/.julia/packages/NaNMath/ceWIc/src/NaNMath.jl:11

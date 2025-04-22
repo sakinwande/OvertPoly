@@ -1,0 +1,53 @@
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Set parameter TokenServer to value "srcc-license-srcf.stanford.edu,srcc-license-rcf.stanford.edu"
+Running TORA Benchmark4509.840273 seconds (3.35 M allocations: 500.481 MiB, 0.01% gc time, 0.00% compilation time)
+0.665770429672914
+##########################################################################################
+Time taken to compute concrete reach: 4509965 milliseconds
+#####################################################################################
+Property is satisfied
+########################################################################################
+Time taken to verify property: 310 milliseconds
+######################################################################################

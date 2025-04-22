@@ -207,11 +207,21 @@ query = GraphPolyQuery(
 #Use concrete reachability to trace out the trajectory
 query1 = deepcopy(query)
 query1.ntime = 20
+@time reachSets, boundSets = multi_step_concreach(query1);
 
-tstart = Dates.now()
-reachSets, boundSets = multi_step_concreach(query1)
-tend = Dates.now()
-println("Time taken to compute concrete reach: ", tend-tstart)
+#Compare to old approach...
+query2 = deepcopy(query)
+query2.problem.bound_func = bound_pend_old
+query2.ntime = 20
+@time reachSets2, boundSets2 = multi_step_concreach(query2);
+
+query2.problem
+
+boundLen1 = [(length(bound[1][1]), length(bound[2][1])) for bound in boundSets]
+boundLen2 = [(length(bound[1][1]), length(bound[2][1])) for bound in boundSets2]
+
+extrema(reachSets[11])
+extrema(reachSets2[11])
 
 extrema(reachSets[11])
 volume(reachSets[11])
