@@ -238,13 +238,9 @@ query = GraphPolyQuery(
     2 #case. Delete this param
 )
 
-# ###################
-#Warm up run (not timed)
-# query0 = deepcopy(query)
-# concInt = [2,2,2]
-# query0.ntime = 6
-# reachSets, boundSets = multi_step_hybreach(query0, depMat, concInt)
-#########################
+currSplit = 5;
+println("Trying to verify with [5,5,5,5] split")
+#Trying to run Unicycle Benchmark
 reachList = []
 symReachList = []
 boundsList = []
@@ -262,309 +258,344 @@ print(sym_set)
 #Timed run
 cquery = deepcopy(query)
 squery = deepcopy(query)
-cquery.ntime = 10
-tstart = Dates.now()
+cquery.ntime = 5
+squery.ntime = 5
+t_sym = 5
+tStart = Dates.now()
 concReachSets, BoundSets = multi_step_concreach(cquery);
-push!(boundsList,BoundSets...)
-push!(reachList,concReachSets...)
-squery.problem.bounds = boundsList
-t_sym = 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
+squery.problem.bounds = BoundSets;
+push!(boundsList,BoundSets...);
+push!(reachList,concReachSets...);
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
 push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-tend1 = Dates.now()
-println("Time to compute 10 hybrid reach sets: ", tend1-tstart)
-cquery.problem.domain = sym_set
+t1 = Dates.now()
+cquery.problem.domain = sym_set;
+print("Time to compute 5 hybrid reach sets: ", t1-tStart)
 concReachSets, BoundSets = multi_step_concreach(cquery);
-push!(boundsList,BoundSets...)
-push!(reachList,concReachSets[2:end]...)
-squery.problem.bounds = boundsList
-#Use reachlist!!!
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
+squery.problem.bounds = BoundSets;
+push!(boundsList,BoundSets...);
+push!(reachList,concReachSets...);
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
 push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-tend2 = Dates.now()
-println("Time to compute 20 hybrid reach sets: ", tend2-tstart)
-cquery.problem.domain = sym_set
+t2 = Dates.now()
+cquery.problem.domain = sym_set;
+print("Time to compute 10 hybrid reach sets: ", t2-tStart)
 concReachSets, BoundSets = multi_step_concreach(cquery);
-push!(boundsList,BoundSets...)
-push!(reachList,concReachSets[2:end]...)
-squery.problem.bounds = boundsList
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
+squery.problem.bounds = BoundSets;
+push!(boundsList,BoundSets...);
+push!(reachList,concReachSets...);
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
 push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-tend3 = Dates.now()
-println("Time to compute 30 hybrid reach sets: ", tend3-tstart)
-cquery.problem.domain = sym_set
+t3 = Dates.now()
+cquery.problem.domain = sym_set;
+print("Time to compute 15 hybrid reach sets: ", t3-tStart)
 concReachSets, BoundSets = multi_step_concreach(cquery);
-push!(boundsList,BoundSets...)
-push!(reachList,concReachSets[2:end]...)
-squery.problem.bounds = boundsList
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
+squery.problem.bounds = BoundSets;
+push!(boundsList,BoundSets...);
+push!(reachList,concReachSets...);
+sym_set = symreach(squery, concReachSets, depMat, t_sym);
 push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-tend4 = Dates.now()
-println("Time to compute 40 hybrid reach sets: ", tend4-tstart)
-cquery.problem.domain = sym_set
-concReachSets, BoundSets = multi_step_concreach(cquery);
-push!(boundsList,BoundSets...)
-push!(reachList,concReachSets[2:end]...)
-squery.problem.bounds = boundsList
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-t_sym += 1
-println(t_sym)
-squery.ntime = t_sym
-@time sym_set = symreach(squery, reachList, depMat, t_sym);
-push!(symReachList, sym_set)
-println(volume(sym_set))
-println(extrema(sym_set))
-tend = Dates.now()
-# push!(reachList,concReachSets...)
+t4 = Dates.now()
+cquery.problem.domain = sym_set;
+print("Time to compute 20 hybrid reach sets: ", t4-tStart)
+
+
+
+
+#####Scaling/Ablation Run
+#Timed run
+# cquery = deepcopy(query)
+# squery = deepcopy(query)
+# cquery.ntime = 10
+# tstart = Dates.now()
+# concReachSets, BoundSets = multi_step_concreach(cquery);
 # push!(boundsList,BoundSets...)
-println("##################################################################")
-println("Time taken to compute 50 hybrid reach: ", tend-tstart)
-println("##################################################################")
-# println(reachList...)
-# println(boundsList...)
-# #############################################################################
-# #for tySte
-
-
-# for t_sym in 1:1:50
-#     println(t_sym)
-#     squery = deepcopy(query)
-#     squery.ntime = t_sym
-#     squery.problem.bounds = boundsList[1:t_sym]
-#     @time sym_set = symreach(squery, concReachSets[1:t_sym], depMat, t_sym);
-# end
+# push!(reachList,concReachSets...)
+# squery.problem.bounds = boundsList
+# t_sym = 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# tend1 = Dates.now()
+# println("Time to compute 10 hybrid reach sets: ", tend1-tstart)
+# cquery.problem.domain = sym_set
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# push!(boundsList,BoundSets...)
+# push!(reachList,concReachSets[2:end]...)
+# squery.problem.bounds = boundsList
+# #Use reachlist!!!
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# tend2 = Dates.now()
+# println("Time to compute 20 hybrid reach sets: ", tend2-tstart)
+# cquery.problem.domain = sym_set
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# push!(boundsList,BoundSets...)
+# push!(reachList,concReachSets[2:end]...)
+# squery.problem.bounds = boundsList
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# tend3 = Dates.now()
+# println("Time to compute 30 hybrid reach sets: ", tend3-tstart)
+# cquery.problem.domain = sym_set
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# push!(boundsList,BoundSets...)
+# push!(reachList,concReachSets[2:end]...)
+# squery.problem.bounds = boundsList
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# tend4 = Dates.now()
+# println("Time to compute 40 hybrid reach sets: ", tend4-tstart)
+# cquery.problem.domain = sym_set
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# push!(boundsList,BoundSets...)
+# push!(reachList,concReachSets[2:end]...)
+# squery.problem.bounds = boundsList
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t_sym += 1
+# println(t_sym)
+# squery.ntime = t_sym
+# @time sym_set = symreach(squery, reachList, depMat, t_sym);
+# push!(symReachList, sym_set)
+# println(volume(sym_set))
+# println(extrema(sym_set))
+# tend = Dates.now()
+# # push!(reachList,concReachSets...)
+# # push!(boundsList,BoundSets...)
+# println("##################################################################")
+# println("Time taken to compute 50 hybrid reach: ", tend-tstart)
+# println("##################################################################")
