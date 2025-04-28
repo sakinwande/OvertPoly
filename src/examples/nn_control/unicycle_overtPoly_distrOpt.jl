@@ -465,11 +465,11 @@ query11.problem.bound_func = bound_unicycle_old
 @time reachSetOld, boundSetOld = concreach!(query11);
 #Next, test multi-step concrete reachability
 query2 = deepcopy(query)
-query2.ntime = 5
+query2.ntime = 20
 @time reachSets, boundSets = multi_step_concreach(query2);
 
 query22 = deepcopy(query)
-query22.ntime = 5
+query22.ntime = 20
 query22.problem.bound_func = bound_unicycle_old
 @time reachSetsOld, boundSetsOld = multi_step_concreach(query22);
 
@@ -506,12 +506,102 @@ query3.ntime = 2
 @time symReach = symreach(query3,reachSets, depMat,2)
 
 
-#Test hybrid reachability
-concInt = [2,2,2,2,2]
-query4 = deepcopy(query)
-@time reachSets = multi_step_hybreach(query4, depMat, concInt)
+# #Test hybrid reachability
+# concInt = [2,2,2,2,2]
+# query4 = deepcopy(query)
+# @time reachSets = multi_step_hybreach(query4, depMat, concInt)
 
+###########Trying hybrid symbolic##############
+reachList = []
+symReachList = []
+boundsList = []
+#Timed run
+#println("Trying [15,5,5,5,5,5,5,5]")
+#println("Trying [20,10,5,5,5,5]")
+cquery = deepcopy(query)
+squery = deepcopy(query)
+cquery.ntime = 10
+squery.ntime = 10
+t_sym = 10
+tStart = Dates.now()
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets;
+push!(boundsList,BoundSets...);
+push!(reachList,concReachSets...);
+@time sym_set = symreach(squery, concReachSets, depMat, t_sym);
+push!(symReachList, sym_set)
+t1 = Dates.now()
+cquery.problem.domain = sym_set;
+print("Time to compute 10 hybrid reach sets: ", t1-tStart)
+# cquery.ntime = 5
+# squery.ntime = 5
+# t_sym = 5
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets;
+push!(boundsList,BoundSets...);
+push!(reachList,concReachSets...);
+@time sym_set = symreach(squery, concReachSets, depMat, t_sym);
+push!(symReachList, sym_set)
+t2 = Dates.now()
+cquery.problem.domain = sym_set;
+print("Time to compute 20 hybrid reach sets: ", t2-tStart)
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets;
+push!(boundsList,BoundSets...);
+push!(reachList,concReachSets...);
+@time sym_set = symreach(squery, concReachSets, depMat, t_sym);
+push!(symReachList, sym_set)
+t3 = Dates.now()
+cquery.problem.domain = sym_set;
+print("Time to compute 30 hybrid reach sets: ", t4-tStart)
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets;
+push!(boundsList,BoundSets...);
+push!(reachList,concReachSets...);
+@time sym_set = symreach(squery, concReachSets, depMat, t_sym);
+push!(symReachList, sym_set)
+t5 = Dates.now()
+cquery.problem.domain = sym_set;
+print("Time to compute 40 hybrid reach sets: ", t5-tStart)
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets;
+push!(boundsList,BoundSets...);
+push!(reachList,concReachSets...);
+@time sym_set = symreach(squery, concReachSets, depMat, t_sym);
+push!(symReachList, sym_set)
+t6 = Dates.now()
+cquery.problem.domain = sym_set;
+print("Time to compute 50 hybrid reach sets: ", t6-tStart)
+# tPause = Dates.now()
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# squery.problem.bounds = BoundSets;
+# push!(boundsList,BoundSets...);
+# push!(reachList,concReachSets...);
+# sym_set = symreach(squery, concReachSets, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t7 = Dates.now()
+# cquery.problem.domain = sym_set;
+# print("Time to compute 40 hybrid reach sets: ", t7 - tPause)
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# squery.problem.bounds = BoundSets;
+# push!(boundsList,BoundSets...);
+# push!(reachList,concReachSets...);
+# sym_set = symreach(squery, concReachSets, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t8 = Dates.now()
+# cquery.problem.domain = sym_set;
+# print("Time to compute 45 hybrid reach sets: ", t8-tPause)
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# squery.problem.bounds = BoundSets;
+# push!(boundsList,BoundSets...);
+# push!(reachList,concReachSets...);
+# sym_set = symreach(squery, concReachSets, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t9 = Dates.now()
+# cquery.problem.domain = sym_set;
+# print("Time to compute 50 hybrid reach sets: ", t9-tStart)
 
+###########Verify Prop#####################
 goalSet = Hyperrectangle(low = [-0.6, -0.2, -0.06, -0.3], high=[0.6, 0.2, 0.06, 0.3])
 
 plot(project(reachSets[end], [1,2]), lab="Reachable Set", color="lightblue", lw=0.5)
@@ -525,188 +615,3 @@ symQuery = deepcopy(query)
 symQuery.problem.bounds = boundSets
 reachSets[end]
 
-# # reachSets[1]
-# query.problem.bound_func(query.problem; plotFlag=true)
-
-##################################################
-#######Sketching out sym reach###################
-symQuery.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
-symQuery.mod_dict = Dict{Symbol,Any}()
-
-############Sketching out encode_sym_dynamics
-#####Inputs to encode sym dynamics 
-x_dim = length(symQuery.problem.varList) #state dimension
-
-function encode_sym_dynamics!(symQuery, x_dim)
-    """
-    Method to encode symbolic dynamics. Takes symQuery as input
-    """
-    symGraph = OptiGraph()
-    #####Enter time loop######
-    for t_ind = 1:symQuery.ntime
-        x_ind = 0
-        #Create a new set of nodes for each time step
-        dynNodes = @optinode(symGraph, nodes[1:x_dim])
-        #####Enter Symbol loop####
-        for sym in symQuery.problem.varList
-            sym_t = Meta.parse("$(sym)_$(t_ind)")
-            x_ind += 1
-            #Get lower and upper bounds for first variable in first time step
-            LB, UB = symQuery.problem.bounds[t_ind][x_ind]
-            Tri = OA2PWA(LB)
-            xS = [(tup[1:end-1]) for tup in LB]
-            yUB = [tup[end] for tup in UB]
-            yLB = [tup[end] for tup in LB]
-
-            ccEncoding!(xS, yLB, yUB, Tri, symQuery, sym_t, x_ind, dynNodes[x_ind])
-        end
-
-        f_t = Meta.parse("f_$(t_ind)")
-        symQuery.mod_dict[f_t] = dynNodes
-    end
-    symQuery.mod_dict[:graph] = symGraph
-end
-
-encode_sym_dynamics!(symQuery, x_dim)
-
-######Sketching out Encode Sym Control####
-function encode_sym_control!(symQuery)
-    """
-    Method to encode symbolic control. Takes symQuery as input
-    """
-    network_file = symQuery.network_file
-    neurList = []
-    for t_ind = 1:symQuery.ntime
-        input_set = reachSets[t_ind]
-        network_file = symQuery.network_file
-        netModel = @optinode(symQuery.mod_dict[:graph])
-        neurons = add_controller_constraints!(netModel, network_file, input_set, Id())
-        u_ind = Meta.parse("u_$(t_ind)")
-        symQuery.mod_dict[u_ind] = netModel
-        push!(neurList, neurons)
-    end
-    return neurList
-end
-########################################
-neurList = encode_sym_control!(symQuery)
-
-
-#########Sketching out time encoding with dynamics/control link######
-function encode_time(symQuery, neurList)
-    for t_ind = 1:symQuery.ntime
-        symGraph = symQuery.mod_dict[:graph]
-        dynModel = symQuery.mod_dict[Meta.parse("f_$(t_ind)")]
-        netModel = symQuery.mod_dict[Meta.parse("u_$(t_ind)")]
-
-        #Link the dynamics and control first 
-        symQuery.problem.link_func(symQuery, neurList[t_ind], symGraph, dynModel, netModel, t_ind)
-    end
-
-    #Next link time steps
-    symGraph = symQuery.mod_dict[:graph]
-    #######Enter time loop######
-    #TEST: Entering time loop manually
-    # t_ind = 1
-    for t_ind = 1:symQuery.ntime-1
-        currDyn = symQuery.mod_dict[Meta.parse("f_$(t_ind)")]
-        nextDyn = symQuery.mod_dict[Meta.parse("f_$(t_ind+1)")]
-        #Iterate through models and link pertinent variables 
-        x_ind = 1
-        #TEST: Entering the loop manually
-        # sym = symQuery.problem.varList[x_ind]
-        for sym in symQuery.problem.varList
-            currModel = currDyn[x_ind]
-            currSym = Meta.parse("$(sym)_$(t_ind)")
-            nextModel = nextDyn[x_ind]
-            nextSym = Meta.parse("$(sym)_$(t_ind+1)")
-
-            xNow = symQuery.var_dict[currSym][end][1] 
-            yNow = symQuery.var_dict[currSym][2][1]
-            xNext = symQuery.var_dict[nextSym][end][1]
-
-            @linkconstraint(symGraph, xNext == xNow + symQuery.dt*yNow)
-            x_ind += 1
-        end
-    end
-end
-
-###########################
-encode_time(symQuery, neurList)
-
-##############################
-#inputs to sym reach solve 
-t_sym = symQuery.ntime
-#######Next define Sym Reach Solve###########
-function sym_reach_solve(symQuery, t_sym)
-    #Ensure that the time step is within bounds
-    @assert t_sym <= symQuery.ntime
-    #Akin to conc_reach_solve
-    max_query = deepcopy(symQuery)
-    min_query = deepcopy(symQuery)
-    lows = Array{Float64}(undef, 0)
-    highs = Array{Float64}(undef, 0)
-    f_sym = Meta.parse("f_$(t_sym)")
-    min_dynModel = min_query.mod_dict[f_sym]
-    minGraph = min_query.mod_dict[:graph]
-    i = 0
-
-    #Compute lower bounds
-    for sym in min_query.problem.varList
-        sym_t = Meta.parse("$(sym)_$(t_sym)") 
-        i += 1
-        model = min_dynModel[i]
-        v = min_query.var_dict[sym_t][end][1]
-        dv = min_query.var_dict[sym_t][2][1]
-        @variable(model, next_v)
-        @constraint(model, next_v == v + query.dt*dv)
-        @objective(model, Min, next_v)
-    end
-
-    set_optimizer(minGraph, Gurobi.Optimizer)
-    optimize!(minGraph)
-    @assert termination_status(minGraph) == MOI.OPTIMAL
-    i = 0
-    for _ in symQuery.problem.varList
-        i += 1
-        push!(lows, value(min_dynModel[i][:next_v]))
-    end
-
-
-    #Compute upper bounds
-    max_dynModel = max_query.mod_dict[f_sym]
-    maxGraph = max_query.mod_dict[:graph]
-    i = 0
-    for sym in query.problem.varList 
-        sym_t = Meta.parse("$(sym)_$(t_sym)") 
-        i += 1
-        model = max_dynModel[i]
-        v = max_query.var_dict[sym_t][end][1]
-        dv = max_query.var_dict[sym_t][2][1]
-        @variable(model, next_v)
-        @constraint(model, next_v == v + max_query.dt*dv)
-        @objective(model, Max, next_v)
-    end
-
-    set_optimizer(maxGraph, Gurobi.Optimizer)
-    optimize!(maxGraph)
-    i = 0
-    for _ in query.problem.varList
-        i += 1
-        push!(highs, value(max_dynModel[i][:next_v]))
-    end
-    reach_set = Hyperrectangle(low=lows, high=highs)
-    return reach_set
-end
-
-
-@time sym_hyp = sym_reach_solve(symQuery, t_sym)
-
-sym_hyp
-reachSets[end]
-
-
-plot(reachSets[end][3,4])
-plot!(sym_hyp)
-
-plot(project(reachSets[end], [3,4]))
-plot!(project(sym_hyp, [3,4]))
