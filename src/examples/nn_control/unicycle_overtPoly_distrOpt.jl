@@ -379,6 +379,124 @@ function bound_unicycle(Unicycle; plotFlag=false)
    return bounds
 end
 
+function bound_unicycle_us(Unicycle; plotFlag=false)
+    lbs, ubs = extrema(Unicycle.domain)
+
+    ##Bound initial state variable (dx1 = x4*cos(x3))#####
+    #Weird behavior with Hyperrectangle
+    lb_x4 = lbs[4]
+    ub_x4 = ubs[4]
+
+    #First bound x4
+    x1FuncSub_1 = :(1*x4)
+    x1FuncSub_1LB, x1FuncSub_1UB = interpol_nd(bound_univariate(x1FuncSub_1, lb_x4, ub_x4)...)
+    
+    #Also bound cos(x3)
+    lb_x3 = lbs[3]
+    ub_x3 = ubs[3]
+    x1FuncSub_2 = :(cos(x3))
+    x1FuncSub_2LB, x1FuncSub_2UB = interpol_nd(bound_univariate(x1FuncSub_2, lb_x3, ub_x3)...)
+
+    #Lift the bounds to the same space
+    #First lift the first component of dx1
+    emptyList = [1]
+    currList = [2]
+    l_x1FuncSub_1LB, l_x1FuncSub_1UB = lift_OA(emptyList, currList, x1FuncSub_1LB, x1FuncSub_1UB, lbs[3:4], ubs[3:4])
+
+    #Next lift the second component of dx1
+    emptyList = [2]
+    currList = [1]
+    l_x1FuncSub_2LB, l_x1FuncSub_2UB = lift_OA(emptyList, currList, x1FuncSub_2LB, x1FuncSub_2UB, lbs[3:4], ubs[3:4])
+
+    #Combine to get x4*cos(x3)
+    x1FuncLB, x1FuncUB = prodBounds2(l_x1FuncSub_1LB, l_x1FuncSub_1UB, l_x1FuncSub_2LB, l_x1FuncSub_2UB)
+
+    #Check if bounds are valid by plotting the surface
+    if plotFlag
+        xS = unique!(Any[tup[1] for tup in x1FuncLB])
+        yS = unique!(Any[tup[2] for tup in x1FuncLB])
+
+        surfDim = (size(yS)[1], size(xS)[1])
+        baseFunc = exprList[1]
+
+        #Plot the surface
+        plotSurf(baseFunc, x1FuncLB, x1FuncUB, surfDim, xS, yS, true)
+    end
+    #############Next, bound dx2 (dx2 = x4*sin(x3))#####
+    #Bound first component of dx2 (x4)
+    x2FuncSub1 = :(1*x4)
+    x2FuncSub1LB, x2FuncSub1UB = interpol_nd(bound_univariate(x2FuncSub1, lb_x4, ub_x4)...)
+
+    #Bound second component of dx2 (sin(x3))
+    x2FuncSub2 = :(sin(x3))
+    x2FuncSub2LB, x2FuncSub2UB = interpol_nd(bound_univariate(x2FuncSub2, lb_x3, ub_x3)...)
+
+    #Lift the bounds to the same space
+    #First lift the first component of dx2\
+    emptyList = [1]
+    currList = [2]
+    l_x2FuncSub1LB, l_x2FuncSub1UB = lift_OA(emptyList, currList, x2FuncSub1LB, x2FuncSub1UB, lbs[3:4], ubs[3:4])
+
+    #Next lift the second component of dx2
+    emptyList = [2]
+    currList = [1]
+    l_x2FuncSub2LB, l_x2FuncSub2UB = lift_OA(emptyList, currList, x2FuncSub2LB, x2FuncSub2UB, lbs[3:4], ubs[3:4])
+
+    #Combine to get x4*sin(x3)
+    x2FuncLB, x2FuncUB = prodBounds2(l_x2FuncSub1LB, l_x2FuncSub1UB, l_x2FuncSub2LB, l_x2FuncSub2UB)
+    #Check if bounds are valid by plotting the surface
+    if plotFlag
+        xS = unique!(Any[tup[1] for tup in x2FuncLB])
+        yS = unique!(Any[tup[2] for tup in x2FuncLB])
+
+        surfDim = (size(yS)[1], size(xS)[1])
+        baseFunc = exprList[2]
+
+        #Plot the surface
+        plotSurf(baseFunc, x2FuncLB, x2FuncUB, surfDim, xS, yS, true)
+
+    end
+
+   #dx1 and dx2 must be functions of x1 and x2 respectively
+   emptyList = [1]
+   currList = [2,3]
+   
+   #Retcon x1FuncLB and x1FuncUB to be unlifted 
+   x1FuncUB_u = deepcopy(x1FuncUB)
+   x1FuncLB_u = deepcopy(x1FuncLB)
+   
+   lbs_x1 = [lbs[1]]
+   append!(lbs_x1, lbs[3:4])
+   ubs_x1 = [ubs[1]]
+   append!(ubs_x1, ubs[3:4])
+   x1FuncLB, x1FuncUB = lift_OA(emptyList, currList, x1FuncLB_u, x1FuncUB_u, lbs_x1, ubs_x1)
+   
+   emptyList = [1]
+   currList = [2,3]
+   
+   #Retcon x2FuncLB and x2FuncUB to be unlifted
+   x2FuncLB_u = deepcopy(x2FuncLB)
+   x2FuncUB_u = deepcopy(x2FuncUB)
+   
+   lbs_x2 = lbs[2:4]
+   ubs_x2 = ubs[2:4]
+   x2FuncLB, x2FuncUB = lift_OA(emptyList, currList, x2FuncLB_u, x2FuncUB_u, lbs_x2, ubs_x2)
+   
+   #############Next, bound dx3 (dx3 = u[2])#####
+   #Since dx3 is solely a function of u[2], just use a constant
+   x3Func = :(0*x3)
+   x3FuncLB, x3FuncUB = interpol_nd(bound_univariate(x3Func, lb_x3, ub_x3)...)
+   
+   #############Finally, bound dx4 (dx4 = u[1] + w)#####
+   #Here, dx4 is a function of u[1] and a disturbance term. Treat disturbance as a zero mean constant 
+   x4Func = :(0*x4)
+   x4FuncLB, x4FuncUB = interpol_nd(bound_univariate(x4Func, lb_x4, ub_x4, ϵ = w)...)
+   
+   bounds = [[x1FuncLB, x1FuncUB], [x2FuncLB, x2FuncUB], [x3FuncLB, x3FuncUB], [x4FuncLB, x4FuncUB]]
+   
+   return bounds
+end
+
 ###Next Define function to link control and relevant dynamics###
 function unicycle_dyn_con_link!(query, neurons, graph, dynModel, netModel, t_ind=nothing)
 
@@ -455,55 +573,125 @@ query = GraphPolyQuery(
 
 
 #Next, test multi-step concrete reachability
-query1 = deepcopy(query)
-query1.ntime = 1
+query1 = deepcopy(query);
+query1.ntime = 1;
 @time reachSet, boundSet = concreach!(query1);
 
-query11 = deepcopy(query)
-query11.ntime = 1
-query11.problem.bound_func = bound_unicycle_old
+query11 = deepcopy(query);
+query11.ntime = 1;
+query11.problem.bound_func = bound_unicycle_old;
 @time reachSetOld, boundSetOld = concreach!(query11);
+
+query111 = deepcopy(query);
+query111.ntime = 1;
+query111.problem.bound_func = bound_unicycle_us
+@time reachSetUS, boundSetUS = concreach!(query111);
+
+reachSetUS ⊆ reachSet
+reachSet ⊆ reachSetUS
+
+⊆(reachSetUS, reachSet, true)
 #Next, test multi-step concrete reachability
-query2 = deepcopy(query)
-query2.ntime = 20
+query2 = deepcopy(query);
+query2.ntime = 10;
 @time reachSets, boundSets = multi_step_concreach(query2);
 
-query22 = deepcopy(query)
-query22.ntime = 20
-query22.problem.bound_func = bound_unicycle_old
+query22 = deepcopy(query);
+query22.ntime = 10;
+query22.problem.bound_func = bound_unicycle_old;
 @time reachSetsOld, boundSetsOld = multi_step_concreach(query22);
 
+query222 = deepcopy(query);
+query222.ntime = 10;
+query222.problem.bound_func = bound_unicycle_us;
+@time reachSetsUS, boundSetsUS = multi_step_concreach(query222);
 
-boundLen1 = []
-for bound in boundSets 
-    boundVec = []
-    for i = 1:length(bound)
-        push!(boundVec, length(bound[i][1]))
+
+trueFlag = true
+for (i,_) in enumerate(reachSets)
+    trueFlag = reachSetsUS[i] ⊆ reachSets[i]
+    if !trueFlag
+        println("Failed at $(i)")
+        trueFlag = true
     end
-    boundTup = tuple(boundVec...)
-    push!(boundLen1, boundTup)
 end
 
-boundLen2 = []
-for bound in boundSetsOld 
-    boundVec = []
-    for i = 1:length(bound)
-        push!(boundVec, length(bound[i][1]))
+#Recall, boundSets[t] makes reachSets[t+1], but reachSets[t] is used to make boundSets[t], for t >= 1
+t = 1
+j = 1
+tf2 = true
+for (i,bound) in enumerate(boundSets[t][j][1])
+    tf2 = bound[end] <= boundSetsUS[t][j][1][i][end]
+    if !tf2
+        println("Failed at $i")
+        tf2 = true
     end
-    boundTup = tuple(boundVec...)
-    push!(boundLen2, boundTup)
 end
 
-boundLen1
-boundLen2
+for (i,bound) in enumerate(boundSets[t][j][2])
+    tf2 = bound[end] >= boundSetsUS[t][j][2][i][end]
+    if !tf2
+        println("Failed at $i")
+        tf2 = true
+    end
+end
 
-extrema(reachSets[end])
-extrema(reachSetsOld[end])
+reachSetsUS[t] ⊆ reachSets[t]
+reachSets[t] ⊆ reachSetsUS[t]
+
+count = 2
+
+c_dist = LazySets.center(reachSetsUS[t], count) - LazySets.center(reachSets[t], count)
+r_dist = LazySets.radius_hyperrectangle(reachSetsUS[t],count) - LazySets.radius_hyperrectangle(reachSets[t],count)
+
+LazySets._leq(r_dist, c_dist)
+LazySets._leq(c_dist, -r_dist)
+
+sUB = gen_interpol_nd(boundSets[t][j][2])
+usUB = gen_interpol_nd(boundSetsUS[t][j][2])
+
+usInps = [tup[1:end-1] for tup in boundSetsUS[t][j][2]]
+sInps = [tup[1:end-1] for tup in boundSets[t][j][2]]
+
+truthFlag = true
+for (i,inp) in enumerate(usInps)
+    truthFlag = sUB(inp...) >= usUB(inp...)
+    if !truthFlag
+        println("Failed at $i")
+        truthFlag = true
+    end
+end
+
+booL,booU = extrema(reachSetsUS[t])
+booLo = [floor(val, digits=8) for val in booL]
+booLo = [ceil(val, digits=8) for val in booU]
+
+
+
+  extrema(reachSets[t])
+
+  extrema(reachSetsUS[t])[1][2] >= extrema(reachSets[t])[1][2]
+
+t_sym = 10
 #Next, test direct symreach 
-query3 = deepcopy(query)
-query3.problem.bounds = boundSets
-query3.ntime = 2
-@time symReach = symreach(query3,reachSets, depMat,2)
+query3 = deepcopy(query);
+query3.problem.bounds = boundSets;
+query3.ntime = t_sym;
+@time symReach = symreach(query3,reachSets, depMat,2);
+
+query33 = deepcopy(query);
+query33.problem.bounds = boundSetsOld;
+query33.problem.bound_func = bound_unicycle_old;
+query33.ntime = t_sym;
+@time symReachOld = symreach(query33,reachSetsOld, depMat,2);
+
+query333 = deepcopy(query);
+query333.problem.bounds = boundSetsUS;
+query333.problem.bound_func = bound_unicycle_us;
+query333.ntime = t_sym;
+@time symReachUS = symreach(query333,reachSetsUS, depMat,2);
+
+
 
 
 # #Test hybrid reachability

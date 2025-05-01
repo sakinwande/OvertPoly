@@ -423,14 +423,36 @@ query = GraphPolyQuery(
 )
 
 ###################
-query0 = deepcopy(query)
+query0 = deepcopy(query);
 @time reachSets, boundSets = concreach!(query0);
+
+query00 = deepcopy(query);
+query00.problem.bound_func = bound_acc_old;
+@time reachSets_old, boundSets_old = concreach!(query00);
+
+reachSets_old ⊆ reachSets
+reachSets ⊆ reachSets_old
+
 #########################
-query1 = deepcopy(query)
-query1.ntime = 50
+query1 = deepcopy(query);
+query1.ntime = 50;
 @time reachSets, boundSets = multi_step_concreach(query1);
 
+query11 = deepcopy(query);
+query11.problem.bound_func = bound_acc_old;
+query11.ntime = 50;
+@time reachSets_old, boundSets_old = multi_step_concreach(query11);
 
+trueFlag = true
+for i = 1:50
+    if !(reachSets_old[i] ⊆ reachSets[i])
+        println("Unexpected behavior at time $i")
+        trueFlag = false
+        break
+    end
+end
+
+trueFlag
 volume(reachSets[end])
 t = 50
 #Lead
