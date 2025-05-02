@@ -97,7 +97,7 @@ function bound_unicycle_old(Unicycle; plotFlag=false)
     
     for tup in x1FuncLB_s
         #First find the corresponding f(x) and f(y) values
-        #NOTE: Round to avoid floating point errors
+        #NOTE:   to avoid floating point errors
         # xInd = findall(x->x[1] == round(tup[1], digits=5), x1FuncSub_2LB)[1]
         # yInd = findall(y->y[1] == round(tup[2], digits=5), x1FuncSub_1LB)[1]
 
@@ -587,6 +587,13 @@ query111.ntime = 1;
 query111.problem.bound_func = bound_unicycle_us
 @time reachSetUS, boundSetUS = concreach!(query111);
 
+extrema(reachSet)
+extrema(reachSetOld)
+extrema(reachSetUS)
+
+vecTest = extrema(reachSet)[1]
+floor.(vecTest, digits=8)
+
 reachSetUS ⊆ reachSet
 reachSet ⊆ reachSetUS
 
@@ -617,62 +624,49 @@ for (i,_) in enumerate(reachSets)
 end
 
 #Recall, boundSets[t] makes reachSets[t+1], but reachSets[t] is used to make boundSets[t], for t >= 1
-t = 1
+t = 3
 j = 1
 tf2 = true
-for (i,bound) in enumerate(boundSets[t][j][1])
-    tf2 = bound[end] <= boundSetsUS[t][j][1][i][end]
-    if !tf2
-        println("Failed at $i")
-        tf2 = true
-    end
-end
 
-for (i,bound) in enumerate(boundSets[t][j][2])
-    tf2 = bound[end] >= boundSetsUS[t][j][2][i][end]
-    if !tf2
-        println("Failed at $i")
-        tf2 = true
+sLB = gen_interpol_nd(boundSets[t][j][1])
+sUB = gen_interpol_nd(boundSets[t][j][2])
+usLB = gen_interpol_nd(boundSetsUS[t][j][1])
+usUB = gen_interpol_nd(boundSetsUS[t][j][2])
+
+usInps1 = [tup[1:end-1] for tup in boundSetsUS[t][j][1]]
+usInps2 = [tup[1:end-1] for tup in boundSetsUS[t][j][2]]
+usInps = vcat(usInps1, usInps2)
+
+lbFlag = true
+ubFlag = true
+for (i,inp) in enumerate(usInps)
+    lbFlag = sLB(inp...) <= usLB(inp...)
+    ubFlag = sUB(inp...) >= usUB(inp...)
+    if !lbFlag
+        println("LB failed at $i")
+        lbFlag = true
+    end
+    if !ubFlag
+        println("UB failed at $i")
+        ubFlag = true
     end
 end
 
 reachSetsUS[t] ⊆ reachSets[t]
 reachSets[t] ⊆ reachSetsUS[t]
 
-count = 2
+  extrema(reachSets[t])
+extrema(reachSetsUS[t])
 
+count = 4
 c_dist = LazySets.center(reachSetsUS[t], count) - LazySets.center(reachSets[t], count)
 r_dist = LazySets.radius_hyperrectangle(reachSetsUS[t],count) - LazySets.radius_hyperrectangle(reachSets[t],count)
 
-LazySets._leq(r_dist, c_dist)
-LazySets._leq(c_dist, -r_dist)
-
-sUB = gen_interpol_nd(boundSets[t][j][2])
-usUB = gen_interpol_nd(boundSetsUS[t][j][2])
-
-usInps = [tup[1:end-1] for tup in boundSetsUS[t][j][2]]
-sInps = [tup[1:end-1] for tup in boundSets[t][j][2]]
-
-truthFlag = true
-for (i,inp) in enumerate(usInps)
-    truthFlag = sUB(inp...) >= usUB(inp...)
-    if !truthFlag
-        println("Failed at $i")
-        truthFlag = true
-    end
-end
-
-booL,booU = extrema(reachSetsUS[t])
-booLo = [floor(val, digits=8) for val in booL]
-booLo = [ceil(val, digits=8) for val in booU]
 
 
-
-  extrema(reachSets[t])
-
-  extrema(reachSetsUS[t])[1][2] >= extrema(reachSets[t])[1][2]
-
-t_sym = 10
+########################################################
+########################################################
+t_sym = 5
 #Next, test direct symreach 
 query3 = deepcopy(query);
 query3.problem.bounds = boundSets;
@@ -708,6 +702,8 @@ boundsList = []
 #println("Trying [20,10,5,5,5,5]")
 cquery = deepcopy(query)
 squery = deepcopy(query)
+# cquery.problem.bound_func = bound_unicycle_us
+# squery.problem.bound_func = bound_unicycle_us
 cquery.ntime = 10
 squery.ntime = 10
 t_sym = 10
@@ -741,7 +737,7 @@ push!(reachList,concReachSets...);
 push!(symReachList, sym_set)
 t3 = Dates.now()
 cquery.problem.domain = sym_set;
-print("Time to compute 30 hybrid reach sets: ", t4-tStart)
+print("Time to compute 30 hybrid reach sets: ", t3-tStart)
 concReachSets, BoundSets = multi_step_concreach(cquery);
 squery.problem.bounds = BoundSets;
 push!(boundsList,BoundSets...);
@@ -760,6 +756,8 @@ push!(symReachList, sym_set)
 t6 = Dates.now()
 cquery.problem.domain = sym_set;
 print("Time to compute 50 hybrid reach sets: ", t6-tStart)
+
+extrema(sym_set)
 # tPause = Dates.now()
 # concReachSets, BoundSets = multi_step_concreach(cquery);
 # squery.problem.bounds = BoundSets;

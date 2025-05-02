@@ -1231,7 +1231,12 @@ function prodBounds(lb1, ub1, lb2, ub2)
         #Now for soundness, use cell-wise interval arithmetic bounds
         #TODO: Optimization here for tighter bounds 
         LBs .= minimum(LBs)
-        UBs .= maximum(UBs)
+        UBs .= maximum(UBs)'
+
+        #To avoid flat bounds, incorporate (sound) random perturbation
+        #Maximum addition is 1% of bound value 
+        LBs = LBs .- 0.01*rand(length(LBs)).*abs(LBs)
+        UBs = UBs .+ 0.01*rand(length(UBs)).*abs(UBs)
 
         #Update the matrix of bounds
         for (i, vert) in enumerate(verts)
