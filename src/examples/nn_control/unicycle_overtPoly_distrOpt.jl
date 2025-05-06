@@ -571,7 +571,6 @@ query = GraphPolyQuery(
     2 #case. Delete this param
 )
 
-
 #Next, test multi-step concrete reachability
 query1 = deepcopy(query);
 query1.ntime = 1;
@@ -584,20 +583,16 @@ query11.problem.bound_func = bound_unicycle_old;
 
 query111 = deepcopy(query);
 query111.ntime = 1;
-query111.problem.bound_func = bound_unicycle_us
+query111.problem.bound_func = bound_unicycle_us;
 @time reachSetUS, boundSetUS = concreach!(query111);
 
-extrema(reachSet)
-extrema(reachSetOld)
-extrema(reachSetUS)
-
-vecTest = extrema(reachSet)[1]
-floor.(vecTest, digits=8)
+# extrema(reachSet)
+# extrema(reachSetOld)
+# extrema(reachSetUS)
 
 reachSetUS ⊆ reachSet
 reachSet ⊆ reachSetUS
 
-⊆(reachSetUS, reachSet, true)
 #Next, test multi-step concrete reachability
 query2 = deepcopy(query);
 query2.ntime = 10;
@@ -616,51 +611,51 @@ query222.problem.bound_func = bound_unicycle_us;
 
 trueFlag = true
 for (i,_) in enumerate(reachSets)
-    trueFlag = reachSetsUS[i] ⊆ reachSets[i]
+    trueFlag, falseWit = ⊆(reachSetUS, reachSet, true)
     if !trueFlag
-        println("Failed at $(i)")
+        println("Failed at $(i), with withness $(falseWit)")
         trueFlag = true
     end
 end
 
 #Recall, boundSets[t] makes reachSets[t+1], but reachSets[t] is used to make boundSets[t], for t >= 1
-t = 3
-j = 1
-tf2 = true
+# t = 3
+# j = 1
+# tf2 = true
 
-sLB = gen_interpol_nd(boundSets[t][j][1])
-sUB = gen_interpol_nd(boundSets[t][j][2])
-usLB = gen_interpol_nd(boundSetsUS[t][j][1])
-usUB = gen_interpol_nd(boundSetsUS[t][j][2])
+# sLB = gen_interpol_nd(boundSets[t][j][1])
+# sUB = gen_interpol_nd(boundSets[t][j][2])
+# usLB = gen_interpol_nd(boundSetsUS[t][j][1])
+# usUB = gen_interpol_nd(boundSetsUS[t][j][2])
 
-usInps1 = [tup[1:end-1] for tup in boundSetsUS[t][j][1]]
-usInps2 = [tup[1:end-1] for tup in boundSetsUS[t][j][2]]
-usInps = vcat(usInps1, usInps2)
+# usInps1 = [tup[1:end-1] for tup in boundSetsUS[t][j][1]]
+# usInps2 = [tup[1:end-1] for tup in boundSetsUS[t][j][2]]
+# usInps = vcat(usInps1, usInps2)
 
-lbFlag = true
-ubFlag = true
-for (i,inp) in enumerate(usInps)
-    lbFlag = sLB(inp...) <= usLB(inp...)
-    ubFlag = sUB(inp...) >= usUB(inp...)
-    if !lbFlag
-        println("LB failed at $i")
-        lbFlag = true
-    end
-    if !ubFlag
-        println("UB failed at $i")
-        ubFlag = true
-    end
-end
+# lbFlag = true
+# ubFlag = true
+# for (i,inp) in enumerate(usInps)
+#     lbFlag = sLB(inp...) <= usLB(inp...)
+#     ubFlag = sUB(inp...) >= usUB(inp...)
+#     if !lbFlag
+#         println("LB failed at $i")
+#         lbFlag = true
+#     end
+#     if !ubFlag
+#         println("UB failed at $i")
+#         ubFlag = true
+#     end
+# end
 
-reachSetsUS[t] ⊆ reachSets[t]
-reachSets[t] ⊆ reachSetsUS[t]
+# reachSetsUS[t] ⊆ reachSets[t]
+# reachSets[t] ⊆ reachSetsUS[t]
 
-  extrema(reachSets[t])
-extrema(reachSetsUS[t])
+#   extrema(reachSets[t])
+# extrema(reachSetsUS[t])
 
-count = 4
-c_dist = LazySets.center(reachSetsUS[t], count) - LazySets.center(reachSets[t], count)
-r_dist = LazySets.radius_hyperrectangle(reachSetsUS[t],count) - LazySets.radius_hyperrectangle(reachSets[t],count)
+# count = 4
+# c_dist = LazySets.center(reachSetsUS[t], count) - LazySets.center(reachSets[t], count)
+# r_dist = LazySets.radius_hyperrectangle(reachSetsUS[t],count) - LazySets.radius_hyperrectangle(reachSets[t],count)
 
 
 
@@ -721,7 +716,7 @@ print("Time to compute 10 hybrid reach sets: ", t1-tStart)
 # squery.ntime = 5
 # t_sym = 5
 concReachSets, BoundSets = multi_step_concreach(cquery);
-squery.problem.bounds = BoundSets;
+ squery.problem.bounds = BoundSets;
 push!(boundsList,BoundSets...);
 push!(reachList,concReachSets...);
 @time sym_set = symreach(squery, concReachSets, depMat, t_sym);
@@ -729,6 +724,7 @@ push!(symReachList, sym_set)
 t2 = Dates.now()
 cquery.problem.domain = sym_set;
 print("Time to compute 20 hybrid reach sets: ", t2-tStart)
+tMid = Dates.now()
 concReachSets, BoundSets = multi_step_concreach(cquery);
 squery.problem.bounds = BoundSets;
 push!(boundsList,BoundSets...);
@@ -737,7 +733,7 @@ push!(reachList,concReachSets...);
 push!(symReachList, sym_set)
 t3 = Dates.now()
 cquery.problem.domain = sym_set;
-print("Time to compute 30 hybrid reach sets: ", t3-tStart)
+print("Time to compute 30 hybrid reach sets: ", t3-tMid)
 concReachSets, BoundSets = multi_step_concreach(cquery);
 squery.problem.bounds = BoundSets;
 push!(boundsList,BoundSets...);

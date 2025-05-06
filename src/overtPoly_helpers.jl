@@ -1210,7 +1210,9 @@ function prodBounds(lb1, ub1, lb2, ub2)
 
     #Define arrays to hold upper and lower bounds
     lowMat = [(tup..., Inf) for tup in gridMat]
+    ulowMat = [(tup..., Inf) for tup in gridMat]
     highMat = [(tup..., -Inf) for tup in gridMat]
+    uhighMat = [(tup..., -Inf) for tup in gridMat]
 
     #Iterate across grid cells 
     for cell in Iterators.product(subgrid_faces...)
@@ -1230,26 +1232,54 @@ function prodBounds(lb1, ub1, lb2, ub2)
 
         #Now for soundness, use cell-wise interval arithmetic bounds
         #TODO: Optimization here for tighter bounds 
-        LBs .= minimum(LBs)
-        UBs .= maximum(UBs)'
+        minMin = minimum(LBs)
+        maxMax = maximum(UBs)
+
+        uLBs = deepcopy(LBs)
+        uUBs = deepcopy(UBs)
+
+        LBs .= minMin
+        UBs .= maxMax
+
 
         #To avoid flat bounds, incorporate (sound) random perturbation
         #Maximum addition is 1% of bound value 
-        LBs = LBs .- 0.01*rand(length(LBs)).*abs(LBs)
-        UBs = UBs .+ 0.01*rand(length(UBs)).*abs(UBs)
+        # LBs = LBs .- 0.2*rand(size(LBs)...).*abs.(LBs)
+        # UBs = UBs .+ 0.2*rand(size(UBs)...).*abs.(UBs)
+
+        #To avoid flat bounds, incorporate (sound) proportional perturbation
+        # LBs = LBs .- κ*cLBs
+        # UBs = UBs .+ κ*cUBs
 
         #Update the matrix of bounds
         for (i, vert) in enumerate(verts)
             pt = lowMat[vert...][1:end-1] 
             #Update the bounds only if the new bound is looser than the current
             lowMat[vert...]= (pt...,min(lowMat[vert...][end], LBs[i]))
+            ulowMat[vert...]= (pt...,min(ulowMat[vert...][end], uLBs[i]))
             highMat[vert...] = (pt...,max(highMat[vert...][end], UBs[i]))
+            uhighMat[vert...] = (pt...,max(uhighMat[vert...][end], uUBs[i]))
         end
     end
 
     #Return a list of bounds
+    maxMin = maximum([tup[end] for tup in ulowMat])
+    minMax = minimum([tup[end] for tup in uhighMat])
+
+    #Shift bounds to try to match the "shape" of unsound bounds 
+    sULBs = maxMin .- [tup[end] for tup in ulowMat]
+    sUBs = minMax .- [tup[end] for tup in uhighMat]
+
     prodLB = [lowMat...]
     prodUB = [highMat...]
+    for (i, tup) in enumerate(lowMat)
+        prodLB[i] = (prodLB[i][1:end-1]...,prodLB[i][end] - abs(sULBs[i]))
+        prodUB[i] = (prodUB[i][1:end-1]...,prodUB[i][end] + abs(sUBs[i]))
+    end
+    # prodLB = lowMat .+ abs.(sULBs)
+    # prodUB = highMat .+ abs.(sUBs)
+    # prodLB = [lowMat...]
+    # prodUB = [highMat...]
     return prodLB, prodUB
 end
 

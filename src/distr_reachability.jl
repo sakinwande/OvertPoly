@@ -88,8 +88,8 @@ function conc_reach_solve(query;threads=0)
         push!(highs, -JuMP.objective_bound(maxGraph))
     end
 
-    lows = floor.(lows, digits=6)
-    highs = ceil.(highs, digits=6)
+    lows = floor.(lows, digits=8)
+    highs = ceil.(highs, digits=8)
 
     #Since the default 
     reach_set = Hyperrectangle(low=lows, high=highs)
@@ -269,7 +269,7 @@ function sym_link(symQuery::GraphPolyQuery, neurList, depMat)
     end
 end
 
-function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=10000)
+function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=1, timeout=600)
     #Ensure that the time step is within bounds
     @assert t_sym <= symQuery.ntime
     #Akin to conc_reach_solve
@@ -279,7 +279,7 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=100
     i = 0
 
     #Compute lower bounds
-    set_optimizer(minGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0, "Threads" => threads))
+    set_optimizer(minGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0, "Threads" => threads, "TimeLimit" => timeout))
     # set_optimizer(minGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0))
     #NOTE: Optimize each variable separately 
     for sym in symQuery.problem.varList
@@ -297,7 +297,7 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=100
 
     #Compute upper bounds
     maxGraph = symQuery.mod_dict[:graph]
-    set_optimizer(maxGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0, "Threads" => threads))
+    set_optimizer(maxGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0, "Threads" => threads, "TimeLimit" => timeout))
     # set_optimizer(maxGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0))
     #NOTE: Optimize each variable separately
     for sym in query.problem.varList 
@@ -313,8 +313,8 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=100
     end
 
     #Gurobi tolerance is on the order of 1e-6, try rounding
-    lows = floor.(lows, digits=6)
-    highs = ceil.(highs, digits=6)
+    lows = floor.(lows, digits=8)
+    highs = ceil.(highs, digits=8)
 
 
     reach_set = Hyperrectangle(low=lows, high=highs)
