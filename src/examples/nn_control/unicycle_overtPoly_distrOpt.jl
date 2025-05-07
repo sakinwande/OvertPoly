@@ -37,7 +37,7 @@ dt = 0.2
 #Should be 50?
 numSteps = 10
 w = 1e-4
-domain = Hyperrectangle(low=[9.5,-4.5,2.1,1.5], high = [9.55,-4.45,2.11,1.51])
+domain = Hyperrectangle(low=[9.50,-4.50,2.10,1.50], high = [9.55,-4.45,2.11,1.51])
 depMat = [[1,0,1,1],[0,1,1,1], [0,0,1,0], [0,0,0,1]]
 ########TEST: Debugging Bound Unicycle#########
 # lbs, ubs = extrema(domain)
@@ -263,6 +263,7 @@ end
 
 function bound_unicycle(Unicycle; plotFlag=false)
     lbs, ubs = extrema(Unicycle.domain)
+    #Round the bounds to avoid floating point errors
 
     ##Bound initial state variable (dx1 = x4*cos(x3))#####
     #Weird behavior with Hyperrectangle
@@ -586,12 +587,7 @@ query111.ntime = 1;
 query111.problem.bound_func = bound_unicycle_us;
 @time reachSetUS, boundSetUS = concreach!(query111);
 
-# extrema(reachSet)
-# extrema(reachSetOld)
-# extrema(reachSetUS)
-
-reachSetUS ⊆ reachSet
-reachSet ⊆ reachSetUS
+hypContained(reachSetUS, reachSet)
 
 #Next, test multi-step concrete reachability
 query2 = deepcopy(query);
@@ -611,53 +607,68 @@ query222.problem.bound_func = bound_unicycle_us;
 
 trueFlag = true
 for (i,_) in enumerate(reachSets)
-    trueFlag, falseWit = ⊆(reachSetUS, reachSet, true)
+    trueFlag = hypContained(reachSetsUS[i], reachSets[i])
     if !trueFlag
-        println("Failed at $(i), with withness $(falseWit)")
+        println("Failed at $(i)")
         trueFlag = true
     end
 end
 
 #Recall, boundSets[t] makes reachSets[t+1], but reachSets[t] is used to make boundSets[t], for t >= 1
-# t = 3
-# j = 1
-# tf2 = true
+t = 1;
+j = 1;
+tf2 = true;
 
-# sLB = gen_interpol_nd(boundSets[t][j][1])
-# sUB = gen_interpol_nd(boundSets[t][j][2])
-# usLB = gen_interpol_nd(boundSetsUS[t][j][1])
-# usUB = gen_interpol_nd(boundSetsUS[t][j][2])
+sLB = gen_interpol_nd(boundSets[t][j][1]);
+sUB = gen_interpol_nd(boundSets[t][j][2]);
+usLB = gen_interpol_nd(boundSetsUS[t][j][1]);
+usUB = gen_interpol_nd(boundSetsUS[t][j][2]);
 
-# usInps1 = [tup[1:end-1] for tup in boundSetsUS[t][j][1]]
-# usInps2 = [tup[1:end-1] for tup in boundSetsUS[t][j][2]]
-# usInps = vcat(usInps1, usInps2)
+usInps1 = [tup[1:end-1] for tup in boundSetsUS[t][j][1]];
+usInps2 = [tup[1:end-1] for tup in boundSetsUS[t][j][2]];
+sInps1 = [tup[1:end-1] for tup in boundSets[t][j][1]];
+sInps2 = [tup[1:end-1] for tup in boundSets[t][j][2]];
+usInps = vcat(usInps1, usInps2, sInps1, sInps2);
 
-# lbFlag = true
-# ubFlag = true
-# for (i,inp) in enumerate(usInps)
-#     lbFlag = sLB(inp...) <= usLB(inp...)
-#     ubFlag = sUB(inp...) >= usUB(inp...)
-#     if !lbFlag
-#         println("LB failed at $i")
-#         lbFlag = true
-#     end
-#     if !ubFlag
-#         println("UB failed at $i")
-#         ubFlag = true
-#     end
-# end
-
-# reachSetsUS[t] ⊆ reachSets[t]
-# reachSets[t] ⊆ reachSetsUS[t]
-
-#   extrema(reachSets[t])
-# extrema(reachSetsUS[t])
-
-# count = 4
-# c_dist = LazySets.center(reachSetsUS[t], count) - LazySets.center(reachSets[t], count)
-# r_dist = LazySets.radius_hyperrectangle(reachSetsUS[t],count) - LazySets.radius_hyperrectangle(reachSets[t],count)
+lbFlag = true;
+ubFlag = true;
+for (i,inp) in enumerate(usInps)
+    lbFlag = sLB(inp...) <= usLB(inp...)
+    ubFlag = sUB(inp...) >= usUB(inp...)
+    if !lbFlag
+        println("LB failed at $i")
+        lbFlag = true
+    end
+    if !ubFlag
+        println("UB failed at $i")
+        ubFlag = true
+    end
+end
 
 
+
+function hypContained(hyp1, hyp2)
+    """
+    Use Lazysets implementation of set containment for hyperrectangles but with better floating point precision
+    """
+    
+    #First, make sure the dimensions match
+    @assert dim(hyp1) == dim(hyp2)
+
+    contained = true
+    for i in 1:dim(hyp1)
+        c_dist = LazySets.center(hyp1, i) - LazySets.center(hyp2, i)
+        r_dist = LazySets.radius_hyperrectangle(hyp1,i) - LazySets.radius_hyperrectangle(hyp2,i)
+
+        contained = r_dist <= c_dist || c_dist <= -r_dist
+
+        if !contained
+            println("Not contained along dimension $(i)")
+            contained=true
+        end
+    end
+
+end
 
 ########################################################
 ########################################################
@@ -715,7 +726,7 @@ print("Time to compute 10 hybrid reach sets: ", t1-tStart)
 # cquery.ntime = 5
 # squery.ntime = 5
 # t_sym = 5
-concReachSets, BoundSets = multi_step_concreach(cquery);
+  concReachSets, BoundSets = multi_step_concreach(cquery);
  squery.problem.bounds = BoundSets;
 push!(boundsList,BoundSets...);
 push!(reachList,concReachSets...);

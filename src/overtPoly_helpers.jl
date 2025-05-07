@@ -1233,13 +1233,20 @@ function prodBounds(lb1, ub1, lb2, ub2)
         #Now for soundness, use cell-wise interval arithmetic bounds
         #TODO: Optimization here for tighter bounds 
         minMin = minimum(LBs)
+        maxMin = maximum(LBs)
         maxMax = maximum(UBs)
+        minMax = minimum(UBs)
 
-        uLBs = deepcopy(LBs)
-        uUBs = deepcopy(UBs)
+        # cLBs = abs.(maxMin .- deepcopy(LBs))
+        # cUBs = abs.(minMax .- deepcopy(UBs))
 
-        LBs .= minMin
-        UBs .= maxMax
+        # cLBs = abs(maxMin - minMin)
+        # cUBs = abs(maxMax - minMax)
+
+        cLBs = abs.(minMin .- deepcopy(LBs))
+        cUBs = abs.(maxMax .- deepcopy(UBs))
+
+        κ = 1
 
 
         #To avoid flat bounds, incorporate (sound) random perturbation
@@ -1256,30 +1263,12 @@ function prodBounds(lb1, ub1, lb2, ub2)
             pt = lowMat[vert...][1:end-1] 
             #Update the bounds only if the new bound is looser than the current
             lowMat[vert...]= (pt...,min(lowMat[vert...][end], LBs[i]))
-            ulowMat[vert...]= (pt...,min(ulowMat[vert...][end], uLBs[i]))
             highMat[vert...] = (pt...,max(highMat[vert...][end], UBs[i]))
-            uhighMat[vert...] = (pt...,max(uhighMat[vert...][end], uUBs[i]))
         end
     end
 
-    #Return a list of bounds
-    maxMin = maximum([tup[end] for tup in ulowMat])
-    minMax = minimum([tup[end] for tup in uhighMat])
-
-    #Shift bounds to try to match the "shape" of unsound bounds 
-    sULBs = maxMin .- [tup[end] for tup in ulowMat]
-    sUBs = minMax .- [tup[end] for tup in uhighMat]
-
     prodLB = [lowMat...]
     prodUB = [highMat...]
-    for (i, tup) in enumerate(lowMat)
-        prodLB[i] = (prodLB[i][1:end-1]...,prodLB[i][end] - abs(sULBs[i]))
-        prodUB[i] = (prodUB[i][1:end-1]...,prodUB[i][end] + abs(sUBs[i]))
-    end
-    # prodLB = lowMat .+ abs.(sULBs)
-    # prodUB = highMat .+ abs.(sUBs)
-    # prodLB = [lowMat...]
-    # prodUB = [highMat...]
     return prodLB, prodUB
 end
 
@@ -1528,4 +1517,28 @@ function divBounds(lb1, ub1, lb2, ub2)
     divUB = [highMat...]
 
     return divLB, divUB
+end
+
+function hypContained(hyp1, hyp2)
+    """
+    Set containment for hyperrectangles but with better floating point precision
+    """
+    
+    #First, make sure the dimensions match
+    @assert dim(hyp1) == dim(hyp2)
+
+    contained = true
+    dimContained = true
+
+    bounds1 = extrema(hyp1)
+    bounds2 = extrema(hyp2)
+    for i in 1:dim(hyp1)
+        dimContained = bounds1[1][i] >= bounds2[1][i] && bounds1[2][i] <= bounds2[2][i]
+        if !dimContained
+            println("Not contained along dimension $(i)")
+            contained = false
+            dimContained = true
+        end
+    end
+    return contained
 end

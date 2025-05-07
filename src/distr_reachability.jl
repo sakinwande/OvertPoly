@@ -88,8 +88,8 @@ function conc_reach_solve(query;threads=0)
         push!(highs, -JuMP.objective_bound(maxGraph))
     end
 
-    lows = floor.(lows, digits=8)
-    highs = ceil.(highs, digits=8)
+    lows = floor.(lows, digits=16)
+    highs = ceil.(highs, digits=16)
 
     #Since the default 
     reach_set = Hyperrectangle(low=lows, high=highs)
@@ -269,7 +269,7 @@ function sym_link(symQuery::GraphPolyQuery, neurList, depMat)
     end
 end
 
-function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=1, timeout=600)
+function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=1800)
     #Ensure that the time step is within bounds
     @assert t_sym <= symQuery.ntime
     #Akin to conc_reach_solve
@@ -290,7 +290,7 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=1, timeout=600
         next_v_l = v + symQuery.dt*dv
         #NOTE: Set graph level objective directly
         @objective(minGraph, Min, next_v_l)
-        optimize!(minGraph)
+        @time optimize!(minGraph)
         @assert termination_status(minGraph) == MOI.OPTIMAL
         push!(lows, JuMP.objective_bound(minGraph))
     end
@@ -307,14 +307,14 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=1, timeout=600
         next_v_u = v + symQuery.dt*dv
         #NOTE: Set graph level objective directly
         @objective(maxGraph, Min, -next_v_u)
-        optimize!(maxGraph)
+        @time optimize!(maxGraph)
         @assert termination_status(maxGraph) == MOI.OPTIMAL
         push!(highs, -JuMP.objective_bound(maxGraph))
     end
 
     #Gurobi tolerance is on the order of 1e-6, try rounding
-    lows = floor.(lows, digits=8)
-    highs = ceil.(highs, digits=8)
+    lows = floor.(lows, digits=6)
+    highs = ceil.(highs, digits=6)
 
 
     reach_set = Hyperrectangle(low=lows, high=highs)

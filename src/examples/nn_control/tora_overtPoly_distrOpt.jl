@@ -263,6 +263,8 @@ query11.ntime = 1
 query11.problem.bound_func = bound_tora_old
 @time reachset1, boundset1 = concreach!(query11);
 
+hypContained(reachset1, reachset)
+
 boundLen1 = []
 for bound in boundset 
     boundVec = []
