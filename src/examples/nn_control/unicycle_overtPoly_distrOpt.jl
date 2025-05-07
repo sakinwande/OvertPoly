@@ -572,42 +572,44 @@ query = GraphPolyQuery(
     2 #case. Delete this param
 )
 
+dig=16
 #Next, test multi-step concrete reachability
 query1 = deepcopy(query);
 query1.ntime = 1;
-@time reachSet, boundSet = concreach!(query1);
+@time reachSet, boundSet = concreach!(query1, digits=dig);
 
 query11 = deepcopy(query);
 query11.ntime = 1;
 query11.problem.bound_func = bound_unicycle_old;
-@time reachSetOld, boundSetOld = concreach!(query11);
+@time reachSetOld, boundSetOld = concreach!(query11, digits=dig);
 
 query111 = deepcopy(query);
 query111.ntime = 1;
 query111.problem.bound_func = bound_unicycle_us;
-@time reachSetUS, boundSetUS = concreach!(query111);
+@time reachSetUS, boundSetUS = concreach!(query111, digits=dig);
 
-hypContained(reachSetUS, reachSet)
+hypContained(reachSetUS, reachSet, digits=dig)
 
+dig=3
 #Next, test multi-step concrete reachability
 query2 = deepcopy(query);
 query2.ntime = 10;
-@time reachSets, boundSets = multi_step_concreach(query2);
+@time reachSets, boundSets = multi_step_concreach(query2, digits=dig);
 
 query22 = deepcopy(query);
 query22.ntime = 10;
 query22.problem.bound_func = bound_unicycle_old;
-@time reachSetsOld, boundSetsOld = multi_step_concreach(query22);
+@time reachSetsOld, boundSetsOld = multi_step_concreach(query22, digits=dig);
 
 query222 = deepcopy(query);
 query222.ntime = 10;
 query222.problem.bound_func = bound_unicycle_us;
-@time reachSetsUS, boundSetsUS = multi_step_concreach(query222);
+@time reachSetsUS, boundSetsUS = multi_step_concreach(query222, digits=dig);
 
 
 trueFlag = true
 for (i,_) in enumerate(reachSets)
-    trueFlag = hypContained(reachSetsUS[i], reachSets[i])
+    trueFlag = hypContained(reachSetsUS[i], reachSets[i], digits=dig)
     if !trueFlag
         println("Failed at $(i)")
         trueFlag = true
@@ -615,8 +617,8 @@ for (i,_) in enumerate(reachSets)
 end
 
 #Recall, boundSets[t] makes reachSets[t+1], but reachSets[t] is used to make boundSets[t], for t >= 1
-t = 1;
-j = 1;
+t = 6;
+j = 4;
 tf2 = true;
 
 sLB = gen_interpol_nd(boundSets[t][j][1]);
@@ -645,55 +647,39 @@ for (i,inp) in enumerate(usInps)
     end
 end
 
+hypContained(reachSetsUS[t], reachSets[t], digits=dig)
 
 
-function hypContained(hyp1, hyp2)
-    """
-    Use Lazysets implementation of set containment for hyperrectangles but with better floating point precision
-    """
-    
-    #First, make sure the dimensions match
-    @assert dim(hyp1) == dim(hyp2)
 
-    contained = true
-    for i in 1:dim(hyp1)
-        c_dist = LazySets.center(hyp1, i) - LazySets.center(hyp2, i)
-        r_dist = LazySets.radius_hyperrectangle(hyp1,i) - LazySets.radius_hyperrectangle(hyp2,i)
 
-        contained = r_dist <= c_dist || c_dist <= -r_dist
-
-        if !contained
-            println("Not contained along dimension $(i)")
-            contained=true
-        end
-    end
-
-end
 
 ########################################################
 ########################################################
-t_sym = 5
+digs= 3
+t_sym = 10
 #Next, test direct symreach 
 query3 = deepcopy(query);
 query3.problem.bounds = boundSets;
 query3.ntime = t_sym;
-@time symReach = symreach(query3,reachSets, depMat,2);
+@time symReach = symreach(query3,reachSets, depMat,t_sym,digits=digs);
 
-query33 = deepcopy(query);
-query33.problem.bounds = boundSetsOld;
-query33.problem.bound_func = bound_unicycle_old;
-query33.ntime = t_sym;
-@time symReachOld = symreach(query33,reachSetsOld, depMat,2);
+# query33 = deepcopy(query);
+# query33.problem.bounds = boundSetsOld;
+# query33.problem.bound_func = bound_unicycle_old;
+# query33.ntime = t_sym;
+# @time symReachOld = symreach(query33,reachSetsOld, depMat,2,digits=digs);
 
 query333 = deepcopy(query);
 query333.problem.bounds = boundSetsUS;
 query333.problem.bound_func = bound_unicycle_us;
 query333.ntime = t_sym;
-@time symReachUS = symreach(query333,reachSetsUS, depMat,2);
+@time symReachUS = symreach(query333,reachSetsUS, depMat,t_sym,digits=digs);
 
 
+hypContained(symReachUS, symReach, digits=digs)
 
-
+extrema(symReach)
+extrema(symReachUS)
 # #Test hybrid reachability
 # concInt = [2,2,2,2,2]
 # query4 = deepcopy(query)
@@ -726,8 +712,8 @@ print("Time to compute 10 hybrid reach sets: ", t1-tStart)
 # cquery.ntime = 5
 # squery.ntime = 5
 # t_sym = 5
-  concReachSets, BoundSets = multi_step_concreach(cquery);
- squery.problem.bounds = BoundSets;
+concReachSets, BoundSets = multi_step_concreach(cquery);
+squery.problem.bounds = BoundSets;
 push!(boundsList,BoundSets...);
 push!(reachList,concReachSets...);
 @time sym_set = symreach(squery, concReachSets, depMat, t_sym);

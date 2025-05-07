@@ -1248,15 +1248,14 @@ function prodBounds(lb1, ub1, lb2, ub2)
 
         κ = 1
 
-
         #To avoid flat bounds, incorporate (sound) random perturbation
         #Maximum addition is 1% of bound value 
         # LBs = LBs .- 0.2*rand(size(LBs)...).*abs.(LBs)
         # UBs = UBs .+ 0.2*rand(size(UBs)...).*abs.(UBs)
 
         #To avoid flat bounds, incorporate (sound) proportional perturbation
-        # LBs = LBs .- κ*cLBs
-        # UBs = UBs .+ κ*cUBs
+        LBs = LBs .- κ*cLBs
+        UBs = UBs .+ κ*cUBs
 
         #Update the matrix of bounds
         for (i, vert) in enumerate(verts)
@@ -1519,9 +1518,9 @@ function divBounds(lb1, ub1, lb2, ub2)
     return divLB, divUB
 end
 
-function hypContained(hyp1, hyp2)
+function hypContained(hyp1, hyp2; digits=16)
     """
-    Set containment for hyperrectangles but with better floating point precision
+    Set containment for hyperrectangles but with better floating point digits
     """
     
     #First, make sure the dimensions match
@@ -1533,7 +1532,7 @@ function hypContained(hyp1, hyp2)
     bounds1 = extrema(hyp1)
     bounds2 = extrema(hyp2)
     for i in 1:dim(hyp1)
-        dimContained = bounds1[1][i] >= bounds2[1][i] && bounds1[2][i] <= bounds2[2][i]
+        dimContained = floor(bounds1[1][i], digits=digits) >= floor(bounds2[1][i], digits=digits) && ceil(bounds1[2][i], digits=digits) <= ceil(bounds2[2][i], digits=digits)
         if !dimContained
             println("Not contained along dimension $(i)")
             contained = false
