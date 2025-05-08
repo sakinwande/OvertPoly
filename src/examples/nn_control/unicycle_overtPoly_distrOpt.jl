@@ -572,7 +572,7 @@ query = GraphPolyQuery(
     2 #case. Delete this param
 )
 
-dig=16
+dig=3
 #Next, test multi-step concrete reachability
 query1 = deepcopy(query);
 query1.ntime = 1;
@@ -680,6 +680,10 @@ hypContained(symReachUS, symReach, digits=digs)
 
 extrema(symReach)
 extrema(symReachUS)
+
+
+volume(symReach)/volume(symReachUS)
+5e-1
 # #Test hybrid reachability
 # concInt = [2,2,2,2,2]
 # query4 = deepcopy(query)

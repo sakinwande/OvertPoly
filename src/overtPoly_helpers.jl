@@ -1246,7 +1246,7 @@ function prodBounds(lb1, ub1, lb2, ub2)
         cLBs = abs.(minMin .- deepcopy(LBs))
         cUBs = abs.(maxMax .- deepcopy(UBs))
 
-        κ = 1
+        κ = 5e-1
 
         #To avoid flat bounds, incorporate (sound) random perturbation
         #Maximum addition is 1% of bound value 

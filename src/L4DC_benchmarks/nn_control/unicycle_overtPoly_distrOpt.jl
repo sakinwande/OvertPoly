@@ -473,9 +473,9 @@ print(sym_set)
 #Timed run
 cquery = deepcopy(query)
 squery = deepcopy(query)
-cquery.ntime = 5
-squery.ntime = 5
-t_sym = 5
+cquery.ntime = 10
+squery.ntime = 10
+t_sym = 10
 tStart = Dates.now()
 concReachSets, BoundSets = multi_step_concreach(cquery);
 squery.problem.bounds = BoundSets;
@@ -485,7 +485,7 @@ sym_set = symreach(squery, concReachSets, depMat, t_sym);
 push!(symReachList, sym_set)
 t1 = Dates.now()
 cquery.problem.domain = sym_set;
-print("Time to compute 5 hybrid reach sets: ", t1-tStart)
+print("Time to compute 10 hybrid reach sets: ", t1-tStart)
 # cquery.ntime = 10
 # squery.ntime = 10
 # t_sym = 10
@@ -497,7 +497,7 @@ sym_set = symreach(squery, concReachSets, depMat, t_sym);
 push!(symReachList, sym_set)
 t2 = Dates.now()
 cquery.problem.domain = sym_set;
-print("Time to compute 10 hybrid reach sets: ", t2-tStart)
+print("Time to compute 20 hybrid reach sets: ", t2-tStart)
 concReachSets, BoundSets = multi_step_concreach(cquery);
 squery.problem.bounds = BoundSets;
 push!(boundsList,BoundSets...);
@@ -506,7 +506,7 @@ sym_set = symreach(squery, concReachSets, depMat, t_sym);
 push!(symReachList, sym_set)
 t3 = Dates.now()
 cquery.problem.domain = sym_set;
-print("Time to compute 15 hybrid reach sets: ", t3-tStart)
+print("Time to compute 30 hybrid reach sets: ", t3-tStart)
 # cquery.ntime = 5
 # squery.ntime = 5
 # t_sym = 5
@@ -518,7 +518,7 @@ sym_set = symreach(squery, concReachSets, depMat, t_sym);
 push!(symReachList, sym_set)
 t4 = Dates.now()
 cquery.problem.domain = sym_set;
-print("Time to compute 20 hybrid reach sets: ", t4-tStart)
+print("Time to compute 40 hybrid reach sets: ", t4-tStart)
 concReachSets, BoundSets = multi_step_concreach(cquery);
 squery.problem.bounds = BoundSets;
 push!(boundsList,BoundSets...);
@@ -527,52 +527,52 @@ sym_set = symreach(squery, concReachSets, depMat, t_sym);
 push!(symReachList, sym_set)
 t5 = Dates.now()
 cquery.problem.domain = sym_set;
-print("Time to compute 25 hybrid reach sets: ", t5-tStart)
-concReachSets, BoundSets = multi_step_concreach(cquery);
-squery.problem.bounds = BoundSets;
-push!(boundsList,BoundSets...);
-push!(reachList,concReachSets...);
-sym_set = symreach(squery, concReachSets, depMat, t_sym);
-push!(symReachList, sym_set)
-t6 = Dates.now()
-cquery.problem.domain = sym_set;
-print("Time to compute 30 hybrid reach sets: ", t6-tStart)
-concReachSets, BoundSets = multi_step_concreach(cquery);
-squery.problem.bounds = BoundSets;
-push!(boundsList,BoundSets...);
-push!(reachList,concReachSets...);
-sym_set = symreach(squery, concReachSets, depMat, t_sym);
-push!(symReachList, sym_set)
-t7 = Dates.now()
-cquery.problem.domain = sym_set;
-print("Time to compute 35 hybrid reach sets: ", t7-tStart)
-concReachSets, BoundSets = multi_step_concreach(cquery);
-squery.problem.bounds = BoundSets;
-push!(boundsList,BoundSets...);
-push!(reachList,concReachSets...);
-sym_set = symreach(squery, concReachSets, depMat, t_sym);
-push!(symReachList, sym_set)
-t7 = Dates.now()
-cquery.problem.domain = sym_set;
-print("Time to compute 40 hybrid reach sets: ", t7-tStart)
-concReachSets, BoundSets = multi_step_concreach(cquery);
-squery.problem.bounds = BoundSets;
-push!(boundsList,BoundSets...);
-push!(reachList,concReachSets...);
-sym_set = symreach(squery, concReachSets, depMat, t_sym);
-push!(symReachList, sym_set)
-t8 = Dates.now()
-cquery.problem.domain = sym_set;
-print("Time to compute 45 hybrid reach sets: ", t8-tStart)
-concReachSets, BoundSets = multi_step_concreach(cquery);
-squery.problem.bounds = BoundSets;
-push!(boundsList,BoundSets...);
-push!(reachList,concReachSets...);
-sym_set = symreach(squery, concReachSets, depMat, t_sym);
-push!(symReachList, sym_set)
-t9 = Dates.now()
-cquery.problem.domain = sym_set;
-print("Time to compute 50 hybrid reach sets: ", t9-tStart)
+print("Time to compute 50 hybrid reach sets: ", t5-tStart)
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# squery.problem.bounds = BoundSets;
+# push!(boundsList,BoundSets...);
+# push!(reachList,concReachSets...);
+# sym_set = symreach(squery, concReachSets, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t6 = Dates.now()
+# cquery.problem.domain = sym_set;
+# print("Time to compute 30 hybrid reach sets: ", t6-tStart)
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# squery.problem.bounds = BoundSets;
+# push!(boundsList,BoundSets...);
+# push!(reachList,concReachSets...);
+# sym_set = symreach(squery, concReachSets, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t7 = Dates.now()
+# cquery.problem.domain = sym_set;
+# print("Time to compute 35 hybrid reach sets: ", t7-tStart)
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# squery.problem.bounds = BoundSets;
+# push!(boundsList,BoundSets...);
+# push!(reachList,concReachSets...);
+# sym_set = symreach(squery, concReachSets, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t7 = Dates.now()
+# cquery.problem.domain = sym_set;
+# print("Time to compute 40 hybrid reach sets: ", t7-tStart)
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# squery.problem.bounds = BoundSets;
+# push!(boundsList,BoundSets...);
+# push!(reachList,concReachSets...);
+# sym_set = symreach(squery, concReachSets, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t8 = Dates.now()
+# cquery.problem.domain = sym_set;
+# print("Time to compute 45 hybrid reach sets: ", t8-tStart)
+# concReachSets, BoundSets = multi_step_concreach(cquery);
+# squery.problem.bounds = BoundSets;
+# push!(boundsList,BoundSets...);
+# push!(reachList,concReachSets...);
+# sym_set = symreach(squery, concReachSets, depMat, t_sym);
+# push!(symReachList, sym_set)
+# t9 = Dates.now()
+# cquery.problem.domain = sym_set;
+# print("Time to compute 50 hybrid reach sets: ", t9-tStart)
 
 
 
