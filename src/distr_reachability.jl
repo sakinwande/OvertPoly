@@ -97,7 +97,7 @@ function conc_reach_solve(query;threads=0, digits=8)
 end
 
 function concreach!(query::GraphPolyQuery; digits=8)
-    query.problem.bounds = query.problem.bound_func(query.problem)
+    query.problem.bounds = query.problem.bound_func(query.problem, npoint=query.N_overt)
     query.var_dict = Dict{Symbol,Any}()
     query.mod_dict = Dict{Symbol,Any}()
 
@@ -269,7 +269,7 @@ function sym_link(symQuery::GraphPolyQuery, neurList, depMat)
     end
 end
 
-function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=1800, digits=8)
+function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=1800, digits=15)
     #Ensure that the time step is within bounds
     @assert t_sym <= symQuery.ntime
     #Akin to conc_reach_solve
@@ -321,7 +321,7 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=180
     return reach_set
 end
 
-function symreach(symQuery::GraphPolyQuery,reachSets, depMat,t_sym; threads=0, timeout=1800, digits=8)
+function symreach(symQuery::GraphPolyQuery,reachSets, depMat,t_sym; threads=0, timeout=1800, digits=15)
     """
     Method to symbolically solve the reachability problem. Agnostic to how the boundSets are computed
 
@@ -352,6 +352,7 @@ function hybreach(symQuery::GraphPolyQuery, depMat, t_sym, reachSets = nothing, 
         reachSets,boundSets = multi_step_concreach(concQuery)
     end
     symQuery.problem.bounds = boundSets
+    symQuery.ntime = t_sym
     sym_set = symreach(symQuery, reachSets, depMat, t_sym)
     return sym_set
 end
@@ -364,24 +365,23 @@ function multi_step_hybreach(hybQuery, depMat, concInt)
     hyb_reachSets = [hybQuery.problem.domain]
     conc_boundSets = []
     conc_reachSets = [hybQuery.problem.domain]
-    hyInt = 0    
+
+    cquery = deepcopy(hybQuery)
+    squery = deepcopy(hybQuery)  
     for int in concInt
-        #Update time horizon
-        hybQuery.ntime = int
-        #Copy corresponding concrete and hybrid queries
-        hyQ1 = deepcopy(hybQuery)
-        concQuery = deepcopy(hybQuery)
         #Bound the function over the desired interval
-        reachSets,boundSets = multi_step_concreach(concQuery)
+        cquery.ntime = int 
+        reachSets,boundSets = multi_step_concreach(cquery)
         push!(conc_boundSets, boundSets...)
         push!(conc_reachSets, reachSets[2:end]...)
-        hyInt += int
-        hyQ1.ntime = hyInt
-        hySet = hybreach(hyQ1, depMat,hyInt,conc_reachSets,conc_boundSets) 
+
+        squery.problem.bounds = boundSets
+        squery.ntime = int
+        hySet = symReach(squery, reachSets, depMat, int) 
         push!(hyb_reachSets, hySet)
         hybQuery.problem.domain = hySet
     end
-    return hyb_reachSets
+    return hyb_reachSets, [conc_reachSets, conc_boundSets]
 end
 
 ###############Implementing Backwards Reachability####################

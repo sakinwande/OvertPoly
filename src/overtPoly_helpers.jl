@@ -1170,7 +1170,7 @@ function get_subgrids(unionInps)
     sub_grids = [unique(tup[i] for tup in tupList) for i in 1:dim]
     return sub_grids
 end
-function prodBounds(lb1, ub1, lb2, ub2)
+function prodBounds(lb1, ub1, lb2, ub2) 
     """
     Method to compute bounds for the product of two functions defined over the same domain
 
@@ -1246,7 +1246,7 @@ function prodBounds(lb1, ub1, lb2, ub2)
         cLBs = abs.(minMin .- deepcopy(LBs))
         cUBs = abs.(maxMax .- deepcopy(UBs))
 
-        κ = 5e-1
+        κ = 1.0
 
         #To avoid flat bounds, incorporate (sound) random perturbation
         #Maximum addition is 1% of bound value 

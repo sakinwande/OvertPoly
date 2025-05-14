@@ -45,9 +45,10 @@ depMat = [[1,0,1,1],[0,1,1,1], [0,0,1,0], [0,0,0,1]]
 #######################################
 
 ###Define Bound Unicycle########
-function bound_unicycle_old(Unicycle; plotFlag=false)
+function bound_unicycle_old(Unicycle; plotFlag=false,npoint=2)
     lbs, ubs = extrema(Unicycle.domain)
 
+    #Round the bounds to avoid floating point errors
     ##Bound initial state variable (dx1 = x4*cos(x3))#####
     #K-A Decomposition exp(ln(x4) + ln(cos(x3)))
     #Bound ln(x4)
@@ -261,9 +262,13 @@ function bound_unicycle_old(Unicycle; plotFlag=false)
     return bounds
 end
 
-function bound_unicycle(Unicycle; plotFlag=false)
+function bound_unicycle(Unicycle; plotFlag=false, npoint=2)
     lbs, ubs = extrema(Unicycle.domain)
     #Round the bounds to avoid floating point errors
+
+    #TEST: Round domain to avoid floating point errors
+    lbs = floor.(lbs, digits=dig)
+    ubs = ceil.(ubs, digits=dig)
 
     ##Bound initial state variable (dx1 = x4*cos(x3))#####
     #Weird behavior with Hyperrectangle
@@ -278,7 +283,7 @@ function bound_unicycle(Unicycle; plotFlag=false)
     lb_x3 = lbs[3]
     ub_x3 = ubs[3]
     x1FuncSub_2 = :(cos(x3))
-    x1FuncSub_2LB, x1FuncSub_2UB = interpol_nd(bound_univariate(x1FuncSub_2, lb_x3, ub_x3)...)
+    x1FuncSub_2LB, x1FuncSub_2UB = interpol_nd(bound_univariate(x1FuncSub_2, lb_x3, ub_x3, npoint=npoint)...)
 
     #Lift the bounds to the same space
     #First lift the first component of dx1
@@ -312,7 +317,7 @@ function bound_unicycle(Unicycle; plotFlag=false)
 
     #Bound second component of dx2 (sin(x3))
     x2FuncSub2 = :(sin(x3))
-    x2FuncSub2LB, x2FuncSub2UB = interpol_nd(bound_univariate(x2FuncSub2, lb_x3, ub_x3)...)
+    x2FuncSub2LB, x2FuncSub2UB = interpol_nd(bound_univariate(x2FuncSub2, lb_x3, ub_x3, npoint=npoint)...)
 
     #Lift the bounds to the same space
     #First lift the first component of dx2\
@@ -380,8 +385,12 @@ function bound_unicycle(Unicycle; plotFlag=false)
    return bounds
 end
 
-function bound_unicycle_us(Unicycle; plotFlag=false)
+function bound_unicycle_us(Unicycle; plotFlag=false,npoint=2)
     lbs, ubs = extrema(Unicycle.domain)
+
+    #TEST: Round domain to avoid floating point errors
+    lbs = floor.(lbs, digits=dig)
+    ubs = ceil.(ubs, digits=dig)
 
     ##Bound initial state variable (dx1 = x4*cos(x3))#####
     #Weird behavior with Hyperrectangle
@@ -572,16 +581,17 @@ query = GraphPolyQuery(
     2 #case. Delete this param
 )
 
-dig=3
+dig=2
 #Next, test multi-step concrete reachability
 query1 = deepcopy(query);
+query1.N_overt = 2
 query1.ntime = 1;
 @time reachSet, boundSet = concreach!(query1, digits=dig);
 
-query11 = deepcopy(query);
-query11.ntime = 1;
-query11.problem.bound_func = bound_unicycle_old;
-@time reachSetOld, boundSetOld = concreach!(query11, digits=dig);
+# query11 = deepcopy(query);
+# query11.ntime = 1;
+# query11.problem.bound_func = bound_unicycle_old;
+# @time reachSetOld, boundSetOld = concreach!(query11, digits=dig);
 
 query111 = deepcopy(query);
 query111.ntime = 1;
@@ -589,20 +599,35 @@ query111.problem.bound_func = bound_unicycle_us;
 @time reachSetUS, boundSetUS = concreach!(query111, digits=dig);
 
 hypContained(reachSetUS, reachSet, digits=dig)
+hypContained(reachSet, reachSetUS, digits=dig)
 
-dig=3
+volume(reachSet)/volume(reachSetUS)
+
+dig=2
+tHor = 15
 #Next, test multi-step concrete reachability
 query2 = deepcopy(query);
-query2.ntime = 10;
+query2.N_overt = 2
+query2.ntime = tHor;
 @time reachSets, boundSets = multi_step_concreach(query2, digits=dig);
 
-query22 = deepcopy(query);
-query22.ntime = 10;
-query22.problem.bound_func = bound_unicycle_old;
-@time reachSetsOld, boundSetsOld = multi_step_concreach(query22, digits=dig);
+query2v1 = deepcopy(query);
+query2v1.N_overt = 3
+query2v1.ntime = tHor;
+@time reachSetsv1, boundSetsv1 = multi_step_concreach(query2v1, digits=dig);
+
+query2v2 = deepcopy(query);
+query2v2.N_overt = 1
+query2v2.ntime = tHor;
+@time reachSetsv2, boundSetsv2 = multi_step_concreach(query2v2, digits=dig);
+
+# query22 = deepcopy(query);
+# query22.ntime = tHor;
+# query22.problem.bound_func = bound_unicycle_old;
+# @time reachSetsOld, boundSetsOld = multi_step_concreach(query22, digits=dig);
 
 query222 = deepcopy(query);
-query222.ntime = 10;
+query222.ntime = tHor;
 query222.problem.bound_func = bound_unicycle_us;
 @time reachSetsUS, boundSetsUS = multi_step_concreach(query222, digits=dig);
 
@@ -614,54 +639,97 @@ for (i,_) in enumerate(reachSets)
         println("Failed at $(i)")
         trueFlag = true
     end
+    println("Volume ratio $i: ", volume(reachSets[i])/volume(reachSetsUS[i]))
 end
 
 #Recall, boundSets[t] makes reachSets[t+1], but reachSets[t] is used to make boundSets[t], for t >= 1
-t = 6;
-j = 4;
-tf2 = true;
+# t = 6;
+# j = 1;
+# tf2 = true;
 
-sLB = gen_interpol_nd(boundSets[t][j][1]);
-sUB = gen_interpol_nd(boundSets[t][j][2]);
-usLB = gen_interpol_nd(boundSetsUS[t][j][1]);
-usUB = gen_interpol_nd(boundSetsUS[t][j][2]);
+# sLB = gen_interpol_nd(boundSets[t][j][1]);
+# sUB = gen_interpol_nd(boundSets[t][j][2]);
+# usLB = gen_interpol_nd(boundSetsUS[t][j][1]);
+# usUB = gen_interpol_nd(boundSetsUS[t][j][2]);
 
-usInps1 = [tup[1:end-1] for tup in boundSetsUS[t][j][1]];
-usInps2 = [tup[1:end-1] for tup in boundSetsUS[t][j][2]];
-sInps1 = [tup[1:end-1] for tup in boundSets[t][j][1]];
-sInps2 = [tup[1:end-1] for tup in boundSets[t][j][2]];
-usInps = vcat(usInps1, usInps2, sInps1, sInps2);
-
-lbFlag = true;
-ubFlag = true;
-for (i,inp) in enumerate(usInps)
-    lbFlag = sLB(inp...) <= usLB(inp...)
-    ubFlag = sUB(inp...) >= usUB(inp...)
-    if !lbFlag
-        println("LB failed at $i")
-        lbFlag = true
-    end
-    if !ubFlag
-        println("UB failed at $i")
-        ubFlag = true
-    end
-end
-
-hypContained(reachSetsUS[t], reachSets[t], digits=dig)
+# usInps1 = [tup[1:end-1] for tup in boundSetsUS[t][j][1]];
+# usInps2 = [tup[1:end-1] for tup in boundSetsUS[t][j][2]];
+# sInps1 = [tup[1:end-1] for tup in boundSets[t][j][1]];
+# sInps2 = [tup[1:end-1] for tup in boundSets[t][j][2]];
+# usInps = unique(vcat(usInps1, usInps2));
 
 
 
+# lbFlag = true;
+# ubFlag = true;
+# for (i,inp) in enumerate(usInps)
+#     lbFlag = sLB(inp...) <= usLB(inp...)
+#     ubFlag = sUB(inp...) >= usUB(inp...)
+#     if !lbFlag
+#         println("LB failed at $i")
+#         lbFlag = true
+#     end
+#     if !ubFlag
+#         println("UB failed at $i")
+#         ubFlag = true
+#     end
+# end
 
+# if j == 1
+#     desSet = project(reachSetsUS[t], [1,3,4])
+# elseif j == 2
+#     desSet = project(reachSetsUS[t], [2,3,4])
+# else j == 3
+#     desSet = project(reachSetsUS[t], [j])
+# end
+# #Now try random sampling to be safe
+# randomSamples = LazySets.API.sample(desSet,10000);
+# for (i,inp) in enumerate(randomSamples)
+#     lbFlag = sLB(inp...) <= usLB(inp...)
+#     ubFlag = sUB(inp...) >= usUB(inp...)
+#     if !lbFlag
+#         println("LB failed at $i")
+#         lbFlag = true
+#     end
+#     if !ubFlag
+#         println("UB failed at $i")
+#         ubFlag = true
+#     end
+# end
+
+# hypContained(reachSetsUS[t], reachSets[t], digits=dig)
+
+# extrema(reachSets[8])[1][2]
+# extrema(reachSetsUS[8])[1][2]
 
 ########################################################
 ########################################################
-digs= 3
-t_sym = 10
+digs= 2
+t_sym = 5
 #Next, test direct symreach 
+tMid = 3
 query3 = deepcopy(query);
 query3.problem.bounds = boundSets;
-query3.ntime = t_sym;
-@time symReach = symreach(query3,reachSets, depMat,t_sym,digits=digs);
+query3.ntime = tMid;
+@time symReach = symreach(query3,reachSets, depMat,tMid,digits=digs);
+
+# midQuery = deepcopy(query);
+# midQuery.problem.domain = symReach;
+# midQuery.ntime= t_sym - tMid
+# reachSetsMid, boundSetsMid = multi_step_concreach(midQuery, digits=digs);
+# query3.problem.bounds = boundSetsMid;
+# query3.ntime = t_sym - tMid;
+# @time symReach = symreach(query3,reachSetsMid, depMat,t_sym-tMid,digits=digs);
+
+# query3v1 = deepcopy(query);
+# query3v1.problem.bounds = boundSetsv1;
+# query3v1.ntime = t_sym;
+# @time symReachv1 = symreach(query3v1,reachSetsv1, depMat,t_sym,timeout=3600,digits=digs);
+
+# query3v2 = deepcopy(query);
+# query3v2.problem.bounds = boundSetsv2;
+# query3v2.ntime = t_sym;
+# @time symReachv2 = symreach(query3v2,reachSetsv2, depMat,t_sym,timeout=3600,digits=digs);
 
 # query33 = deepcopy(query);
 # query33.problem.bounds = boundSetsOld;
@@ -672,18 +740,44 @@ query3.ntime = t_sym;
 query333 = deepcopy(query);
 query333.problem.bounds = boundSetsUS;
 query333.problem.bound_func = bound_unicycle_us;
-query333.ntime = t_sym;
-@time symReachUS = symreach(query333,reachSetsUS, depMat,t_sym,digits=digs);
+query333.ntime = 10;
+@time symReachUS = symreach(query333,reachSetsUS, depMat,10,digits=digs);
+
+# extrema(symReach)
+# overtSet5 = Hyperrectangle(low=[8.086801359525037, -3.30969656539029, 2.575348053987308, 2.404174385612813], high=[8.146157589283689, -3.2522440408188764, 2.5862983108554296, 2.429526046088343])
+# overtSet10 = Hyperrectangle(low=[5.890836945146775, -2.0430831854657874, 2.616833936065307, 2.177304150435417], high=[5.936847791029251, -1.9941576034378952, 2.6224381808591746, 2.2108241743200003])
+
+# extrema(overtSet10)
+# extrema(symReachUS)
+
+# i = 2
+# j = 4
+# extrema(symReachUS)[i][j] >= extrema(overtSet10)[i][j]
 
 
-hypContained(symReachUS, symReach, digits=digs)
 
-extrema(symReach)
-extrema(symReachUS)
+# hypContained(overtSet10, symReachUS, digits=3)
+# hypContained(symReachUS, overtSet10, digits=digs)
+
+# hypContained(symReachUS, symReach, digits=digs)
+# hypContained(symReach, symReachUS, digits=digs)
+
+# volume(symReach)/volume(reachSets[11])
+# volume(symReachUS)/volume(reachSetsUS[11])
+# hypContained(symReach, reachSets[6], digits=digs)
+# hypContained(symReachUS, reachSetsUS[6], digits=digs)
 
 
 volume(symReach)/volume(symReachUS)
-5e-1
+# volume(symReachv1)/volume(symReachUS)
+# volume(symReachv2)/volume(symReachUS)
+extrema(symReach)
+extrema(symReachUS)
+
+j = 4
+volume(project(symReach, [j]))/volume(project(symReachUS, [j]))
+
+
 # #Test hybrid reachability
 # concInt = [2,2,2,2,2]
 # query4 = deepcopy(query)
@@ -697,6 +791,7 @@ boundsList = []
 #println("Trying [15,5,5,5,5,5,5,5]")
 #println("Trying [20,10,5,5,5,5]")
 cquery = deepcopy(query)
+cquery.N_overt = 3
 squery = deepcopy(query)
 # cquery.problem.bound_func = bound_unicycle_us
 # squery.problem.bound_func = bound_unicycle_us
@@ -730,7 +825,7 @@ concReachSets, BoundSets = multi_step_concreach(cquery);
 squery.problem.bounds = BoundSets;
 push!(boundsList,BoundSets...);
 push!(reachList,concReachSets...);
-@time sym_set = symreach(squery, concReachSets, depMat, t_sym);
+@time sym_set = symreach(squery, concReachSets, depMat, t_sym, timeout=7200);
 push!(symReachList, sym_set)
 t3 = Dates.now()
 cquery.problem.domain = sym_set;
