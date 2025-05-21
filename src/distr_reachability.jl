@@ -377,9 +377,9 @@ function multi_step_hybreach(hybQuery, depMat, concInt)
 
         squery.problem.bounds = boundSets
         squery.ntime = int
-        hySet = symReach(squery, reachSets, depMat, int) 
+        hySet = symreach(squery, reachSets, depMat, int) 
         push!(hyb_reachSets, hySet)
-        hybQuery.problem.domain = hySet
+        cquery.problem.domain = hySet
     end
     return hyb_reachSets, [conc_reachSets, conc_boundSets]
 end

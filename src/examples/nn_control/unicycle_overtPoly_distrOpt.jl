@@ -588,11 +588,6 @@ query1.N_overt = 2
 query1.ntime = 1;
 @time reachSet, boundSet = concreach!(query1, digits=dig);
 
-# query11 = deepcopy(query);
-# query11.ntime = 1;
-# query11.problem.bound_func = bound_unicycle_old;
-# @time reachSetOld, boundSetOld = concreach!(query11, digits=dig);
-
 query111 = deepcopy(query);
 query111.ntime = 1;
 query111.problem.bound_func = bound_unicycle_us;
@@ -610,21 +605,6 @@ query2 = deepcopy(query);
 query2.N_overt = 2
 query2.ntime = tHor;
 @time reachSets, boundSets = multi_step_concreach(query2, digits=dig);
-
-query2v1 = deepcopy(query);
-query2v1.N_overt = 3
-query2v1.ntime = tHor;
-@time reachSetsv1, boundSetsv1 = multi_step_concreach(query2v1, digits=dig);
-
-query2v2 = deepcopy(query);
-query2v2.N_overt = 1
-query2v2.ntime = tHor;
-@time reachSetsv2, boundSetsv2 = multi_step_concreach(query2v2, digits=dig);
-
-# query22 = deepcopy(query);
-# query22.ntime = tHor;
-# query22.problem.bound_func = bound_unicycle_old;
-# @time reachSetsOld, boundSetsOld = multi_step_concreach(query22, digits=dig);
 
 query222 = deepcopy(query);
 query222.ntime = tHor;
@@ -705,77 +685,47 @@ end
 ########################################################
 ########################################################
 digs= 2
-t_sym = 5
+t_sym = 10
 #Next, test direct symreach 
-tMid = 3
+tMid = 5
 query3 = deepcopy(query);
 query3.problem.bounds = boundSets;
 query3.ntime = tMid;
-@time symReach = symreach(query3,reachSets, depMat,tMid,digits=digs);
+@time sym_set = symreach(query3,reachSets, depMat,tMid,digits=digs);
 
-# midQuery = deepcopy(query);
-# midQuery.problem.domain = symReach;
-# midQuery.ntime= t_sym - tMid
-# reachSetsMid, boundSetsMid = multi_step_concreach(midQuery, digits=digs);
-# query3.problem.bounds = boundSetsMid;
-# query3.ntime = t_sym - tMid;
-# @time symReach = symreach(query3,reachSetsMid, depMat,t_sym-tMid,digits=digs);
+midQuery = deepcopy(query);
+midQuery.problem.domain = sym_set;
+midQuery.ntime= t_sym - tMid
+reachSetsMid, boundSetsMid = multi_step_concreach(midQuery, digits=digs);
+query3.problem.bounds = boundSetsMid;
+query3.ntime = t_sym - tMid;
+@time sym_set = symreach(query3,reachSetsMid, depMat,t_sym-tMid,digits=digs);
 
-# query3v1 = deepcopy(query);
-# query3v1.problem.bounds = boundSetsv1;
-# query3v1.ntime = t_sym;
-# @time symReachv1 = symreach(query3v1,reachSetsv1, depMat,t_sym,timeout=3600,digits=digs);
+query3v1 = deepcopy(query);
+concInt = [5,5]
+@time sym_setv1, conc_v1 = multi_step_hybreach(query3v1, depMat, concInt);
 
-# query3v2 = deepcopy(query);
-# query3v2.problem.bounds = boundSetsv2;
-# query3v2.ntime = t_sym;
-# @time symReachv2 = symreach(query3v2,reachSetsv2, depMat,t_sym,timeout=3600,digits=digs);
-
-# query33 = deepcopy(query);
-# query33.problem.bounds = boundSetsOld;
-# query33.problem.bound_func = bound_unicycle_old;
-# query33.ntime = t_sym;
-# @time symReachOld = symreach(query33,reachSetsOld, depMat,2,digits=digs);
 
 query333 = deepcopy(query);
 query333.problem.bounds = boundSetsUS;
 query333.problem.bound_func = bound_unicycle_us;
-query333.ntime = 10;
-@time symReachUS = symreach(query333,reachSetsUS, depMat,10,digits=digs);
+query333.ntime = t_sym;
+@time sym_setUS = symreach(query333,reachSetsUS, depMat,t_sym,digits=digs);
 
-# extrema(symReach)
-# overtSet5 = Hyperrectangle(low=[8.086801359525037, -3.30969656539029, 2.575348053987308, 2.404174385612813], high=[8.146157589283689, -3.2522440408188764, 2.5862983108554296, 2.429526046088343])
-# overtSet10 = Hyperrectangle(low=[5.890836945146775, -2.0430831854657874, 2.616833936065307, 2.177304150435417], high=[5.936847791029251, -1.9941576034378952, 2.6224381808591746, 2.2108241743200003])
-
-# extrema(overtSet10)
-# extrema(symReachUS)
-
-# i = 2
-# j = 4
-# extrema(symReachUS)[i][j] >= extrema(overtSet10)[i][j]
-
-
-
-# hypContained(overtSet10, symReachUS, digits=3)
-# hypContained(symReachUS, overtSet10, digits=digs)
-
-# hypContained(symReachUS, symReach, digits=digs)
-# hypContained(symReach, symReachUS, digits=digs)
-
-# volume(symReach)/volume(reachSets[11])
-# volume(symReachUS)/volume(reachSetsUS[11])
-# hypContained(symReach, reachSets[6], digits=digs)
-# hypContained(symReachUS, reachSetsUS[6], digits=digs)
-
-
-volume(symReach)/volume(symReachUS)
+volume(sym_set)/volume(sym_setUS)
+volume(sym_setv1[end])/volume(sym_setUS)
 # volume(symReachv1)/volume(symReachUS)
 # volume(symReachv2)/volume(symReachUS)
-extrema(symReach)
-extrema(symReachUS)
+extrema(sym_set)
+extrema(sym_setUS)
+extrema(sym_setv1[end])
 
+
+hypContained(sym_setUS,sym_set, digits=digs)
+hypContained(sym_setUS, sym_setv1[end], digits=digs)
 j = 4
-volume(project(symReach, [j]))/volume(project(symReachUS, [j]))
+volume(project(sym_set, [j]))/volume(project(sym_setUS, [j]))
+volume(project(sym_setv1[end], [j]))/volume(project(sym_setUS, [j]))
 
 
 # #Test hybrid reachability
@@ -784,6 +734,21 @@ volume(project(symReach, [j]))/volume(project(symReachUS, [j]))
 # @time reachSets = multi_step_hybreach(query4, depMat, concInt)
 
 ###########Trying hybrid symbolic##############
+sQuery = deepcopy(query)
+sconcInt = [5,5,5,5,5,5,5,5,5,5]
+usConcInt = [10,10]
+usQuery = deepcopy(query)
+usQuery.problem.bound_func = bound_unicycle_us
+
+@time sym_set, sound_conc = multi_step_hybreach(sQuery, depMat, sconcInt);
+@time us_set, us_conc = multi_step_hybreach(usQuery, depMat, usConcInt);
+
+extrema(sym_set[end])
+extrema(us_set[end])
+
+hypContained(us_set[end], sym_set[end], digits=digs)
+volume(sym_set[end])/volume(us_set[end])
+
 reachList = []
 symReachList = []
 boundsList = []
@@ -793,8 +758,8 @@ boundsList = []
 cquery = deepcopy(query)
 cquery.N_overt = 3
 squery = deepcopy(query)
-# cquery.problem.bound_func = bound_unicycle_us
-# squery.problem.bound_func = bound_unicycle_us
+cquery.problem.bound_func = bound_unicycle_us
+squery.problem.bound_func = bound_unicycle_us
 cquery.ntime = 10
 squery.ntime = 10
 t_sym = 10

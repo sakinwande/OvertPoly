@@ -1190,6 +1190,9 @@ function prodBounds(lb1, ub1, lb2, ub2)
     #NOTE: Assumes lbs and ubs have same inputs
     unionInps = sort(unique(vcat(bound1Inps, bound2Inps), dims=1))
 
+    #Get dimension of inputs
+    dim = length(unionInps[1])
+
     #Find unique elements per dimension
     subgrids = get_subgrids(unionInps)
 
@@ -1226,37 +1229,54 @@ function prodBounds(lb1, ub1, lb2, ub2)
         #Use the sub-grids to get grid coordinates 
         coords = collect(Iterators.product(coordinates...))
 
-        #Use pointwise interval arithmetic to get upper and lower bounds
-        LBs = [min(lb1_int(coord...)*lb2_int(coord...), lb1_int(coord...)*ub2_int(coord...), ub1_int(coord...)*lb2_int(coord...), ub1_int(coord...)*ub2_int(coord...)) for coord in coords]
-        UBs = [max(lb1_int(coord...)*lb2_int(coord...), lb1_int(coord...)*ub2_int(coord...), ub1_int(coord...)*lb2_int(coord...), ub1_int(coord...)*ub2_int(coord...)) for coord in coords]
+        if dim == 2
+            #Use a McCormick envelope to get the bounds
+            lb1_l = min([lb1_int(coord...) for coord in coords]...)
+            lb1_u = max([lb1_int(coord...) for coord in coords]...)
+            ub1_l = min([ub1_int(coord...) for coord in coords]...)
+            ub1_u = max([ub1_int(coord...) for coord in coords]...)
 
-        #Now for soundness, use cell-wise interval arithmetic bounds
-        #TODO: Optimization here for tighter bounds 
-        minMin = minimum(LBs)
-        maxMin = maximum(LBs)
-        maxMax = maximum(UBs)
-        minMax = minimum(UBs)
+            lb2_l = min([lb2_int(coord...) for coord in coords]...)
+            lb2_u = max([lb2_int(coord...) for coord in coords]...)
+            ub2_l = min([ub2_int(coord...) for coord in coords]...)
+            ub2_u = max([ub2_int(coord...) for coord in coords]...)
 
-        # cLBs = abs.(maxMin .- deepcopy(LBs))
-        # cUBs = abs.(minMax .- deepcopy(UBs))
+            #McCormick envelopes are defined as follows
+            #treat LB_1 as "x" and LB_2 as "y"
+            LBs = [lb1_l * lb2_int(coord...) + lb2_l * lb1_int(coord...) - (lb1_l * lb2_l) for coord in coords]
+            UBs = [ub1_l * ub2_int(coord...) + ub2_u * ub1_int(coord...) - (ub1_l * ub2_u) for coord in coords]
 
-        # cLBs = abs(maxMin - minMin)
-        # cUBs = abs(maxMax - minMax)
+        else
+            #Use pointwise interval arithmetic to get upper and lower bounds
+            LBs = [min(lb1_int(coord...)*lb2_int(coord...), lb1_int(coord...)*ub2_int(coord...), ub1_int(coord...)*lb2_int(coord...), ub1_int(coord...)*ub2_int(coord...)) for coord in coords]
+            UBs = [max(lb1_int(coord...)*lb2_int(coord...), lb1_int(coord...)*ub2_int(coord...), ub1_int(coord...)*lb2_int(coord...), ub1_int(coord...)*ub2_int(coord...)) for coord in coords]
+            #Now for soundness, use cell-wise interval arithmetic bounds
+            #TODO: Optimization here for tighter bounds 
+            minMin = minimum(LBs)
+            maxMin = maximum(LBs)
+            maxMax = maximum(UBs)
+            minMax = minimum(UBs)
 
-        cLBs = abs.(minMin .- deepcopy(LBs))
-        cUBs = abs.(maxMax .- deepcopy(UBs))
+            # cLBs = abs.(maxMin .- deepcopy(LBs))
+            # cUBs = abs.(minMax .- deepcopy(UBs))
 
-        κ = 1.0
+            # cLBs = abs(maxMin - minMin)
+            # cUBs = abs(maxMax - minMax)
 
-        #To avoid flat bounds, incorporate (sound) random perturbation
-        #Maximum addition is 1% of bound value 
-        # LBs = LBs .- 0.2*rand(size(LBs)...).*abs.(LBs)
-        # UBs = UBs .+ 0.2*rand(size(UBs)...).*abs.(UBs)
+            cLBs = abs.(minMin .- deepcopy(LBs))
+            cUBs = abs.(maxMax .- deepcopy(UBs))
 
-        #To avoid flat bounds, incorporate (sound) proportional perturbation
-        LBs = LBs .- κ*cLBs
-        UBs = UBs .+ κ*cUBs
+            κ = 1.0
 
+            #To avoid flat bounds, incorporate (sound) random perturbation
+            #Maximum addition is 1% of bound value 
+            # LBs = LBs .- 0.2*rand(size(LBs)...).*abs.(LBs)
+            # UBs = UBs .+ 0.2*rand(size(UBs)...).*abs.(UBs)
+
+            #To avoid flat bounds, incorporate (sound) proportional perturbation
+            LBs = LBs .- κ*cLBs
+            UBs = UBs .+ κ*cUBs
+        end
         #Update the matrix of bounds
         for (i, vert) in enumerate(verts)
             pt = lowMat[vert...][1:end-1] 

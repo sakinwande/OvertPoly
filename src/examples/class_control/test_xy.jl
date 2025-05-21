@@ -17,7 +17,7 @@ npoint=1
 #Bounding the pendulum. Break into smaller chunks
 function bound_xy_ia(npoint) 
     lbs, ubs = extrema(domain)
-    p1 = :(x*cos(x))
+    p1 = :(x)
     p1_LB_1_1, p1_UB_1_1 = interpol_nd(bound_univariate(p1, lbs[1], ubs[1],npoint=npoint)...)
     p2 = :(y*sin(y))
     p2_LB_1_1, p2_UB_1_1 = interpol_nd(bound_univariate(p2, lbs[2], ubs[2],npoint=npoint)...)
@@ -31,6 +31,9 @@ domain = Hyperrectangle(low=[9.5,-4.5,2.1,1.5], high = [9.55,-4.45,2.11,1.51])
 
 domS = Hyperrectangle(low=[8.780374446737326, -3.809831601924612, 2.491734297717635, 2.03413289454653], high=[8.846129598195503, -3.7438068609287094, 2.5136044305389933, 2.060266816649551])
 domUS = Hyperrectangle(low=[8.780374446737326, -3.8098316019246123, 2.4919685925517854, 2.03413289454653], high=[8.846129598195503, -3.74380686092871, 2.513604430538992, 2.060266816649551])
+
+x = (4,5,56,6,7)
+length(x)
 
 function raw_points(npoint)
     lbs, ubs = extrema(domain)
