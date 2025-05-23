@@ -581,7 +581,7 @@ query = GraphPolyQuery(
     2 #case. Delete this param
 )
 
-dig=2
+dig=15
 #Next, test multi-step concrete reachability
 query1 = deepcopy(query);
 query1.N_overt = 2
@@ -598,7 +598,7 @@ hypContained(reachSet, reachSetUS, digits=dig)
 
 volume(reachSet)/volume(reachSetUS)
 
-dig=2
+dig= 3
 tHor = 15
 #Next, test multi-step concrete reachability
 query2 = deepcopy(query);
@@ -684,26 +684,26 @@ end
 
 ########################################################
 ########################################################
-digs= 2
-t_sym = 10
+digs= 3
+t_sym = 5
 #Next, test direct symreach 
-tMid = 5
+tMid = t_sym
 query3 = deepcopy(query);
 query3.problem.bounds = boundSets;
 query3.ntime = tMid;
 @time sym_set = symreach(query3,reachSets, depMat,tMid,digits=digs);
 
-midQuery = deepcopy(query);
-midQuery.problem.domain = sym_set;
-midQuery.ntime= t_sym - tMid
-reachSetsMid, boundSetsMid = multi_step_concreach(midQuery, digits=digs);
-query3.problem.bounds = boundSetsMid;
-query3.ntime = t_sym - tMid;
-@time sym_set = symreach(query3,reachSetsMid, depMat,t_sym-tMid,digits=digs);
+# midQuery = deepcopy(query);
+# midQuery.problem.domain = sym_set;
+# midQuery.ntime= t_sym - tMid
+# reachSetsMid, boundSetsMid = multi_step_concreach(midQuery, digits=digs);
+# query3.problem.bounds = boundSetsMid;
+# query3.ntime = t_sym - tMid;
+# @time sym_set = symreach(query3,reachSetsMid, depMat,t_sym-tMid,digits=digs);
 
-query3v1 = deepcopy(query);
-concInt = [5,5]
-@time sym_setv1, conc_v1 = multi_step_hybreach(query3v1, depMat, concInt);
+# query3v1 = deepcopy(query);
+# concInt = [5,5]
+# @time sym_setv1, conc_v1 = multi_step_hybreach(query3v1, depMat, concInt);
 
 
 query333 = deepcopy(query);
@@ -713,19 +713,19 @@ query333.ntime = t_sym;
 @time sym_setUS = symreach(query333,reachSetsUS, depMat,t_sym,digits=digs);
 
 volume(sym_set)/volume(sym_setUS)
-volume(sym_setv1[end])/volume(sym_setUS)
+#volume(sym_setv1[end])/volume(sym_setUS)
 # volume(symReachv1)/volume(symReachUS)
 # volume(symReachv2)/volume(symReachUS)
 extrema(sym_set)
 extrema(sym_setUS)
-extrema(sym_setv1[end])
+# extrema(sym_setv1[end])
 
 
-hypContained(sym_setUS,sym_set, digits=digs)
-hypContained(sym_setUS, sym_setv1[end], digits=digs)
-j = 4
-volume(project(sym_set, [j]))/volume(project(sym_setUS, [j]))
-volume(project(sym_setv1[end], [j]))/volume(project(sym_setUS, [j]))
+# hypContained(sym_setUS,sym_set, digits=digs)
+# hypContained(sym_setUS, sym_setv1[end], digits=digs)
+# j = 4
+# volume(project(sym_set, [j]))/volume(project(sym_setUS, [j]))
+# volume(project(sym_setv1[end], [j]))/volume(project(sym_setUS, [j]))
 
 
 # #Test hybrid reachability
@@ -735,126 +735,28 @@ volume(project(sym_setv1[end], [j]))/volume(project(sym_setUS, [j]))
 
 ###########Trying hybrid symbolic##############
 sQuery = deepcopy(query)
-sconcInt = [5,5,5,5,5,5,5,5,5,5]
-usConcInt = [10,10]
-usQuery = deepcopy(query)
-usQuery.problem.bound_func = bound_unicycle_us
+sconcInt = [10,10,10,10,10]
+# usConcInt = [5,5]
+# usQuery = deepcopy(query)
+# usQuery.problem.bound_func = bound_unicycle_us
 
 @time sym_set, sound_conc = multi_step_hybreach(sQuery, depMat, sconcInt);
-@time us_set, us_conc = multi_step_hybreach(usQuery, depMat, usConcInt);
+#@time us_set, us_conc = multi_step_hybreach(usQuery, depMat, usConcInt);
 
+# extrema(sym_set[end])
+# extrema(us_set[end])
+
+goal_set  = Hyperrectangle(low=[-0.6, -0.2, -0.06, -0.3], high = [0.6, 0.2, 0.06, 0.3])
+
+extrema(goal_set)
 extrema(sym_set[end])
-extrema(us_set[end])
 
-hypContained(us_set[end], sym_set[end], digits=digs)
-volume(sym_set[end])/volume(us_set[end])
+hypContained(sym_set[end], goal_set, digits=2)
 
-reachList = []
-symReachList = []
-boundsList = []
-#Timed run
-#println("Trying [15,5,5,5,5,5,5,5]")
-#println("Trying [20,10,5,5,5,5]")
-cquery = deepcopy(query)
-cquery.N_overt = 3
-squery = deepcopy(query)
-cquery.problem.bound_func = bound_unicycle_us
-squery.problem.bound_func = bound_unicycle_us
-cquery.ntime = 10
-squery.ntime = 10
-t_sym = 10
-tStart = Dates.now()
-concReachSets, BoundSets = multi_step_concreach(cquery);
-squery.problem.bounds = BoundSets;
-push!(boundsList,BoundSets...);
-push!(reachList,concReachSets...);
-@time sym_set = symreach(squery, concReachSets, depMat, t_sym);
-push!(symReachList, sym_set)
-t1 = Dates.now()
-cquery.problem.domain = sym_set;
-print("Time to compute 10 hybrid reach sets: ", t1-tStart)
-# cquery.ntime = 5
-# squery.ntime = 5
-# t_sym = 5
-concReachSets, BoundSets = multi_step_concreach(cquery);
-squery.problem.bounds = BoundSets;
-push!(boundsList,BoundSets...);
-push!(reachList,concReachSets...);
-@time sym_set = symreach(squery, concReachSets, depMat, t_sym);
-push!(symReachList, sym_set)
-t2 = Dates.now()
-cquery.problem.domain = sym_set;
-print("Time to compute 20 hybrid reach sets: ", t2-tStart)
-tMid = Dates.now()
-concReachSets, BoundSets = multi_step_concreach(cquery);
-squery.problem.bounds = BoundSets;
-push!(boundsList,BoundSets...);
-push!(reachList,concReachSets...);
-@time sym_set = symreach(squery, concReachSets, depMat, t_sym, timeout=7200);
-push!(symReachList, sym_set)
-t3 = Dates.now()
-cquery.problem.domain = sym_set;
-print("Time to compute 30 hybrid reach sets: ", t3-tMid)
-concReachSets, BoundSets = multi_step_concreach(cquery);
-squery.problem.bounds = BoundSets;
-push!(boundsList,BoundSets...);
-push!(reachList,concReachSets...);
-@time sym_set = symreach(squery, concReachSets, depMat, t_sym);
-push!(symReachList, sym_set)
-t5 = Dates.now()
-cquery.problem.domain = sym_set;
-print("Time to compute 40 hybrid reach sets: ", t5-tStart)
-concReachSets, BoundSets = multi_step_concreach(cquery);
-squery.problem.bounds = BoundSets;
-push!(boundsList,BoundSets...);
-push!(reachList,concReachSets...);
-@time sym_set = symreach(squery, concReachSets, depMat, t_sym);
-push!(symReachList, sym_set)
-t6 = Dates.now()
-cquery.problem.domain = sym_set;
-print("Time to compute 50 hybrid reach sets: ", t6-tStart)
+floor(extrema(sym_set[end])[1][3], digits=3)
+extrema(goal_set)[1][3]
 
-extrema(sym_set)
-# tPause = Dates.now()
-# concReachSets, BoundSets = multi_step_concreach(cquery);
-# squery.problem.bounds = BoundSets;
-# push!(boundsList,BoundSets...);
-# push!(reachList,concReachSets...);
-# sym_set = symreach(squery, concReachSets, depMat, t_sym);
-# push!(symReachList, sym_set)
-# t7 = Dates.now()
-# cquery.problem.domain = sym_set;
-# print("Time to compute 40 hybrid reach sets: ", t7 - tPause)
-# concReachSets, BoundSets = multi_step_concreach(cquery);
-# squery.problem.bounds = BoundSets;
-# push!(boundsList,BoundSets...);
-# push!(reachList,concReachSets...);
-# sym_set = symreach(squery, concReachSets, depMat, t_sym);
-# push!(symReachList, sym_set)
-# t8 = Dates.now()
-# cquery.problem.domain = sym_set;
-# print("Time to compute 45 hybrid reach sets: ", t8-tPause)
-# concReachSets, BoundSets = multi_step_concreach(cquery);
-# squery.problem.bounds = BoundSets;
-# push!(boundsList,BoundSets...);
-# push!(reachList,concReachSets...);
-# sym_set = symreach(squery, concReachSets, depMat, t_sym);
-# push!(symReachList, sym_set)
-# t9 = Dates.now()
-# cquery.problem.domain = sym_set;
-# print("Time to compute 50 hybrid reach sets: ", t9-tStart)
+# hypContained(us_set[end], sym_set[end], digits=digs)
+# volume(sym_set[end])/volume(us_set[end])
 
-###########Verify Prop#####################
-goalSet = Hyperrectangle(low = [-0.6, -0.2, -0.06, -0.3], high=[0.6, 0.2, 0.06, 0.3])
-
-plot(project(reachSets[end], [1,2]), lab="Reachable Set", color="lightblue", lw=0.5)
-plot!(project(goalSet, [1,2]), lab="Goal Set", color="red", lw=0.5)
-
-
-plot(project(reachSets[end], [3,4]))
-plot!(project(goalSet, [3,4]))
-
-symQuery = deepcopy(query)
-symQuery.problem.bounds = boundSets
-reachSets[end]
 

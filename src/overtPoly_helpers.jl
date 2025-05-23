@@ -1170,7 +1170,7 @@ function get_subgrids(unionInps)
     sub_grids = [unique(tup[i] for tup in tupList) for i in 1:dim]
     return sub_grids
 end
-function prodBounds(lb1, ub1, lb2, ub2) 
+function prodBounds(lb1, ub1, lb2, ub2, a1Flag = false, a2Flag = false) 
     """
     Method to compute bounds for the product of two functions defined over the same domain
 
@@ -1230,6 +1230,7 @@ function prodBounds(lb1, ub1, lb2, ub2)
         coords = collect(Iterators.product(coordinates...))
 
         if dim == 2
+            McCormickFlag = true
             #Use a McCormick envelope to get the bounds
             lb1_l = min([lb1_int(coord...) for coord in coords]...)
             lb1_u = max([lb1_int(coord...) for coord in coords]...)
@@ -1241,10 +1242,82 @@ function prodBounds(lb1, ub1, lb2, ub2)
             ub2_l = min([ub2_int(coord...) for coord in coords]...)
             ub2_u = max([ub2_int(coord...) for coord in coords]...)
 
-            #McCormick envelopes are defined as follows
-            #treat LB_1 as "x" and LB_2 as "y"
-            LBs = [lb1_l * lb2_int(coord...) + lb2_l * lb1_int(coord...) - (lb1_l * lb2_l) for coord in coords]
-            UBs = [ub1_l * ub2_int(coord...) + ub2_u * ub1_int(coord...) - (ub1_l * ub2_u) for coord in coords]
+            #First, do a case analysis 
+            #Case 1: 1 is +ve and 2 is +ve
+            if lb1_l >= 0 && lb2_l >= 0
+                #l1*l2 and u1*u2
+                x₁ˡ, x₁ᵘ, y₁ˡ, y₁ᵘ = lb1_l, lb1_u, lb2_l, lb2_u
+                x1Func = lb1_int
+                y1Func = lb2_int
+
+                x₂ˡ, x₂ᵘ, y₂ˡ, y₂ᵘ = ub1_l, ub1_u, ub2_l, ub2_u
+                x2Func = ub1_int
+                y2Func = ub2_int
+            elseif lb1_l >=0 && ub2_u <= 0
+                #Case where 1 is +ve and 2 is -ve
+                #u1*l2 and l1*u2
+                x₁ˡ, x₁ᵘ, y₁ˡ, y₁ᵘ = ub1_l, ub1_u, lb2_l, lb2_u
+                x1Func = ub1_int
+                y1Func = lb2_int
+
+                x₂ˡ, x₂ᵘ, y₂ˡ, y₂ᵘ = lb1_l, lb1_u, ub2_l, ub2_u
+                x2Func = lb1_int
+                y2Func = ub2_int
+            elseif ub1_u <= 0 && lb2_l >= 0
+                #Case where 1 is -ve and 2 is +ve
+                #l1*u2 and u1*l2
+                x₁ˡ, x₁ᵘ, y₁ˡ, y₁ᵘ = lb1_l, lb1_u, ub2_l, ub2_u
+                x1Func = lb1_int
+                y1Func = ub2_int
+
+                x₂ˡ, x₂ᵘ, y₂ˡ, y₂ᵘ = ub1_l, ub1_u, lb2_l, lb2_u
+                x2Func = ub1_int
+                y2Func = lb2_int
+            elseif ub1_u <= 0 && ub2_u <= 0 
+                #Case where 1 is -ve and 2 is -ve
+                #u1*u2 and l1*l2
+                x₁ˡ, x₁ᵘ, y₁ˡ, y₁ᵘ = ub1_l, ub1_u, ub2_l, ub2_u
+                x1Func = ub1_int
+                y1Func = ub2_int
+
+                x₂ˡ, x₂ᵘ, y₂ˡ, y₂ᵘ = lb1_l, lb1_u, lb2_l, lb2_u
+                x2Func = lb1_int
+                y2Func = lb2_int
+            else
+                #Revert to pointwise interval arithmetic
+                McCormickFlag = false
+
+            end
+
+            if McCormickFlag
+                #McCormick envelopes are defined as follows
+                #treat f_1 as "x" and f_2 as "y"
+
+                #First, get a lower bound on the lower envelope? (meaning lb_1 and lb_2)
+                #Lower envelope: xˡy + yˡx - (xˡyˡ)
+                #Alternative: xᵘy + yᵘx - (xᵘyᵘ)
+                if a1Flag
+                    LBs = [x₁ᵘ * y1Func(coord...) + y₁ᵘ * x1Func(coord...) - (x₁ᵘ * y₁ᵘ) for coord in coords]
+                else
+                    LBs = [x₁ˡ*y1Func(coord...) + y₁ˡ*x1Func(coord...) - (x₁ˡ*y₁ˡ) for coord in coords]
+                end
+
+                #Upper envelope: xˡy + yᵘx - (xˡyᵘ)
+                #Alternative: xᵘy + yˡx - (xᵘyˡ)
+                if a2Flag
+                    UBs = [x₂ˡ*y2Func(coord...) + y₂ᵘ*x2Func(coord...) - (x₂ˡ*y₂ᵘ) for coord in coords]
+                else
+                    UBs = [x₂ᵘ*y2Func(coord...) + y₂ˡ*x2Func(coord...) - (x₂ᵘ*y₂ˡ) for coord in coords]
+                end
+            else
+                #Use pointwise interval arithmetic to get upper and lower bounds
+                LBs = [min(lb1_int(coord...)*lb2_int(coord...), lb1_int(coord...)*ub2_int(coord...), ub1_int(coord...)*lb2_int(coord...), ub1_int(coord...)*ub2_int(coord...)) for coord in coords]
+                UBs = [max(lb1_int(coord...)*lb2_int(coord...), lb1_int(coord...)*ub2_int(coord...), ub1_int(coord...)*lb2_int(coord...), ub1_int(coord...)*ub2_int(coord...)) for coord in coords]
+                #Now for soundness, use cell-wise interval arithmetic bounds
+
+                LBs .= minimum(LBs)
+                UBs .= maximum(UBs)
+            end
 
         else
             #Use pointwise interval arithmetic to get upper and lower bounds

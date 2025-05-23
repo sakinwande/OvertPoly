@@ -38,13 +38,13 @@ function attitude_control(input_set)
     return con_inp_set
 end
 
-function bound_attitude(attitude, plotFlag=false, sanityFlag = false)
-    x1LB, x1UB = bound_att1(attitude, plotFlag, sanityFlag)
-    x2LB, x2UB = bound_att2(attitude, plotFlag, sanityFlag)
-    x3LB, x3UB = bound_att3(attitude, plotFlag, sanityFlag)
-    x4LB, x4UB = bound_att4(attitude, plotFlag, sanityFlag)
-    x5LB, x5UB = bound_att5(attitude, plotFlag, sanityFlag)
-    x6LB, x6UB = bound_att6(attitude, plotFlag, sanityFlag)
+function bound_attitude(attitude;npoint=1, plotFlag=false, sanityFlag = false)
+    x1LB, x1UB = bound_att1(attitude, plotFlag, sanityFlag, npoint)
+    x2LB, x2UB = bound_att2(attitude, plotFlag, sanityFlag, npoint)
+    x3LB, x3UB = bound_att3(attitude, plotFlag, sanityFlag, npoint)
+    x4LB, x4UB = bound_att4(attitude, plotFlag, sanityFlag, npoint)
+    x5LB, x5UB = bound_att5(attitude, plotFlag, sanityFlag, npoint)
+    x6LB, x6UB = bound_att6(attitude, plotFlag, sanityFlag, npoint)
 
     return [[x1LB, x1UB], [x2LB, x2UB], [x3LB, x3UB], [x4LB, x4UB], [x5LB, x5UB], [x6LB, x6UB]]
 end

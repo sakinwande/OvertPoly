@@ -45,7 +45,7 @@ function JuMP.objective_bound(graph::OptiGraph)
     return MOI.get(graph, MOI.ObjectiveBound())
 end
 
-function conc_reach_solve(query;threads=0, digits=8)
+function conc_reach_solve(query;threads=0, digits=15)
     lows = Array{Float64}(undef, 0)
     highs = Array{Float64}(undef, 0)
 
@@ -96,7 +96,7 @@ function conc_reach_solve(query;threads=0, digits=8)
     return reach_set 
 end
 
-function concreach!(query::GraphPolyQuery; digits=8)
+function concreach!(query::GraphPolyQuery; digits=15)
     query.problem.bounds = query.problem.bound_func(query.problem, npoint=query.N_overt)
     query.var_dict = Dict{Symbol,Any}()
     query.mod_dict = Dict{Symbol,Any}()
@@ -118,7 +118,7 @@ function concreach!(query::GraphPolyQuery; digits=8)
     return reach_set, query.problem.bounds
 end
 
-function multi_step_concreach(query::GraphPolyQuery; digits=8)
+function multi_step_concreach(query::GraphPolyQuery; digits=15)
     """
     Method to solve the concrete reachability problem using MIP for multiple time steps.
     """
