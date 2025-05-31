@@ -15,6 +15,7 @@ exprList = []
 dt = 0.1
 domain = domain  = Hyperrectangle(low=[-0.75, 0.85, -0.65, -0.45, -0.55, 0.65], high=[-0.74, 0.86, -0.64, -0.44, -0.54, 0.66])
 numSteps = 30
+depMat = [[1,1,1,1,1,1], [1,1,1,1,1,1], [1,1,1,1,1,1], [0,0,0,1,1,1], [0,0,0,1,1,1], [0,0,0,1,1,1]]
 
 #Define attitude dynamics
 function attitude_dynamics(x, u)
@@ -138,8 +139,21 @@ query1 = deepcopy(query)
 
 #Test multi-step concrete reachability
 query2 = deepcopy(query)
-query2.ntime = 30
+query2.ntime = 3
 @time reachSets, boundSets = multi_step_concreach(query2);
+
+#Test symbolic reachability
+t_sym = 3
+query3 = deepcopy(query)
+query3.problem.bounds = boundSets
+query3.ntime = t_sym
+@time sym_set = symreach(query3, reachSets, depMat, t_sym);
+
+hquery = deepcopy(query)
+hConcInt = [2,2]
+hConcInt = [3,3,3,3,3,3,3,3,3,3]
+
+@time hyb_set, concVec = multi_step_hybreach(hquery, depMat, hConcInt);
 
 extrema(reachSets[end])
 

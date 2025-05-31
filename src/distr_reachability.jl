@@ -269,7 +269,7 @@ function sym_link(symQuery::GraphPolyQuery, neurList, depMat)
     end
 end
 
-function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=1800, digits=15)
+function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=14400, digits=15)
     #Ensure that the time step is within bounds
     @assert t_sym <= symQuery.ntime
     #Akin to conc_reach_solve
@@ -321,7 +321,7 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=180
     return reach_set
 end
 
-function symreach(symQuery::GraphPolyQuery,reachSets, depMat,t_sym; threads=0, timeout=1800, digits=15)
+function symreach(symQuery::GraphPolyQuery,reachSets, depMat,t_sym; threads=0, timeout=14400, digits=15)
     """
     Method to symbolically solve the reachability problem. Agnostic to how the boundSets are computed
 
