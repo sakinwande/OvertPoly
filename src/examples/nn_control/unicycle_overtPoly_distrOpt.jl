@@ -685,7 +685,7 @@ end
 ########################################################
 ########################################################
 digs= 3
-t_sym = 5
+t_sym = 3
 #Next, test direct symreach 
 tMid = t_sym
 query3 = deepcopy(query);
@@ -736,11 +736,14 @@ extrema(sym_setUS)
 ###########Trying hybrid symbolic##############
 sQuery = deepcopy(query)
 sconcInt = [10,10,10,10,10]
+sconcInt = [2,2]
+#NOTE: sconcInt is marginally safe, to be sound, use tighter horizons
+altConcInt = [15,10,10,10,5]
 # usConcInt = [5,5]
 # usQuery = deepcopy(query)
 # usQuery.problem.bound_func = bound_unicycle_us
 
-@time sym_set, sound_conc = multi_step_hybreach(sQuery, depMat, sconcInt);
+@time sym_set, sound_conc = multi_step_hybreach(sQuery, depMat, altConcInt);
 #@time us_set, us_conc = multi_step_hybreach(usQuery, depMat, usConcInt);
 
 # extrema(sym_set[end])
