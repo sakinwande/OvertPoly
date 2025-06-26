@@ -735,7 +735,7 @@ extrema(sym_setUS)
 
 ###########Trying hybrid symbolic##############
 sQuery = deepcopy(query)
-sconcInt = [10,10,10,10,10]
+#sconcInt = [10,10,10,10,10]
 sconcInt = [2,2]
 #NOTE: sconcInt is marginally safe, to be sound, use tighter horizons
 altConcInt = [15,10,10,10,5]
@@ -754,7 +754,9 @@ goal_set  = Hyperrectangle(low=[-0.6, -0.2, -0.06, -0.3], high = [0.6, 0.2, 0.06
 extrema(goal_set)
 extrema(sym_set[end])
 
-hypContained(sym_set[end], goal_set, digits=2)
+hypContained(sym_set[end], goal_set, digits=16)
+
+volume(sym_set[end])
 
 floor(extrema(sym_set[end])[1][3], digits=3)
 extrema(goal_set)[1][3]

@@ -42,7 +42,7 @@ dt = 0.1
 
 
 ####Define Bound TORA########
-function bound_tora_old(TORA; plotFlag=false)
+function bound_tora_old(TORA; plotFlag=false, npoint=2)
     lbs, ubs = extrema(TORA.domain)
 
     ##Bound initial state variable (dx1 = x2)
@@ -111,7 +111,7 @@ function bound_tora_old(TORA; plotFlag=false)
     return bounds 
 end
 
-function bound_tora(TORA; plotFlag=false)
+function bound_tora(TORA; plotFlag=false,npoint=2)
     lbs, ubs = extrema(TORA.domain)
 
     ##Bound initial state variable (dx1 = x2)
@@ -355,6 +355,8 @@ for (i, reachset) in enumerate(reachsets)
         println("Property is violated at time $i")
     end
 end
+
+volume(reachsets[end])
 
 p = plot(project(safeSet, [1, 2]), lab="Safe Set", color="lightblue", lw=0.5)
 for reachset in reachsets

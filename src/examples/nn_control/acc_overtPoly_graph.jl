@@ -80,7 +80,7 @@ numSteps = 50
 dt = 0.1
 
 ########Define Bound ACC Dynamics#######
-function bound_acc_old(ACC; plotFlag = false)
+function bound_acc_old(ACC; plotFlag = false, npoint=2)
     lbs, ubs = extrema(ACC.domain)
 
     ##Bound Lead Car Dynamics#####
@@ -212,7 +212,7 @@ function bound_acc_old(ACC; plotFlag = false)
     return bounds
 end
 
-function bound_acc(ACC; plotFlag = false)
+function bound_acc(ACC; plotFlag = false, npoint=2)
     lbs, ubs = extrema(ACC.domain)
 
     ##Bound Lead Car Dynamics#####
@@ -438,6 +438,8 @@ query1 = deepcopy(query);
 query1.ntime = 50;
 @time reachSets, boundSets = multi_step_concreach(query1);
 
+volume(reachSets[end])
+
 query11 = deepcopy(query);
 query11.problem.bound_func = bound_acc_old;
 query11.ntime = 50;
@@ -477,7 +479,7 @@ plot!(project(reachsets[t], [5,6]), label="FlatReach")
 
 dRel = Any[]
 dSafe = Any[]
-for reachset in reachsets
+for reachset in reachSets
     reachInts = extrema(reachset)
     dRel_min = minimum([reachInts[1][1] - reachInts[1][4], reachInts[1][1] - reachInts[2][4], reachInts[2][1] - reachInts[1][4], reachInts[2][1] - reachInts[2][4]])
     dRel_max = maximum([reachInts[1][1] - reachInts[1][4], reachInts[1][1] - reachInts[2][4], reachInts[2][1] - reachInts[1][4], reachInts[2][1] - reachInts[2][4]])

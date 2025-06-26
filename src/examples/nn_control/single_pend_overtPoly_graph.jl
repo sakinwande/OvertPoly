@@ -85,7 +85,7 @@ function bound_pend_old(SinglePendulum; plotFlag=false)
     return bounds
 end
 
-function bound_pend(SinglePendulum; plotFlag=false)
+function bound_pend(SinglePendulum; plotFlag=false, npoint=2)
     #Define the true dynamics
     # single_pend_θ_doubledot = :($(grav_const/pend_len) * sin(x1) + $(1/(pend_mass*pend_len^2)) * u1 - $(friction/(pend_mass*pend_len^2)) * x2)
 
@@ -209,6 +209,8 @@ query1 = deepcopy(query)
 query1.ntime = 20
 @time reachSets, boundSets = multi_step_concreach(query1);
 
+extrema(reachSets[10])
+volume(reachSets[10])
 #Compare to old approach...
 query2 = deepcopy(query)
 query2.problem.bound_func = bound_pend_old

@@ -139,11 +139,11 @@ query1 = deepcopy(query)
 
 #Test multi-step concrete reachability
 query2 = deepcopy(query)
-query2.ntime = 3
+query2.ntime = 5
 @time reachSets, boundSets = multi_step_concreach(query2);
 
 #Test symbolic reachability
-t_sym = 3
+t_sym = 2
 query3 = deepcopy(query)
 query3.problem.bounds = boundSets
 query3.ntime = t_sym
@@ -151,13 +151,24 @@ query3.ntime = t_sym
 
 hquery = deepcopy(query)
 hConcInt = [2,2]
-hConcInt = [3,3,3,3,3,3,3,3,3,3]
+hConcInt = [[2 for i in 1:7]...,1]
+#hConcInt = [3 for i in 1:5]
 
 @time hyb_set, concVec = multi_step_hybreach(hquery, depMat, hConcInt);
 
 extrema(reachSets[end])
 
 volume(reachSets[end])
+
+extrema(hyb_set[end])
+
+a = 1
+b = a +1
+proj_sets = [project(set, [a,b]) for set in hyb_set]
+plot(proj_sets[1:4], fillcolor=:lightblue)
+
+av_set = Hyperrectangle(low=[-0.7, 0.7, -0.4, -0.2, -0.5, 0], high=[-0.6, 0.8, -0.2, 0, -0.4, 0.2])
+plot!(project(av_set, [a,b]), fillcolor=:red)
 
 using Plots
 plot(reachSets)
