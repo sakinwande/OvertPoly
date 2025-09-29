@@ -53,16 +53,18 @@ function bound_pend(SinglePendulum; plotFlag=false)
     bF1sub2 = :($((friction)/((pend_mass)*(pend_len)^2)) *-x2)
     bF1s2LB, bF1s2UB = interpol_nd(bound_univariate(bF1sub2, lb2, ub2, plotflag = plotFlag)...)
 
-    #Add a dimension to prepare for Minkowski sum
-    bF1s1LB_l = addDim(bF1s1LB, 2)
-    bF1s1UB_l = addDim(bF1s1UB, 2)
+    #Lift bounds to same space
+    emptyList = [2] #f(x1) missing theta_dot
+    currList = [1]
+    l_bF1s1LB, l_bF1s1UB = lift_OA(emptyList, currList, bF1s1LB, bF1s1UB, lbs, ubs)
 
-    bF1s2LB_l = addDim(bF1s2LB, 1)
-    bF1s2UB_l = addDim(bF1s2UB, 1)
+    #Lift f2
+    emptyList = [1] #f(x2) missing theta
+    currList = [2]
+    l_bF1s2LB, l_bF1s2UB = lift_OA(emptyList, currList, bF1s2LB, bF1s2UB, lbs, ubs)
 
     #Combine to get f(x1) + f(x2)
-    bF1LB = MinkSum(bF1s1LB_l, bF1s2LB_l)
-    bF1UB = MinkSum(bF1s1UB_l, bF1s2UB_l)
+    bF1LB, bF1UB = sumBounds(l_bF1s1LB, l_bF1s1UB, l_bF1s2LB, l_bF1s2UB, false)
 
     #Bound angle dynamics 
     lb_θ = lbs[2]

@@ -1,1 +1,1 @@
-# OvertPoly - Test submodule
+# OvertPoly - test submodule

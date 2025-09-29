@@ -102,17 +102,18 @@ function bound_acc(ACC; plotFlag = false)
     #Set number of digits for this one to avoid rounding out the points 
     aleadSub2LB, aleadSub2UB = interpol_nd(bound_univariate(aleadSub2, lb_a_Lead_sub2, ub_a_Lead_sub2, plotflag = plotFlag)...)
 
-    #Add a dimension to prepare for Minkowski sum
-    aleadSub1LB_l = addDim(aleadSub1LB, 2)
-    aleadSub1UB_l = addDim(aleadSub1UB, 2)
+    #Lift bounds to same space
+    emptyList = [2] #f(x1) missing v
+    currList = [1]
+    l_aleadSub1LB, l_aleadSub1UB = lift_OA(emptyList, currList, aleadSub1LB, aleadSub1UB, lbs[2:3], ubs[2:3])
 
-    aleadSub2LB_l = addDim(aleadSub2LB, 1)
-    aleadSub2UB_l = addDim(aleadSub2UB, 1)
+    #Lift f2
+    emptyList = [1] #f(x2) missing x
+    currList = [2]
+    l_aleadSub2LB, l_aleadSub2UB = lift_OA(emptyList, currList, aleadSub2LB, aleadSub2UB, lbs[2:3], ubs[2:3])
 
-    #Minkowski sum of the bounds
-    #NOTE: Unique flag added to eliminate duplicate points
-    aleadLB = unique(MinkSum(aleadSub1LB_l, aleadSub2LB_l))
-    aleadUB = unique(MinkSum(aleadSub1UB_l, aleadSub2UB_l))
+    #Combine to get f(x1) + f(x2)
+    aleadLB, aleadUB = sumBounds(l_aleadSub1LB, l_aleadSub1UB, l_aleadSub2LB, l_aleadSub2UB, false)
     
     #Bound lead veclocity dynamics 
     #Note that velocity dynamics are just acceleration
@@ -157,17 +158,18 @@ function bound_acc(ACC; plotFlag = false)
     #Set number of digits to be 9 bc we're dealing with very small numbers here
     aegoSub2LB, aegoSub2UB = interpol_nd(bound_univariate(aegoSub2, lb_a_Ego_sub2, ub_a_Ego_sub2, plotflag = plotFlag)...)
 
-    #Add a dimension to prepare for Minkowski sum
-    aegoSub1LB_l = addDim(aegoSub1LB, 2)
-    aegoSub1UB_l = addDim(aegoSub1UB, 2)
+    #Lift bounds to same space
+    emptyList = [2] #f(x1) missing v
+    currList = [1]
+    l_aegoSub1LB, l_aegoSub1UB = lift_OA(emptyList, currList, aegoSub1LB, aegoSub1UB, lbs[5:6], ubs[5:6])
 
-    aegoSub2LB_l = addDim(aegoSub2LB, 1)
-    aegoSub2UB_l = addDim(aegoSub2UB, 1)
+    #Lift f2
+    emptyList = [1] #f(x2) missing x
+    currList = [2]
+    l_aegoSub2LB, l_aegoSub2UB = lift_OA(emptyList, currList, aegoSub2LB, aegoSub2UB, lbs[5:6], ubs[5:6])
 
-    #Minkowski sum of the bounds
-    #NOTE: Unique flag added to eliminate duplicate points
-    aegoLB = unique(MinkSum(aegoSub1LB_l, aegoSub2LB_l))
-    aegoUB = unique(MinkSum(aegoSub1UB_l, aegoSub2UB_l))
+    #Combine to get f(x1) + f(x2)
+    aegoLB, aegoUB = sumBounds(l_aegoSub1LB, l_aegoSub1UB, l_aegoSub2LB, l_aegoSub2UB, false)
 
     #Bound ego velocity dynamics
     lb_v_ego = lbs[6]

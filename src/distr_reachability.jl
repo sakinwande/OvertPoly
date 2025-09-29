@@ -45,7 +45,7 @@ function JuMP.objective_bound(graph::OptiGraph)
     return MOI.get(graph, MOI.ObjectiveBound())
 end
 
-function conc_reach_solve(query;threads=0)
+function conc_reach_solve(query;threads=0, digits=15)
     lows = Array{Float64}(undef, 0)
     highs = Array{Float64}(undef, 0)
 
@@ -84,14 +84,20 @@ function conc_reach_solve(query;threads=0)
         @objective(maxGraph, Min, -next_v_u)
         optimize!(maxGraph)
         #push!(highs, -objective_value(maxGraph))
+        @assert termination_status(maxGraph) == MOI.OPTIMAL
         push!(highs, -JuMP.objective_bound(maxGraph))
     end
+
+    lows = floor.(lows, digits=digits)
+    highs = ceil.(highs, digits=digits)
+
+    #Since the default 
     reach_set = Hyperrectangle(low=lows, high=highs)
     return reach_set 
 end
 
-function concreach!(query::GraphPolyQuery)
-    query.problem.bounds = query.problem.bound_func(query.problem)
+function concreach!(query::GraphPolyQuery; digits=15)
+    query.problem.bounds = query.problem.bound_func(query.problem, npoint=query.N_overt)
     query.var_dict = Dict{Symbol,Any}()
     query.mod_dict = Dict{Symbol,Any}()
 
@@ -108,11 +114,11 @@ function concreach!(query::GraphPolyQuery)
     netModel = query.mod_dict[:u]
     dyn_con_link!(query, neurons, graph, dynModel, netModel)
 
-    reach_set = conc_reach_solve(query)
+    reach_set = conc_reach_solve(query, digits=digits)
     return reach_set, query.problem.bounds
 end
 
-function multi_step_concreach(query::GraphPolyQuery)
+function multi_step_concreach(query::GraphPolyQuery; digits=15)
     """
     Method to solve the concrete reachability problem using MIP for multiple time steps.
     """
@@ -124,7 +130,7 @@ function multi_step_concreach(query::GraphPolyQuery)
     
     for i = 1:query.ntime
         query.problem.domain = reachSets[end]
-        reachSet, boundSet = concreach!(query)
+        reachSet, boundSet = concreach!(query; digits=digits)
         push!(reachSets, reachSet)
         push!(boundSets, boundSet)
     end
@@ -263,7 +269,7 @@ function sym_link(symQuery::GraphPolyQuery, neurList, depMat)
     end
 end
 
-function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=3600)
+function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=14400, digits=15)
     #Ensure that the time step is within bounds
     @assert t_sym <= symQuery.ntime
     #Akin to conc_reach_solve
@@ -284,7 +290,7 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=360
         next_v_l = v + symQuery.dt*dv
         #NOTE: Set graph level objective directly
         @objective(minGraph, Min, next_v_l)
-        optimize!(minGraph)
+        @time optimize!(minGraph)
         @assert termination_status(minGraph) == MOI.OPTIMAL
         push!(lows, JuMP.objective_bound(minGraph))
     end
@@ -301,15 +307,21 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=360
         next_v_u = v + symQuery.dt*dv
         #NOTE: Set graph level objective directly
         @objective(maxGraph, Min, -next_v_u)
-        optimize!(maxGraph)
+        @time optimize!(maxGraph)
+        @assert termination_status(maxGraph) == MOI.OPTIMAL
         push!(highs, -JuMP.objective_bound(maxGraph))
     end
+
+    #Gurobi tolerance is on the order of 1e-6, try rounding
+    lows = floor.(lows, digits=digits)
+    highs = ceil.(highs, digits=digits)
+
 
     reach_set = Hyperrectangle(low=lows, high=highs)
     return reach_set
 end
 
-function symreach(symQuery::GraphPolyQuery,reachSets, depMat,t_sym)
+function symreach(symQuery::GraphPolyQuery,reachSets, depMat,t_sym; threads=0, timeout=14400, digits=15)
     """
     Method to symbolically solve the reachability problem. Agnostic to how the boundSets are computed
 
@@ -322,11 +334,11 @@ function symreach(symQuery::GraphPolyQuery,reachSets, depMat,t_sym)
     symQuery.mod_dict = Dict{Symbol,Any}()
 
     x_dim = length(symQuery.problem.varList) #state dimension
-    @time encode_sym_dynamics!(symQuery, x_dim)
+    encode_sym_dynamics!(symQuery, x_dim)
     neurList = encode_sym_control!(symQuery, reachSets)
     sym_link(symQuery, neurList, depMat)
 
-    sym_set = sym_reach_solve(symQuery, t_sym)
+    sym_set = sym_reach_solve(symQuery, t_sym, threads=threads, timeout=timeout, digits=digits)
     return sym_set
 end
 
@@ -340,6 +352,7 @@ function hybreach(symQuery::GraphPolyQuery, depMat, t_sym, reachSets = nothing, 
         reachSets,boundSets = multi_step_concreach(concQuery)
     end
     symQuery.problem.bounds = boundSets
+    symQuery.ntime = t_sym
     sym_set = symreach(symQuery, reachSets, depMat, t_sym)
     return sym_set
 end
@@ -352,24 +365,23 @@ function multi_step_hybreach(hybQuery, depMat, concInt)
     hyb_reachSets = [hybQuery.problem.domain]
     conc_boundSets = []
     conc_reachSets = [hybQuery.problem.domain]
-    hyInt = 0    
+
+    cquery = deepcopy(hybQuery)
+    squery = deepcopy(hybQuery)  
     for int in concInt
-        #Update time horizon
-        hybQuery.ntime = int
-        #Copy corresponding concrete and hybrid queries
-        hyQ1 = deepcopy(hybQuery)
-        concQuery = deepcopy(hybQuery)
         #Bound the function over the desired interval
-        reachSets,boundSets = multi_step_concreach(concQuery)
+        cquery.ntime = int 
+        reachSets,boundSets = multi_step_concreach(cquery)
         push!(conc_boundSets, boundSets...)
         push!(conc_reachSets, reachSets[2:end]...)
-        hyInt += int
-        hyQ1.ntime = hyInt
-        hySet = hybreach(hyQ1, depMat,hyInt,conc_reachSets,conc_boundSets) 
+
+        squery.problem.bounds = boundSets
+        squery.ntime = int
+        hySet = symreach(squery, reachSets, depMat, int) 
         push!(hyb_reachSets, hySet)
-        hybQuery.problem.domain = hySet
+        cquery.problem.domain = hySet
     end
-    return hyb_reachSets
+    return hyb_reachSets, [conc_reachSets, conc_boundSets]
 end
 
 ###############Implementing Backwards Reachability####################

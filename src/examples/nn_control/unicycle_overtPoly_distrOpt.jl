@@ -37,7 +37,7 @@ dt = 0.2
 #Should be 50?
 numSteps = 10
 w = 1e-4
-domain = Hyperrectangle(low=[9.5,-4.5,2.1,1.5], high = [9.55,-4.45,2.11,1.51])
+domain = Hyperrectangle(low=[9.50,-4.50,2.10,1.50], high = [9.55,-4.45,2.11,1.51])
 depMat = [[1,0,1,1],[0,1,1,1], [0,0,1,0], [0,0,0,1]]
 ########TEST: Debugging Bound Unicycle#########
 # lbs, ubs = extrema(domain)
@@ -45,9 +45,10 @@ depMat = [[1,0,1,1],[0,1,1,1], [0,0,1,0], [0,0,0,1]]
 #######################################
 
 ###Define Bound Unicycle########
-function bound_unicycle(Unicycle; plotFlag=false)
+function bound_unicycle_old(Unicycle; plotFlag=false,npoint=2)
     lbs, ubs = extrema(Unicycle.domain)
 
+    #Round the bounds to avoid floating point errors
     ##Bound initial state variable (dx1 = x4*cos(x3))#####
     #K-A Decomposition exp(ln(x4) + ln(cos(x3)))
     #Bound ln(x4)
@@ -97,7 +98,7 @@ function bound_unicycle(Unicycle; plotFlag=false)
     
     for tup in x1FuncLB_s
         #First find the corresponding f(x) and f(y) values
-        #NOTE: Round to avoid floating point errors
+        #NOTE:   to avoid floating point errors
         # xInd = findall(x->x[1] == round(tup[1], digits=5), x1FuncSub_2LB)[1]
         # yInd = findall(y->y[1] == round(tup[2], digits=5), x1FuncSub_1LB)[1]
 
@@ -261,6 +262,251 @@ function bound_unicycle(Unicycle; plotFlag=false)
     return bounds
 end
 
+function bound_unicycle(Unicycle; plotFlag=false, npoint=2)
+    lbs, ubs = extrema(Unicycle.domain)
+    #Round the bounds to avoid floating point errors
+
+    #TEST: Round domain to avoid floating point errors
+    lbs = floor.(lbs, digits=dig)
+    ubs = ceil.(ubs, digits=dig)
+
+    ##Bound initial state variable (dx1 = x4*cos(x3))#####
+    #Weird behavior with Hyperrectangle
+    lb_x4 = lbs[4]
+    ub_x4 = ubs[4]
+
+    #First bound x4
+    x1FuncSub_1 = :(1*x4)
+    x1FuncSub_1LB, x1FuncSub_1UB = interpol_nd(bound_univariate(x1FuncSub_1, lb_x4, ub_x4)...)
+    
+    #Also bound cos(x3)
+    lb_x3 = lbs[3]
+    ub_x3 = ubs[3]
+    x1FuncSub_2 = :(cos(x3))
+    x1FuncSub_2LB, x1FuncSub_2UB = interpol_nd(bound_univariate(x1FuncSub_2, lb_x3, ub_x3, npoint=npoint)...)
+
+    #Lift the bounds to the same space
+    #First lift the first component of dx1
+    emptyList = [1]
+    currList = [2]
+    l_x1FuncSub_1LB, l_x1FuncSub_1UB = lift_OA(emptyList, currList, x1FuncSub_1LB, x1FuncSub_1UB, lbs[3:4], ubs[3:4])
+
+    #Next lift the second component of dx1
+    emptyList = [2]
+    currList = [1]
+    l_x1FuncSub_2LB, l_x1FuncSub_2UB = lift_OA(emptyList, currList, x1FuncSub_2LB, x1FuncSub_2UB, lbs[3:4], ubs[3:4])
+
+    #Combine to get x4*cos(x3)
+    x1FuncLB, x1FuncUB = prodBounds(l_x1FuncSub_1LB, l_x1FuncSub_1UB, l_x1FuncSub_2LB, l_x1FuncSub_2UB)
+
+    #Check if bounds are valid by plotting the surface
+    if plotFlag
+        xS = unique!(Any[tup[1] for tup in x1FuncLB])
+        yS = unique!(Any[tup[2] for tup in x1FuncLB])
+
+        surfDim = (size(yS)[1], size(xS)[1])
+        baseFunc = exprList[1]
+
+        #Plot the surface
+        plotSurf(baseFunc, x1FuncLB, x1FuncUB, surfDim, xS, yS, true)
+    end
+    #############Next, bound dx2 (dx2 = x4*sin(x3))#####
+    #Bound first component of dx2 (x4)
+    x2FuncSub1 = :(1*x4)
+    x2FuncSub1LB, x2FuncSub1UB = interpol_nd(bound_univariate(x2FuncSub1, lb_x4, ub_x4)...)
+
+    #Bound second component of dx2 (sin(x3))
+    x2FuncSub2 = :(sin(x3))
+    x2FuncSub2LB, x2FuncSub2UB = interpol_nd(bound_univariate(x2FuncSub2, lb_x3, ub_x3, npoint=npoint)...)
+
+    #Lift the bounds to the same space
+    #First lift the first component of dx2\
+    emptyList = [1]
+    currList = [2]
+    l_x2FuncSub1LB, l_x2FuncSub1UB = lift_OA(emptyList, currList, x2FuncSub1LB, x2FuncSub1UB, lbs[3:4], ubs[3:4])
+
+    #Next lift the second component of dx2
+    emptyList = [2]
+    currList = [1]
+    l_x2FuncSub2LB, l_x2FuncSub2UB = lift_OA(emptyList, currList, x2FuncSub2LB, x2FuncSub2UB, lbs[3:4], ubs[3:4])
+
+    #Combine to get x4*sin(x3)
+    x2FuncLB, x2FuncUB = prodBounds(l_x2FuncSub1LB, l_x2FuncSub1UB, l_x2FuncSub2LB, l_x2FuncSub2UB)
+    #Check if bounds are valid by plotting the surface
+    if plotFlag
+        xS = unique!(Any[tup[1] for tup in x2FuncLB])
+        yS = unique!(Any[tup[2] for tup in x2FuncLB])
+
+        surfDim = (size(yS)[1], size(xS)[1])
+        baseFunc = exprList[2]
+
+        #Plot the surface
+        plotSurf(baseFunc, x2FuncLB, x2FuncUB, surfDim, xS, yS, true)
+
+    end
+
+   #dx1 and dx2 must be functions of x1 and x2 respectively
+   emptyList = [1]
+   currList = [2,3]
+   
+   #Retcon x1FuncLB and x1FuncUB to be unlifted 
+   x1FuncUB_u = deepcopy(x1FuncUB)
+   x1FuncLB_u = deepcopy(x1FuncLB)
+   
+   lbs_x1 = [lbs[1]]
+   append!(lbs_x1, lbs[3:4])
+   ubs_x1 = [ubs[1]]
+   append!(ubs_x1, ubs[3:4])
+   x1FuncLB, x1FuncUB = lift_OA(emptyList, currList, x1FuncLB_u, x1FuncUB_u, lbs_x1, ubs_x1)
+   
+   emptyList = [1]
+   currList = [2,3]
+   
+   #Retcon x2FuncLB and x2FuncUB to be unlifted
+   x2FuncLB_u = deepcopy(x2FuncLB)
+   x2FuncUB_u = deepcopy(x2FuncUB)
+   
+   lbs_x2 = lbs[2:4]
+   ubs_x2 = ubs[2:4]
+   x2FuncLB, x2FuncUB = lift_OA(emptyList, currList, x2FuncLB_u, x2FuncUB_u, lbs_x2, ubs_x2)
+   
+   #############Next, bound dx3 (dx3 = u[2])#####
+   #Since dx3 is solely a function of u[2], just use a constant
+   x3Func = :(0*x3)
+   x3FuncLB, x3FuncUB = interpol_nd(bound_univariate(x3Func, lb_x3, ub_x3)...)
+   
+   #############Finally, bound dx4 (dx4 = u[1] + w)#####
+   #Here, dx4 is a function of u[1] and a disturbance term. Treat disturbance as a zero mean constant 
+   x4Func = :(0*x4)
+   x4FuncLB, x4FuncUB = interpol_nd(bound_univariate(x4Func, lb_x4, ub_x4, ϵ = w)...)
+   
+   bounds = [[x1FuncLB, x1FuncUB], [x2FuncLB, x2FuncUB], [x3FuncLB, x3FuncUB], [x4FuncLB, x4FuncUB]]
+   
+   return bounds
+end
+
+function bound_unicycle_us(Unicycle; plotFlag=false,npoint=2)
+    lbs, ubs = extrema(Unicycle.domain)
+
+    #TEST: Round domain to avoid floating point errors
+    lbs = floor.(lbs, digits=dig)
+    ubs = ceil.(ubs, digits=dig)
+
+    ##Bound initial state variable (dx1 = x4*cos(x3))#####
+    #Weird behavior with Hyperrectangle
+    lb_x4 = lbs[4]
+    ub_x4 = ubs[4]
+
+    #First bound x4
+    x1FuncSub_1 = :(1*x4)
+    x1FuncSub_1LB, x1FuncSub_1UB = interpol_nd(bound_univariate(x1FuncSub_1, lb_x4, ub_x4)...)
+    
+    #Also bound cos(x3)
+    lb_x3 = lbs[3]
+    ub_x3 = ubs[3]
+    x1FuncSub_2 = :(cos(x3))
+    x1FuncSub_2LB, x1FuncSub_2UB = interpol_nd(bound_univariate(x1FuncSub_2, lb_x3, ub_x3)...)
+
+    #Lift the bounds to the same space
+    #First lift the first component of dx1
+    emptyList = [1]
+    currList = [2]
+    l_x1FuncSub_1LB, l_x1FuncSub_1UB = lift_OA(emptyList, currList, x1FuncSub_1LB, x1FuncSub_1UB, lbs[3:4], ubs[3:4])
+
+    #Next lift the second component of dx1
+    emptyList = [2]
+    currList = [1]
+    l_x1FuncSub_2LB, l_x1FuncSub_2UB = lift_OA(emptyList, currList, x1FuncSub_2LB, x1FuncSub_2UB, lbs[3:4], ubs[3:4])
+
+    #Combine to get x4*cos(x3)
+    x1FuncLB, x1FuncUB = prodBounds2(l_x1FuncSub_1LB, l_x1FuncSub_1UB, l_x1FuncSub_2LB, l_x1FuncSub_2UB)
+
+    #Check if bounds are valid by plotting the surface
+    if plotFlag
+        xS = unique!(Any[tup[1] for tup in x1FuncLB])
+        yS = unique!(Any[tup[2] for tup in x1FuncLB])
+
+        surfDim = (size(yS)[1], size(xS)[1])
+        baseFunc = exprList[1]
+
+        #Plot the surface
+        plotSurf(baseFunc, x1FuncLB, x1FuncUB, surfDim, xS, yS, true)
+    end
+    #############Next, bound dx2 (dx2 = x4*sin(x3))#####
+    #Bound first component of dx2 (x4)
+    x2FuncSub1 = :(1*x4)
+    x2FuncSub1LB, x2FuncSub1UB = interpol_nd(bound_univariate(x2FuncSub1, lb_x4, ub_x4)...)
+
+    #Bound second component of dx2 (sin(x3))
+    x2FuncSub2 = :(sin(x3))
+    x2FuncSub2LB, x2FuncSub2UB = interpol_nd(bound_univariate(x2FuncSub2, lb_x3, ub_x3)...)
+
+    #Lift the bounds to the same space
+    #First lift the first component of dx2\
+    emptyList = [1]
+    currList = [2]
+    l_x2FuncSub1LB, l_x2FuncSub1UB = lift_OA(emptyList, currList, x2FuncSub1LB, x2FuncSub1UB, lbs[3:4], ubs[3:4])
+
+    #Next lift the second component of dx2
+    emptyList = [2]
+    currList = [1]
+    l_x2FuncSub2LB, l_x2FuncSub2UB = lift_OA(emptyList, currList, x2FuncSub2LB, x2FuncSub2UB, lbs[3:4], ubs[3:4])
+
+    #Combine to get x4*sin(x3)
+    x2FuncLB, x2FuncUB = prodBounds2(l_x2FuncSub1LB, l_x2FuncSub1UB, l_x2FuncSub2LB, l_x2FuncSub2UB)
+    #Check if bounds are valid by plotting the surface
+    if plotFlag
+        xS = unique!(Any[tup[1] for tup in x2FuncLB])
+        yS = unique!(Any[tup[2] for tup in x2FuncLB])
+
+        surfDim = (size(yS)[1], size(xS)[1])
+        baseFunc = exprList[2]
+
+        #Plot the surface
+        plotSurf(baseFunc, x2FuncLB, x2FuncUB, surfDim, xS, yS, true)
+
+    end
+
+   #dx1 and dx2 must be functions of x1 and x2 respectively
+   emptyList = [1]
+   currList = [2,3]
+   
+   #Retcon x1FuncLB and x1FuncUB to be unlifted 
+   x1FuncUB_u = deepcopy(x1FuncUB)
+   x1FuncLB_u = deepcopy(x1FuncLB)
+   
+   lbs_x1 = [lbs[1]]
+   append!(lbs_x1, lbs[3:4])
+   ubs_x1 = [ubs[1]]
+   append!(ubs_x1, ubs[3:4])
+   x1FuncLB, x1FuncUB = lift_OA(emptyList, currList, x1FuncLB_u, x1FuncUB_u, lbs_x1, ubs_x1)
+   
+   emptyList = [1]
+   currList = [2,3]
+   
+   #Retcon x2FuncLB and x2FuncUB to be unlifted
+   x2FuncLB_u = deepcopy(x2FuncLB)
+   x2FuncUB_u = deepcopy(x2FuncUB)
+   
+   lbs_x2 = lbs[2:4]
+   ubs_x2 = ubs[2:4]
+   x2FuncLB, x2FuncUB = lift_OA(emptyList, currList, x2FuncLB_u, x2FuncUB_u, lbs_x2, ubs_x2)
+   
+   #############Next, bound dx3 (dx3 = u[2])#####
+   #Since dx3 is solely a function of u[2], just use a constant
+   x3Func = :(0*x3)
+   x3FuncLB, x3FuncUB = interpol_nd(bound_univariate(x3Func, lb_x3, ub_x3)...)
+   
+   #############Finally, bound dx4 (dx4 = u[1] + w)#####
+   #Here, dx4 is a function of u[1] and a disturbance term. Treat disturbance as a zero mean constant 
+   x4Func = :(0*x4)
+   x4FuncLB, x4FuncUB = interpol_nd(bound_univariate(x4Func, lb_x4, ub_x4, ϵ = w)...)
+   
+   bounds = [[x1FuncLB, x1FuncUB], [x2FuncLB, x2FuncUB], [x3FuncLB, x3FuncUB], [x4FuncLB, x4FuncUB]]
+   
+   return bounds
+end
+
 ###Next Define function to link control and relevant dynamics###
 function unicycle_dyn_con_link!(query, neurons, graph, dynModel, netModel, t_ind=nothing)
 
@@ -335,225 +581,187 @@ query = GraphPolyQuery(
     2 #case. Delete this param
 )
 
-
+dig=15
 #Next, test multi-step concrete reachability
-query1 = deepcopy(query)
-query1.ntime = 1
-@time reachSet, boundSet = concreach!(query1);
+query1 = deepcopy(query);
+query1.N_overt = 2
+query1.ntime = 1;
+@time reachSet, boundSet = concreach!(query1, digits=dig);
 
+query111 = deepcopy(query);
+query111.ntime = 1;
+query111.problem.bound_func = bound_unicycle_us;
+@time reachSetUS, boundSetUS = concreach!(query111, digits=dig);
+
+hypContained(reachSetUS, reachSet, digits=dig)
+hypContained(reachSet, reachSetUS, digits=dig)
+
+volume(reachSet)/volume(reachSetUS)
+
+dig= 3
+tHor = 15
 #Next, test multi-step concrete reachability
-query2 = deepcopy(query)
-query2.ntime = 2
-@time reachSets, boundSets = multi_step_concreach(query2);
+query2 = deepcopy(query);
+query2.N_overt = 2
+query2.ntime = tHor;
+@time reachSets, boundSets = multi_step_concreach(query2, digits=dig);
 
+query222 = deepcopy(query);
+query222.ntime = tHor;
+query222.problem.bound_func = bound_unicycle_us;
+@time reachSetsUS, boundSetsUS = multi_step_concreach(query222, digits=dig);
+
+
+trueFlag = true
+for (i,_) in enumerate(reachSets)
+    trueFlag = hypContained(reachSetsUS[i], reachSets[i], digits=dig)
+    if !trueFlag
+        println("Failed at $(i)")
+        trueFlag = true
+    end
+    println("Volume ratio $i: ", volume(reachSets[i])/volume(reachSetsUS[i]))
+end
+
+#Recall, boundSets[t] makes reachSets[t+1], but reachSets[t] is used to make boundSets[t], for t >= 1
+# t = 6;
+# j = 1;
+# tf2 = true;
+
+# sLB = gen_interpol_nd(boundSets[t][j][1]);
+# sUB = gen_interpol_nd(boundSets[t][j][2]);
+# usLB = gen_interpol_nd(boundSetsUS[t][j][1]);
+# usUB = gen_interpol_nd(boundSetsUS[t][j][2]);
+
+# usInps1 = [tup[1:end-1] for tup in boundSetsUS[t][j][1]];
+# usInps2 = [tup[1:end-1] for tup in boundSetsUS[t][j][2]];
+# sInps1 = [tup[1:end-1] for tup in boundSets[t][j][1]];
+# sInps2 = [tup[1:end-1] for tup in boundSets[t][j][2]];
+# usInps = unique(vcat(usInps1, usInps2));
+
+
+
+# lbFlag = true;
+# ubFlag = true;
+# for (i,inp) in enumerate(usInps)
+#     lbFlag = sLB(inp...) <= usLB(inp...)
+#     ubFlag = sUB(inp...) >= usUB(inp...)
+#     if !lbFlag
+#         println("LB failed at $i")
+#         lbFlag = true
+#     end
+#     if !ubFlag
+#         println("UB failed at $i")
+#         ubFlag = true
+#     end
+# end
+
+# if j == 1
+#     desSet = project(reachSetsUS[t], [1,3,4])
+# elseif j == 2
+#     desSet = project(reachSetsUS[t], [2,3,4])
+# else j == 3
+#     desSet = project(reachSetsUS[t], [j])
+# end
+# #Now try random sampling to be safe
+# randomSamples = LazySets.API.sample(desSet,10000);
+# for (i,inp) in enumerate(randomSamples)
+#     lbFlag = sLB(inp...) <= usLB(inp...)
+#     ubFlag = sUB(inp...) >= usUB(inp...)
+#     if !lbFlag
+#         println("LB failed at $i")
+#         lbFlag = true
+#     end
+#     if !ubFlag
+#         println("UB failed at $i")
+#         ubFlag = true
+#     end
+# end
+
+# hypContained(reachSetsUS[t], reachSets[t], digits=dig)
+
+# extrema(reachSets[8])[1][2]
+# extrema(reachSetsUS[8])[1][2]
+
+########################################################
+########################################################
+digs= 3
+t_sym = 3
 #Next, test direct symreach 
-query3 = deepcopy(query)
-query3.problem.bounds = boundSets
-query3.ntime = 2
-@time symReach = symreach(query3,reachSets, depMat,2)
+tMid = t_sym
+query3 = deepcopy(query);
+query3.problem.bounds = boundSets;
+query3.ntime = tMid;
+@time sym_set = symreach(query3,reachSets, depMat,tMid,digits=digs);
+
+# midQuery = deepcopy(query);
+# midQuery.problem.domain = sym_set;
+# midQuery.ntime= t_sym - tMid
+# reachSetsMid, boundSetsMid = multi_step_concreach(midQuery, digits=digs);
+# query3.problem.bounds = boundSetsMid;
+# query3.ntime = t_sym - tMid;
+# @time sym_set = symreach(query3,reachSetsMid, depMat,t_sym-tMid,digits=digs);
+
+# query3v1 = deepcopy(query);
+# concInt = [5,5]
+# @time sym_setv1, conc_v1 = multi_step_hybreach(query3v1, depMat, concInt);
 
 
-#Test hybrid reachability
-concInt = [2,2,2,2,2]
-query4 = deepcopy(query)
-@time reachSets = multi_step_hybreach(query4, depMat, concInt)
+query333 = deepcopy(query);
+query333.problem.bounds = boundSetsUS;
+query333.problem.bound_func = bound_unicycle_us;
+query333.ntime = t_sym;
+@time sym_setUS = symreach(query333,reachSetsUS, depMat,t_sym,digits=digs);
+
+volume(sym_set)/volume(sym_setUS)
+#volume(sym_setv1[end])/volume(sym_setUS)
+# volume(symReachv1)/volume(symReachUS)
+# volume(symReachv2)/volume(symReachUS)
+extrema(sym_set)
+extrema(sym_setUS)
+# extrema(sym_setv1[end])
 
 
-goalSet = Hyperrectangle(low = [-0.6, -0.2, -0.06, -0.3], high=[0.6, 0.2, 0.06, 0.3])
-
-plot(project(reachSets[end], [1,2]), lab="Reachable Set", color="lightblue", lw=0.5)
-plot!(project(goalSet, [1,2]), lab="Goal Set", color="red", lw=0.5)
-
-
-plot(project(reachSets[end], [3,4]))
-plot!(project(goalSet, [3,4]))
-
-symQuery = deepcopy(query)
-symQuery.problem.bounds = boundSets
-reachSets[end]
-
-# # reachSets[1]
-# query.problem.bound_func(query.problem; plotFlag=true)
-
-##################################################
-#######Sketching out sym reach###################
-symQuery.var_dict = Dict{Symbol,JuMP.Vector{VariableRef}}()
-symQuery.mod_dict = Dict{Symbol,Any}()
-
-############Sketching out encode_sym_dynamics
-#####Inputs to encode sym dynamics 
-x_dim = length(symQuery.problem.varList) #state dimension
-
-function encode_sym_dynamics!(symQuery, x_dim)
-    """
-    Method to encode symbolic dynamics. Takes symQuery as input
-    """
-    symGraph = OptiGraph()
-    #####Enter time loop######
-    for t_ind = 1:symQuery.ntime
-        x_ind = 0
-        #Create a new set of nodes for each time step
-        dynNodes = @optinode(symGraph, nodes[1:x_dim])
-        #####Enter Symbol loop####
-        for sym in symQuery.problem.varList
-            sym_t = Meta.parse("$(sym)_$(t_ind)")
-            x_ind += 1
-            #Get lower and upper bounds for first variable in first time step
-            LB, UB = symQuery.problem.bounds[t_ind][x_ind]
-            Tri = OA2PWA(LB)
-            xS = [(tup[1:end-1]) for tup in LB]
-            yUB = [tup[end] for tup in UB]
-            yLB = [tup[end] for tup in LB]
-
-            ccEncoding!(xS, yLB, yUB, Tri, symQuery, sym_t, x_ind, dynNodes[x_ind])
-        end
-
-        f_t = Meta.parse("f_$(t_ind)")
-        symQuery.mod_dict[f_t] = dynNodes
-    end
-    symQuery.mod_dict[:graph] = symGraph
-end
-
-encode_sym_dynamics!(symQuery, x_dim)
-
-######Sketching out Encode Sym Control####
-function encode_sym_control!(symQuery)
-    """
-    Method to encode symbolic control. Takes symQuery as input
-    """
-    network_file = symQuery.network_file
-    neurList = []
-    for t_ind = 1:symQuery.ntime
-        input_set = reachSets[t_ind]
-        network_file = symQuery.network_file
-        netModel = @optinode(symQuery.mod_dict[:graph])
-        neurons = add_controller_constraints!(netModel, network_file, input_set, Id())
-        u_ind = Meta.parse("u_$(t_ind)")
-        symQuery.mod_dict[u_ind] = netModel
-        push!(neurList, neurons)
-    end
-    return neurList
-end
-########################################
-neurList = encode_sym_control!(symQuery)
+# hypContained(sym_setUS,sym_set, digits=digs)
+# hypContained(sym_setUS, sym_setv1[end], digits=digs)
+# j = 4
+# volume(project(sym_set, [j]))/volume(project(sym_setUS, [j]))
+# volume(project(sym_setv1[end], [j]))/volume(project(sym_setUS, [j]))
 
 
-#########Sketching out time encoding with dynamics/control link######
-function encode_time(symQuery, neurList)
-    for t_ind = 1:symQuery.ntime
-        symGraph = symQuery.mod_dict[:graph]
-        dynModel = symQuery.mod_dict[Meta.parse("f_$(t_ind)")]
-        netModel = symQuery.mod_dict[Meta.parse("u_$(t_ind)")]
+# #Test hybrid reachability
+# concInt = [2,2,2,2,2]
+# query4 = deepcopy(query)
+# @time reachSets = multi_step_hybreach(query4, depMat, concInt)
 
-        #Link the dynamics and control first 
-        symQuery.problem.link_func(symQuery, neurList[t_ind], symGraph, dynModel, netModel, t_ind)
-    end
+###########Trying hybrid symbolic##############
+sQuery = deepcopy(query)
+#sconcInt = [10,10,10,10,10]
+sconcInt = [2,2]
+#NOTE: sconcInt is marginally safe, to be sound, use tighter horizons
+altConcInt = [15,10,10,10,5]
+# usConcInt = [5,5]
+# usQuery = deepcopy(query)
+# usQuery.problem.bound_func = bound_unicycle_us
 
-    #Next link time steps
-    symGraph = symQuery.mod_dict[:graph]
-    #######Enter time loop######
-    #TEST: Entering time loop manually
-    # t_ind = 1
-    for t_ind = 1:symQuery.ntime-1
-        currDyn = symQuery.mod_dict[Meta.parse("f_$(t_ind)")]
-        nextDyn = symQuery.mod_dict[Meta.parse("f_$(t_ind+1)")]
-        #Iterate through models and link pertinent variables 
-        x_ind = 1
-        #TEST: Entering the loop manually
-        # sym = symQuery.problem.varList[x_ind]
-        for sym in symQuery.problem.varList
-            currModel = currDyn[x_ind]
-            currSym = Meta.parse("$(sym)_$(t_ind)")
-            nextModel = nextDyn[x_ind]
-            nextSym = Meta.parse("$(sym)_$(t_ind+1)")
+@time sym_set, sound_conc = multi_step_hybreach(sQuery, depMat, altConcInt);
+#@time us_set, us_conc = multi_step_hybreach(usQuery, depMat, usConcInt);
 
-            xNow = symQuery.var_dict[currSym][end][1] 
-            yNow = symQuery.var_dict[currSym][2][1]
-            xNext = symQuery.var_dict[nextSym][end][1]
+# extrema(sym_set[end])
+# extrema(us_set[end])
 
-            @linkconstraint(symGraph, xNext == xNow + symQuery.dt*yNow)
-            x_ind += 1
-        end
-    end
-end
+goal_set  = Hyperrectangle(low=[-0.6, -0.2, -0.06, -0.3], high = [0.6, 0.2, 0.06, 0.3])
 
-###########################
-encode_time(symQuery, neurList)
+extrema(goal_set)
+extrema(sym_set[end])
 
-##############################
-#inputs to sym reach solve 
-t_sym = symQuery.ntime
-#######Next define Sym Reach Solve###########
-function sym_reach_solve(symQuery, t_sym)
-    #Ensure that the time step is within bounds
-    @assert t_sym <= symQuery.ntime
-    #Akin to conc_reach_solve
-    max_query = deepcopy(symQuery)
-    min_query = deepcopy(symQuery)
-    lows = Array{Float64}(undef, 0)
-    highs = Array{Float64}(undef, 0)
-    f_sym = Meta.parse("f_$(t_sym)")
-    min_dynModel = min_query.mod_dict[f_sym]
-    minGraph = min_query.mod_dict[:graph]
-    i = 0
+hypContained(sym_set[end], goal_set, digits=16)
 
-    #Compute lower bounds
-    for sym in min_query.problem.varList
-        sym_t = Meta.parse("$(sym)_$(t_sym)") 
-        i += 1
-        model = min_dynModel[i]
-        v = min_query.var_dict[sym_t][end][1]
-        dv = min_query.var_dict[sym_t][2][1]
-        @variable(model, next_v)
-        @constraint(model, next_v == v + query.dt*dv)
-        @objective(model, Min, next_v)
-    end
+volume(sym_set[end])
 
-    set_optimizer(minGraph, Gurobi.Optimizer)
-    optimize!(minGraph)
-    @assert termination_status(minGraph) == MOI.OPTIMAL
-    i = 0
-    for _ in symQuery.problem.varList
-        i += 1
-        push!(lows, value(min_dynModel[i][:next_v]))
-    end
+floor(extrema(sym_set[end])[1][3], digits=3)
+extrema(goal_set)[1][3]
+
+# hypContained(us_set[end], sym_set[end], digits=digs)
+# volume(sym_set[end])/volume(us_set[end])
 
 
-    #Compute upper bounds
-    max_dynModel = max_query.mod_dict[f_sym]
-    maxGraph = max_query.mod_dict[:graph]
-    i = 0
-    for sym in query.problem.varList 
-        sym_t = Meta.parse("$(sym)_$(t_sym)") 
-        i += 1
-        model = max_dynModel[i]
-        v = max_query.var_dict[sym_t][end][1]
-        dv = max_query.var_dict[sym_t][2][1]
-        @variable(model, next_v)
-        @constraint(model, next_v == v + max_query.dt*dv)
-        @objective(model, Max, next_v)
-    end
-
-    set_optimizer(maxGraph, Gurobi.Optimizer)
-    optimize!(maxGraph)
-    i = 0
-    for _ in query.problem.varList
-        i += 1
-        push!(highs, value(max_dynModel[i][:next_v]))
-    end
-    reach_set = Hyperrectangle(low=lows, high=highs)
-    return reach_set
-end
-
-
-@time sym_hyp = sym_reach_solve(symQuery, t_sym)
-
-sym_hyp
-reachSets[end]
-
-
-plot(reachSets[end][3,4])
-plot!(sym_hyp)
-
-plot(project(reachSets[end], [3,4]))
-plot!(project(sym_hyp, [3,4]))

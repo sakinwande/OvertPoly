@@ -145,7 +145,7 @@ function quad_dyn_con_link!(query, neurons, graph, dynModel, netModel, t_ind=not
     end
 end
 
-function bound_quad(Quad, plotFlag = false, sanityFlag = true)
+function bound_quad(Quad; npoint=1, plotFlag = false, sanityFlag = true)
     x1LB, x1UB = bound_quadx1(Quad, plotFlag, sanityFlag)
     x2LB, x2UB = bound_quadx2(Quad, plotFlag, sanityFlag)
     x3LB, x3UB = bound_quadx3(Quad, plotFlag, sanityFlag)
