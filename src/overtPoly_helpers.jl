@@ -5,8 +5,39 @@ using Interpolations
 using OVERT: bound, find_variables, to_pairs 
 #using Plots; plotly()
 global NPLOTS = 0
+const VAR_DEFAULT = :xₚ
+const TRIG_FUNS = (:sin, :cos, :tan)
 # using CSV
 
+function extract_trig_pattern(expr)
+    """
+    Helper function to extract trigonometric pattern from expression
+    Extracts the trigonometric function type from expressions like:
+    - sin(xₚ), cos(xₚ), tan(xₚ)
+    - k*sin(xₚ), 2*cos(xₚ), etc.
+    - sin(xₚ)*k, cos(xₚ)*3.14, etc.
+    Returns :sin, :cos, :tan, or :none
+    """
+    if expr == :(sin(xₚ))
+        return :sin
+    elseif expr == :(cos(xₚ))
+        return :cos  
+    elseif expr == :(tan(xₚ))
+        return :tan
+    elseif isa(expr, Expr) && expr.head == :call && expr.args[1] == :*
+        # Check multiplication patterns
+        for arg in expr.args[2:end]
+            if arg == :(sin(xₚ))
+                return :sin
+            elseif arg == :(cos(xₚ))
+                return :cos
+            elseif arg == :(tan(xₚ))
+                return :tan
+            end
+        end
+    end
+    return :none
+end
 function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-12, npoint=2, rel_error_tol=5e-3, plotflag=false)
     """
     Method to bound a univariate function
@@ -44,6 +75,7 @@ function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-12, npoint=2, rel_error_
     dFunc = Symbolics.build_function(df, xₚ, expression=false)
     d2f = expand_derivatives(D2(f))
     d2Func = Symbolics.build_function(d2f, xₚ, expression=false)
+    d2Expr = Meta.parse(string(d2f))
 
     if isa(Symbolics.value(f), Number)
         #In this case, the expression is just a constant
@@ -84,14 +116,14 @@ function bound_univariate(baseExpr::Expr, lb, ub; ϵ=1e-12, npoint=2, rel_error_
         #Mixed convexity case 
         try 
             #TODO: Review this 
-            if standExpr == :(sin(xₚ))
-                d2f_zeros, _ = get_sincos_regions(lb, ub)
-            elseif standExpr == :(cos(xₚ))
-                d2f_zeros, _ = get_sincos_regions(lb, ub, offset=pi/2)
-            elseif standExpr == :(tan(xₚ))
-                d2f_zeros, _ = get_tan_regions(lb, ub)
+            tm = extract_trig_params(d2Expr)
+
+            if !isnothing(tm)
+                trig_type, factor = tm
+                d2f_zeros, _ = get_trig_regions(lb, ub, kind=trig_type, m=factor)
             else
                 #Find the roots over the given interval 
+                #println("#########Reaching here############")
                 rootVals = IntervalRootFinding.roots(d2Func, IntervalArithmetic.Interval(lb, ub))
                 #TODO: Fix soundness concerns. Soundness concern follows from the fact that the the roots are floating point numbers and technically the roots returned are an interval and not a single value
                 #These intervals have widths on the order of 10^-8
@@ -1242,3 +1274,209 @@ function get_tan_regions(a,b)
         return tan_zeros, nothing # nothing implies mixed convexity 
     end
 end
+
+function is_numeric_only(expr)::Bool
+    """
+    Helper function to check if an expression is numeric only
+    (i.e. contains no variables or non-numeric functions)
+    """
+    if expr isa Number
+        #Case for when the input is just a number 
+        return true
+    elseif expr isa Expr && expr.head === :call
+        #Case for expressions
+        #Extract the root level function
+        f = expr.args[1]
+        # Case of unary - (i.e. -5)
+        if f === :- && length(expr.args) == 2
+            return is_numeric_only(expr.args[2])
+        end
+        # n-ary +, -, *, /
+        if (f === :+ || f === :- || f === :* || f === :/) && length(expr.args) >= 3
+            for t in Iterators.drop(expr.args, 1)
+                is_numeric_only(t) || return false
+            end
+            return true
+        end
+    end
+    return false
+end
+
+
+# Accept plain numbers and unary-negated numbers (e.g., -2, (-3.5))
+#Basically, if expr is a number, just return its float value, otherwise check if it's a unary negation of a number and return the negative float value
+numeric_literal_divonly(expr) = expr isa Number ? float(expr) :
+(expr isa Expr && expr.head === :call && expr.args[1] === :- && length(expr.args) == 2 && expr.args[2] isa Number) ? -float(expr.args[2]) : nothing
+
+function extract_m(arg; var::Symbol=VAR_DEFAULT)
+    """
+    Helper function to extract the coefficient of a variable in an expression. This is a step towards extracting coefficients in trig functions like sin(kx) or cos(kx).
+    """
+    #Base case: arg is the variable itself
+    arg === var && return 1
+
+    # unary minus: -(...)
+    if arg isa Expr && arg.head === :call && arg.args[1] === :- && length(arg.args) == 2
+        m = extract_m(arg.args[2]; var=var)
+        return m === nothing ? nothing : -m
+    end
+
+    # Case where the variable is multiplied by a coefficient
+    #Third case is basically for a negative coefficient
+    if arg isa Expr && arg.head === :call && arg.args[1] === :*
+        coef = 1.0
+        varcount = 0
+        for t in Iterators.drop(arg.args, 1)
+            if t === var
+                varcount += 1
+            elseif t isa Number
+                coef *= float(t)
+            elseif t isa Expr && t.head === :call && t.args[1] === :- && length(t.args) == 2 && t.args[2] isa Number
+                coef *= -float(t.args[2])
+            else
+                return nothing
+            end
+        end
+        return varcount == 1 ? coef : nothing
+    end
+
+    #Case where the variable is divided by a coefficient
+    if arg isa Expr && arg.head === :call && arg.args[1] === :/
+        #Extract the scale m from the numerator (must be var or numeric*var)
+        m = extract_m(arg.args[2]; var=var)
+        m === nothing && return nothing
+
+        # 2) Each denominator must be a numeric literal (incl. unary -)
+        for den in Iterators.drop(arg.args, 2)
+            v = numeric_literal_divonly(den)
+            v === nothing && return nothing            # reject 2/xₚ, or symbolic den
+            m /= v
+        end
+        return m
+    end
+
+    return nothing
+end
+
+function trig_kind_and_m(expr; var::Symbol=VAR_DEFAULT)
+    """
+    Helper function to determine if what we have is simply a trig function with one argument that is a scaled variable (e.g., sin(kx), cos(kx), tan(kx)).
+    If so, return a tuple of (trig function type, scale m). Otherwise, return nothing.
+    """
+    if expr isa Expr && expr.head === :call && (expr.args[1] in TRIG_FUNS) && length(expr.args) == 2
+        m = extract_m(expr.args[2]; var=var)
+        return m === nothing ? nothing : (expr.args[1]::Symbol, m)
+    end
+    return nothing
+end
+
+function extract_trig_params(expr; var::Symbol=VAR_DEFAULT)
+    """
+    Helper function to extract trigonometric parameters from an expression. Take a general expression and attempt to extract the trigonometric function type and scaling parameter if the expression represents a trigonometric function of a scaled variable (e.g., sin(kx), cos(kx), tan(kx)), possibly combined with numeric terms.
+    """
+    #Check if the entire expression is a trig function of the desired form
+    if (tm = trig_kind_and_m(expr; var=var)) !== nothing
+        return tm
+    end
+
+    #Unary minus of base case
+    if expr isa Expr && expr.head === :call && expr.args[1] === :- && length(expr.args) == 2
+        return extract_trig_params(expr.args[2]; var=var)
+    end
+
+    # Handle + and - as "sum of terms"
+    if expr isa Expr && expr.head === :call && (expr.args[1] === :+ || expr.args[1] === :-)
+        found = nothing
+        # normalize subtraction: a - b - c → a, (-1)*b, (-1)*c
+        terms = Any[]
+        if expr.args[1] === :+
+            append!(terms, Iterators.drop(expr.args, 1))
+        else
+            push!(terms, expr.args[2])
+            for t in Iterators.drop(expr.args, 2)
+                push!(terms, Expr(:call, :*, -1, t))
+            end
+        end
+        for t in terms
+            if is_numeric_only(t)
+                continue                        # pure numeric → ignore
+            end
+            tm = extract_trig_params(t; var=var) # recurse into the non-numeric term
+            if tm === nothing
+                return nothing                 # non-numeric, non-trig stuff → reject
+            end
+            found === nothing || return nothing # found two trig terms → ambiguous zeros
+            found = tm
+        end
+        return found
+    end
+
+    # Handle * and / as "product of factors"
+    if expr isa Expr && expr.head === :call && (expr.args[1] === :* || expr.args[1] === :/)
+        factors = Any[]
+        if expr.args[1] === :*
+            append!(factors, Iterators.drop(expr.args, 1))
+        else
+            # a / b / c -> a, 1/b, 1/c  (sufficient for numeric-only checks)
+            push!(factors, expr.args[2])
+            for t in Iterators.drop(expr.args, 2)
+                push!(factors, Expr(:call, :/, 1, t))
+            end
+        end
+        found = nothing
+        for f in factors
+            if is_numeric_only(f)
+                continue                        # numeric factor → doesn’t change zeros
+            end
+            tm = extract_trig_params(f; var=var) # only one factor may carry trig
+            if tm === nothing
+                return nothing
+            end
+            found === nothing || return nothing  # more than one non-numeric factor → reject
+            found = tm
+        end
+        return found
+    end
+
+    # Otherwise, not our form
+    return nothing
+end
+
+function get_trig_regions(a, b; kind::Symbol=:sin, m::Real=1)
+    @assert a <= b "Require a ≤ b"
+    @assert m != 0 "m=0 makes kind(m*x) constant; no meaningful inflection structure."
+
+    # Choose the phase φ so that zeros of f'' occur at m*x = φ + nπ
+    φ = kind === :cos ? (π/2) : 0.0  # sin, tan → 0; cos → π/2
+
+    # Work in t = m*x space to handle sign(m)
+    ta, tb = sort([m*a, m*b])
+    n_a = ceil((ta - φ) / π)
+    n_b = floor((tb - φ) / π)
+    n_vals = n_a:n_b
+
+    if isempty(n_vals)
+        # No inflection inside → determine convexity from sign of f'' at x=a
+        if kind === :sin
+            # f'' = -m^2 * sin(m*a)
+            is_convex = sin(m*a) < 0
+        elseif kind === :cos
+            # f'' = -m^2 * cos(m*a) = -m^2 * sin(m*a + π/2)
+            is_convex = sin(m*a + π/2) < 0
+        elseif kind === :tan
+            # f'' ∝ tan(m*a); sec^2 > 0 wherever defined
+            @assert cos(m*a) != 0 "tan(m*x) undefined at x=a (asymptote)."
+            is_convex = tan(m*a) > 0
+        else
+            error("Unsupported kind=$(kind). Use :sin, :cos, or :tan.")
+        end
+        return Float64[], is_convex
+    else
+        # Map t = φ + nπ back to x = t / m
+        pts = [(φ + n*π) / m for n in n_vals]
+        # Keep only those within [a,b] (guard against floating error)
+        pts = [x for x in pts if a - eps() <= x <= b + eps()]
+        return pts, nothing  # mixed convexity across inflection(s)
+    end
+end
+
