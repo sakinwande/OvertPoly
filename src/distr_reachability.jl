@@ -269,7 +269,7 @@ function sym_link(symQuery::GraphPolyQuery, neurList, depMat)
     end
 end
 
-function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=14400, digits=15)
+function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=14400, digits=15, outputFlag=1)
     #Ensure that the time step is within bounds
     @assert t_sym <= symQuery.ntime
     #Akin to conc_reach_solve
@@ -279,7 +279,7 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=144
     i = 0
 
     #Compute lower bounds
-    set_optimizer(minGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0, "Threads" => threads, "TimeLimit" => timeout))
+    set_optimizer(minGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => outputFlag, "Threads" => threads, "TimeLimit" => timeout))
     # set_optimizer(minGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0))
     #NOTE: Optimize each variable separately 
     for sym in symQuery.problem.varList
@@ -297,7 +297,7 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=144
 
     #Compute upper bounds
     maxGraph = symQuery.mod_dict[:graph]
-    set_optimizer(maxGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0, "Threads" => threads, "TimeLimit" => timeout))
+    set_optimizer(maxGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => outputFlag, "Threads" => threads, "TimeLimit" => timeout))
     # set_optimizer(maxGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0))
     #NOTE: Optimize each variable separately
     for sym in query.problem.varList 

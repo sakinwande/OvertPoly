@@ -39,6 +39,7 @@ numSteps = 10
 w = 1e-4
 domain = Hyperrectangle(low=[9.50,-4.50,2.10,1.50], high = [9.55,-4.45,2.11,1.51])
 depMat = [[1,0,1,1],[0,1,1,1], [0,0,1,0], [0,0,0,1]]
+dig = 15 #Digits to round to for floating point errors
 ########TEST: Debugging Bound Unicycle#########
 # lbs, ubs = extrema(domain)
 # plotFlag = true
@@ -581,56 +582,56 @@ query = GraphPolyQuery(
     2 #case. Delete this param
 )
 
-dig=15
-#Next, test multi-step concrete reachability
-query1 = deepcopy(query);
-query1.N_overt = 2
-query1.ntime = 1;
-@time reachSet, boundSet = concreach!(query1, digits=dig);
+# dig=15
+# #Next, test multi-step concrete reachability
+# query1 = deepcopy(query);
+# query1.N_overt = 2
+# query1.ntime = 1;
+# @time reachSet, boundSet = concreach!(query1, digits=dig);
 
-query111 = deepcopy(query);
-query111.ntime = 1;
-query111.problem.bound_func = bound_unicycle_us;
-@time reachSetUS, boundSetUS = concreach!(query111, digits=dig);
+# query111 = deepcopy(query);
+# query111.ntime = 1;
+# query111.problem.bound_func = bound_unicycle_us;
+# @time reachSetUS, boundSetUS = concreach!(query111, digits=dig);
 
-hypContained(reachSetUS, reachSet, digits=dig)
-hypContained(reachSet, reachSetUS, digits=dig)
+# hypContained(reachSetUS, reachSet, digits=dig)
+# hypContained(reachSet, reachSetUS, digits=dig)
 
-volume(reachSet)/volume(reachSetUS)
+# volume(reachSet)/volume(reachSetUS)
 
-dig= 3
-tHor = 15
-#Next, test multi-step concrete reachability
-query2 = deepcopy(query);
-query2.N_overt = 2
-query2.ntime = tHor;
-@time reachSets, boundSets = multi_step_concreach(query2, digits=dig);
+# dig= 3
+# tHor = 15
+# #Next, test multi-step concrete reachability
+# query2 = deepcopy(query);
+# query2.N_overt = 2
+# query2.ntime = tHor;
+# @time reachSets, boundSets = multi_step_concreach(query2, digits=dig);
 
-query222 = deepcopy(query);
-query222.ntime = tHor;
-query222.problem.bound_func = bound_unicycle_us;
-@time reachSetsUS, boundSetsUS = multi_step_concreach(query222, digits=dig);
+# query222 = deepcopy(query);
+# query222.ntime = tHor;
+# query222.problem.bound_func = bound_unicycle_us;
+# @time reachSetsUS, boundSetsUS = multi_step_concreach(query222, digits=dig);
 
 
-trueFlag = true
-for (i,_) in enumerate(reachSets)
-    trueFlag = hypContained(reachSetsUS[i], reachSets[i], digits=dig)
-    if !trueFlag
-        println("Failed at $(i)")
-        trueFlag = true
-    end
-    println("Volume ratio $i: ", volume(reachSets[i])/volume(reachSetsUS[i]))
-end
+# trueFlag = true
+# for (i,_) in enumerate(reachSets)
+#     trueFlag = hypContained(reachSetsUS[i], reachSets[i], digits=dig)
+#     if !trueFlag
+#         println("Failed at $(i)")
+#         trueFlag = true
+#     end
+#     println("Volume ratio $i: ", volume(reachSets[i])/volume(reachSetsUS[i]))
+# end
 
-#Recall, boundSets[t] makes reachSets[t+1], but reachSets[t] is used to make boundSets[t], for t >= 1
-# t = 6;
-# j = 1;
-# tf2 = true;
+# #Recall, boundSets[t] makes reachSets[t+1], but reachSets[t] is used to make boundSets[t], for t >= 1
+# # t = 6;
+# # j = 1;
+# # tf2 = true;
 
-# sLB = gen_interpol_nd(boundSets[t][j][1]);
-# sUB = gen_interpol_nd(boundSets[t][j][2]);
-# usLB = gen_interpol_nd(boundSetsUS[t][j][1]);
-# usUB = gen_interpol_nd(boundSetsUS[t][j][2]);
+# # sLB = gen_interpol_nd(boundSets[t][j][1]);
+# # sUB = gen_interpol_nd(boundSets[t][j][2]);
+# # usLB = gen_interpol_nd(boundSetsUS[t][j][1]);
+# # usUB = gen_interpol_nd(boundSetsUS[t][j][2]);
 
 # usInps1 = [tup[1:end-1] for tup in boundSetsUS[t][j][1]];
 # usInps2 = [tup[1:end-1] for tup in boundSetsUS[t][j][2]];
@@ -684,14 +685,14 @@ end
 
 ########################################################
 ########################################################
-digs= 3
-t_sym = 3
-#Next, test direct symreach 
-tMid = t_sym
-query3 = deepcopy(query);
-query3.problem.bounds = boundSets;
-query3.ntime = tMid;
-@time sym_set = symreach(query3,reachSets, depMat,tMid,digits=digs);
+# digs= 3
+# t_sym = 3
+# #Next, test direct symreach 
+# tMid = t_sym
+# query3 = deepcopy(query);
+# query3.problem.bounds = boundSets;
+# query3.ntime = tMid;
+# @time sym_set = symreach(query3,reachSets, depMat,tMid,digits=digs);
 
 # midQuery = deepcopy(query);
 # midQuery.problem.domain = sym_set;
@@ -701,41 +702,41 @@ query3.ntime = tMid;
 # query3.ntime = t_sym - tMid;
 # @time sym_set = symreach(query3,reachSetsMid, depMat,t_sym-tMid,digits=digs);
 
-# query3v1 = deepcopy(query);
-# concInt = [5,5]
-# @time sym_setv1, conc_v1 = multi_step_hybreach(query3v1, depMat, concInt);
+# # query3v1 = deepcopy(query);
+# # concInt = [5,5]
+# # @time sym_setv1, conc_v1 = multi_step_hybreach(query3v1, depMat, concInt);
 
 
-query333 = deepcopy(query);
-query333.problem.bounds = boundSetsUS;
-query333.problem.bound_func = bound_unicycle_us;
-query333.ntime = t_sym;
-@time sym_setUS = symreach(query333,reachSetsUS, depMat,t_sym,digits=digs);
+# query333 = deepcopy(query);
+# query333.problem.bounds = boundSetsUS;
+# query333.problem.bound_func = bound_unicycle_us;
+# query333.ntime = t_sym;
+# @time sym_setUS = symreach(query333,reachSetsUS, depMat,t_sym,digits=digs);
 
-volume(sym_set)/volume(sym_setUS)
-#volume(sym_setv1[end])/volume(sym_setUS)
-# volume(symReachv1)/volume(symReachUS)
-# volume(symReachv2)/volume(symReachUS)
-extrema(sym_set)
-extrema(sym_setUS)
-# extrema(sym_setv1[end])
-
-
-# hypContained(sym_setUS,sym_set, digits=digs)
-# hypContained(sym_setUS, sym_setv1[end], digits=digs)
-# j = 4
-# volume(project(sym_set, [j]))/volume(project(sym_setUS, [j]))
-# volume(project(sym_setv1[end], [j]))/volume(project(sym_setUS, [j]))
+# volume(sym_set)/volume(sym_setUS)
+# #volume(sym_setv1[end])/volume(sym_setUS)
+# # volume(symReachv1)/volume(symReachUS)
+# # # volume(symReachv2)/volume(symReachUS)
+# # extrema(sym_set)
+# # extrema(sym_setUS)
+# # # extrema(sym_setv1[end])
 
 
-# #Test hybrid reachability
-# concInt = [2,2,2,2,2]
-# query4 = deepcopy(query)
-# @time reachSets = multi_step_hybreach(query4, depMat, concInt)
+# # hypContained(sym_setUS,sym_set, digits=digs)
+# # hypContained(sym_setUS, sym_setv1[end], digits=digs)
+# # j = 4
+# # volume(project(sym_set, [j]))/volume(project(sym_setUS, [j]))
+# # volume(project(sym_setv1[end], [j]))/volume(project(sym_setUS, [j]))
 
-###########Trying hybrid symbolic##############
+
+# # #Test hybrid reachability
+# # concInt = [2,2,2,2,2]
+# # query4 = deepcopy(query)
+# # @time reachSets = multi_step_hybreach(query4, depMat, concInt)
+
+# ###########Trying hybrid symbolic##############
 sQuery = deepcopy(query)
-#sconcInt = [10,10,10,10,10]
+sconcInt = [12,10,10,10,8]
 sconcInt = [2,2]
 #NOTE: sconcInt is marginally safe, to be sound, use tighter horizons
 altConcInt = [15,10,10,10,5]
@@ -744,24 +745,36 @@ altConcInt = [15,10,10,10,5]
 # usQuery.problem.bound_func = bound_unicycle_us
 
 @time sym_set, sound_conc = multi_step_hybreach(sQuery, depMat, altConcInt);
-#@time us_set, us_conc = multi_step_hybreach(usQuery, depMat, usConcInt);
+# #@time us_set, us_conc = multi_step_hybreach(usQuery, depMat, usConcInt);
 
+# # extrema(sym_set[end])
+# # extrema(us_set[end])
+
+# goal_set  = Hyperrectangle(low=[-0.6, -0.2, -0.06, -0.3], high = [0.6, 0.2, 0.06, 0.3])
+
+# extrema(goal_set)
 # extrema(sym_set[end])
-# extrema(us_set[end])
 
-goal_set  = Hyperrectangle(low=[-0.6, -0.2, -0.06, -0.3], high = [0.6, 0.2, 0.06, 0.3])
+# hypContained(sym_set[end], goal_set, digits=16)
 
-extrema(goal_set)
-extrema(sym_set[end])
+# volume(sym_set[end])
 
-hypContained(sym_set[end], goal_set, digits=16)
+# floor(extrema(sym_set[end])[1][3], digits=3)
+# extrema(goal_set)[1][3]
 
-volume(sym_set[end])
-
-floor(extrema(sym_set[end])[1][3], digits=3)
-extrema(goal_set)[1][3]
-
-# hypContained(us_set[end], sym_set[end], digits=digs)
+# # hypContained(us_set[end], sym_set[end], digits=digs)
 # volume(sym_set[end])/volume(us_set[end])
 
 
+# #Symbolic Scaling Exercise 
+# for i in range(21,30)
+#     println("Iteration: ", i)
+#     cQuery = deepcopy(query);
+#     cQuery.ntime = i;
+#     reachsets, boundsets = multi_step_concreach(cQuery);
+#     #try sym reach
+#     sQuery = deepcopy(cQuery);
+#     sQuery.problem.bounds = boundsets;
+#     sQuery.ntime = i;
+#     @time sym_set = symreach(sQuery, reachsets, depMat, i, timeout=3600);
+# end
