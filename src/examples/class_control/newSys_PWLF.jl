@@ -27,7 +27,7 @@ Jp_1 = -0.8957
 Jp_2 = -0.4447
 
 function bound_func(npoint)
-    domain = Hyperrectangle(low=[-1, -1], high=[1, 1])
+    domain = Hyperrectangle(low=[-0.25, -0.25], high=[0.25, 0.25])
     lbs, ubs = extrema(domain)
     #Function to bound: -sin(x1) + 0.5(x1)^3 - 0.5x2
     #Part 1: Bound the -sin(x1) + 0.5(x1)^3 term
@@ -62,7 +62,7 @@ function bound_func(npoint)
 end
 
 function bound_func2(npoint)
-    domain = Hyperrectangle(low=[-0.6, -0.6], high=[0.6, 0.6])
+    domain = Hyperrectangle(low=[-0.25, -0.25], high=[0.25, 0.25])
     lbs, ubs = extrema(domain)
     #Function to bound: -sin(x1) + 0.5(x1)^3 - x1 + (x2)^2 - sin(x2)
     #Part 1: Bound the -sin(x1) - 0.5(x1)^3 term
@@ -201,21 +201,21 @@ end
 
 function bound_func4(npoint)
     """
-    x_dot = -3x + 4y + x² - y²
-    y_dot = sin(5x) - y³
+    x_dot = -.3x + .4y + 1/4x² - 1/2y²
+    y_dot = sin(5x) - 1/3y³
 
     We want to bound it as one function so we can use 
         func = -y³ - y² + x² + sin(5x)
     the domain is x,y in [-1, 1] x [-1, 1]
     """
-    domain = Hyperrectangle(low=[-1, -1], high=[1, 1])
+    domain = Hyperrectangle(low=[-0.25, -0.25], high=[0.25, 0.25])
     lbs, ubs = extrema(domain)
     #Part 1: Bound the -y³ - y² term
-    p1 = :(-1*x^3 - 1*x^2)
+    p1 = :(-1/3*x^3 - 1/2*x^2)
     p1_LB_1_1, p1_UB_1_1 = bound_univariate(p1, lbs[2], ubs[2], npoint=npoint)
 
     #Part 2: Bound the x² + sin(5x) term
-    p2 = :(1*x^2 + 1*sin(5*x))
+    p2 = :(1/4*x^2 + 1*sin(5*x))
     p2_LB_1_2, p2_UB_1_2 = bound_univariate(p2, lbs[1], ubs[1], npoint=npoint)
 
     #Lift bounds to space of (x₁, x₂)
@@ -242,21 +242,21 @@ end
 
 function bound_func5(npoint)
     """
-    x_dot = x^2 - y^2 - x
+    x_dot = .5x^2 - .5y^2 - .5x
     y_dot = 2xy - 0.5x^2
 
     Use something like x^2 + y^2 since that's what primarily drives the convexity here
     """
 
-    domain = Hyperrectangle(low=[-1, -1], high=[1, 1])
+    domain = Hyperrectangle(low=[-0.25, -0.25], high=[0.25, 0.25])
     lbs, ubs = extrema(domain)
 
     #Part 1, bound the x^2 term 
-    p1 = :(1*x^2)
+    p1 = :(1/2*x^2)
     p1_LB_1_1, p1_UB_1_1 = bound_univariate(p1, lbs[1], ubs[1], npoint=npoint)
 
     #Part 2, bound the y^2 term
-    p2 = :( -1*x^2)
+    p2 = :( -1/2*x^2)
     p2_LB_1_2, p2_UB_1_2 = bound_univariate(p2, lbs[2], ubs[2], npoint=npoint)
 
     #Lift bounds to space of (x₁, x₂)
@@ -286,7 +286,7 @@ function bound_func6(npoint)
     want to bound as one function, so focus on bounding 0.5x^3 + 0.5y^3 since that's what really drives the curvature here
     """
 
-    domain = Hyperrectangle(low=[-2, -2], high=[2, 2])
+    domain = Hyperrectangle(low=[-0.25, -0.25], high=[0.25, 0.25])
     lbs, ubs = extrema(domain)
 
     #Part 1, bound the 0.5x^3 term
@@ -320,7 +320,7 @@ function bound_func7(npoint)
     """
     x_dot = z
     y_dot = w
-    z_dot = -x^3 - 0.5z  - x + y -0.25z + 0.25w
+    z_dot = -(1/6)x^3 - 0.5z  - x + y -0.25z + 0.25w
     w_dot = -y + x - 0.25w + 0.25z
 
     want to bound as one function, so focus on bounding -x^3 + y + z + w since that's what really drives the curvature here
@@ -330,7 +330,7 @@ function bound_func7(npoint)
     lbs, ubs = extrema(domain)
 
     #Part 1, bound the -x^3 term
-    p1 = :(-1*x^3)
+    p1 = :(-1/6*x^3)
     p1_LB_1_1, p1_UB_1_1 = bound_univariate(p1, lbs[1], ubs[1], npoint=npoint)
 
     #Part 2, bound the y term
@@ -378,8 +378,8 @@ function bound_func8(npoint)
     """
     x_dot = z
     y_dot = w
-    z_dot = -x -0.5z - x^3 + 43x^2 - 3xy^2 + y^3 - 0.25z + 0.25w
-    w_dot = x^3 + 3x^2y + 3xy^2 - y^3 - y - 0.25w + 0.25z
+    z_dot = -x -0.5z - 1/3x^3 + x^2y - xy^2 + 1/3y^3 - 0.25z + 0.25w
+    w_dot = 1/3x^3 + x^2y + xy^2 - 1/3y^3 - y - 0.25w + 0.25z
 
     want to bound as one function. So focus on bounding x^3 + y^3 + 3x^2y + 3xy^2 + z + w since that's what really drives the curvature here
     """
@@ -388,16 +388,16 @@ function bound_func8(npoint)
     lbs, ubs = extrema(domain)
 
     #Part 1, bound the x^3 term
-    p1 = :(1*x^3)
+    p1 = :(1/3*x^3)
     p1_LB_1_1, p1_UB_1_1 = bound_univariate(p1, lbs[1], ubs[1], npoint=npoint)  
 
     #Part 2, bound the y^3 term
-    p2 = :(1*x^3)
+    p2 = :(1/3*x^3)
     p2_LB_1_2, p2_UB_1_2 = bound_univariate(p2, lbs[2], ubs[2], npoint=npoint)
 
     #Part 3, bound the 3x^2y term
     #Split into two parts
-    p3_sp1 = :(3*x^2)
+    p3_sp1 = :(x^2)
     p3_sp1_LB, p3_sp1_UB = bound_univariate(p3_sp1, lbs[1], ubs[1], npoint=npoint)
 
     p3_sp2 = :(1*x)
@@ -412,7 +412,7 @@ function bound_func8(npoint)
 
     #Part 4, bound the 3xy^2 term
     #Split into two parts
-    p4_sp1 = :(3*x)
+    p4_sp1 = :(1*x)
     p4_sp1_LB, p4_sp1_UB = bound_univariate(p4_sp1, lbs[1], ubs[1], npoint=npoint)
 
     p4_sp2 = :(x^2)
@@ -478,8 +478,9 @@ bound_func4(3)
 bound_func4(4)
 bound_func4(5)
 bound_func4(10)
-bound_func4(20)
+bound_func4(25)
 bound_func4(50)
+bound_func4(75)
 bound_func4(100)
 bound_func4(200)
 
@@ -489,8 +490,9 @@ bound_func5(3)
 bound_func5(4)
 bound_func5(5)
 bound_func5(10)
-bound_func5(20)
+bound_func5(25)
 bound_func5(50)
+bound_func5(75)
 bound_func5(100)
 bound_func5(200)
 
@@ -499,8 +501,9 @@ bound_func6(3)
 bound_func6(4)
 bound_func6(5)
 bound_func6(10)
-bound_func6(20)
+bound_func6(25)
 bound_func6(50)
+bound_func6(75)
 bound_func6(100)
 bound_func6(200)
 
@@ -509,8 +512,9 @@ bound_func7(3)
 bound_func7(4)
 bound_func7(5)
 bound_func7(10)
-bound_func7(20)
+bound_func7(25)
 bound_func7(50)
+bound_func7(75)
 bound_func7(100)
 bound_func7(200)
 
@@ -519,8 +523,9 @@ bound_func8(3)
 bound_func8(4)
 bound_func8(5)
 bound_func8(10)
-bound_func8(20)
+bound_func8(25)
 bound_func8(50)
+bound_func8(75)
 bound_func8(100)
 bound_func8(200)
 
