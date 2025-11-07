@@ -286,7 +286,7 @@ function bound_func6(npoint)
     want to bound as one function, so focus on bounding 0.5x^3 + 0.5y^3 since that's what really drives the curvature here
     """
 
-    domain = Hyperrectangle(low=[-1, -1], high=[1, 1])
+    domain = Hyperrectangle(low=[-2, -2], high=[2, 2])
     lbs, ubs = extrema(domain)
 
     #Part 1, bound the 0.5x^3 term
@@ -474,6 +474,8 @@ end
 ###########################################
 
 bound_func4(2)
+bound_func4(3)
+bound_func4(4)
 bound_func4(5)
 bound_func4(10)
 bound_func4(20)
@@ -483,6 +485,8 @@ bound_func4(200)
 
 
 bound_func5(2)
+bound_func5(3)
+bound_func5(4)
 bound_func5(5)
 bound_func5(10)
 bound_func5(20)
@@ -491,6 +495,8 @@ bound_func5(100)
 bound_func5(200)
 
 bound_func6(2)
+bound_func6(3)
+bound_func6(4)
 bound_func6(5)
 bound_func6(10)
 bound_func6(20)
@@ -499,6 +505,8 @@ bound_func6(100)
 bound_func6(200)
 
 bound_func7(2)
+bound_func7(3)
+bound_func7(4)
 bound_func7(5)
 bound_func7(10)
 bound_func7(20)
@@ -507,6 +515,8 @@ bound_func7(100)
 bound_func7(200)
 
 bound_func8(2)
+bound_func8(3)
+bound_func8(4)
 bound_func8(5)
 bound_func8(10)
 bound_func8(20)
