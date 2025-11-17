@@ -471,6 +471,156 @@ function bound_func8(npoint)
 
 
 end
+
+function bound_func9(npoint)
+    """
+    The nonlinear terms aere 0.3x^5 - 0.5y^4 - 0.5x^6
+    """
+
+    domain = Hyperrectangle(low=[-0.75, -0.75], high=[0.75, 0.75])
+    lbs, ubs = extrema(domain)
+
+    #Part 1, bound the 0.3x^5 term
+    p1 = :(0.3*x^5 - 0.5*x^6)
+    p1_LB_1_1, p1_UB_1_1 = bound_univariate(p1, lbs[1], ubs[1], npoint=npoint)
+
+    #Part 2, bound the -0.5y^4 term
+    p2 = :( -0.5*x^4)
+    p2_LB_1_2, p2_UB_1_2 = bound_univariate(p2, lbs[2], ubs[2], npoint=npoint)
+
+    #Lift bounds to space of (x₁, x₂)
+    #Lift part 1 first
+    l_p1_LB_11, l_p1_UB_11 = lift_OA([2], [1], p1_LB_1_1, p1_UB_1_1, lbs, ubs)
+    #Lift part 2
+    l_p2_LB_12, l_p2_UB_12 = lift_OA([1], [2], p2_LB_1_2, p2_UB_1_2, lbs, ubs)
+
+    #Sum the bounds to recover 2d bounds
+    LB_1, UB_1 = sumBounds(l_p1_LB_11, l_p1_UB_11, l_p2_LB_12, l_p2_UB_12, false)
+
+    LB_inputs = [tup[1:end-1] for tup in LB_1]
+    open("nfunc9_n$(npoint)_bounds.txt", "w") do file 
+        write(file, "dx_1\n")
+        for tup in LB_inputs
+            write(file, string(tup[1], ",", tup[2], "\n"))
+        end
+    end
+end
+
+function bound_func10(npoint)
+    """
+    The nonlinear terms are 0.5x^4 *sin(y) - x*y^3
+    """
+
+    domain = Hyperrectangle(low=[-1, -1], high=[1, 1])
+    lbs, ubs = extrema(domain)
+
+    #Part 1, bound the 0.5x^4 *sin(y) term
+    p1_sp1 = :(0.5*x^4)
+    p1_sp1_LB, p1_sp1_UB = bound_univariate(p1_sp1, lbs[1], ubs[1], npoint=npoint)
+
+    p1_sp2 = :(sin(x))
+    p1_sp2_LB, p1_sp2_UB = bound_univariate(p1_sp2, lbs[2], ubs[2], npoint=npoint)
+
+    #Lift bounds to space of (x₁, x₂)
+    l_p1_LB_1, l_p1_UB_1 = lift_OA([2], [1], p1_sp1_LB, p1_sp1_UB, lbs, ubs)
+    l_p1_LB_2, l_p1_UB_2 = lift_OA([1], [2], p1_sp2_LB, p1_sp2_UB, lbs, ubs)
+
+    #Combine to get bounds on 0.5x^4 *sin(y)
+    p1_LB, p1_UB = prodBounds(l_p1_LB_1, l_p1_UB_1, l_p1_LB_2, l_p1_UB_2)
+
+    #Part 2, bound the - x*y^3 term
+    p2_sp1 = :( -1*x)
+    p2_sp1_LB, p2_sp1_UB = bound_univariate(p2_sp1, lbs[1], ubs[1], npoint=npoint)
+
+    p2_sp2 = :(x^3)
+    p2_sp2_LB, p2_sp2_UB = bound_univariate(p2_sp2, lbs[2], ubs[2], npoint=npoint)
+
+    #Lift bounds to space of (x₁, x₂)
+    l_p2_LB_1, l_p2_UB_1 = lift_OA([1], [2], p2_sp1_LB, p2_sp1_UB, lbs, ubs)
+    l_p2_LB_2, l_p2_UB_2 = lift_OA([2], [1], p2_sp2_LB, p2_sp2_UB, lbs, ubs)
+
+    #Combine to get bounds on - x*y^3
+    p2_LB, p2_UB = prodBounds(l_p2_LB_1, l_p2_UB_1, l_p2_LB_2, l_p2_UB_2)
+
+    #All bounds are now in 2d space, so sum them
+    LB_1, UB_1 = sumBounds(p1_LB, p1_UB, p2_LB, p2_UB, false)
+
+    LB_inputs = [tup[1:end-1] for tup in LB_1]
+    open("nfunc10_n$(npoint)_bounds.txt", "w") do file 
+        write(file, "dx_1\n")
+        for tup in LB_inputs
+            write(file, string(tup[1], ",", tup[2], "\n"))
+        end
+    end
+end
+
+# npoint=1
+function bound_func11(npoint)
+    """
+    New 3d system 
+
+    -x3 * x2^4 -x2 * x3^4 +x1 * x2^2
+    """
+
+    domain = Hyperrectangle(low=[-1,-1,-1], high=[1,1,1])
+    lbs, ubs = extrema(domain)
+
+    #Part 1, bound the -x3 * x2^4 term
+    p1_sp1 = :( -1*x)
+    p1_sp1_LB, p1_sp1_UB = bound_univariate(p1_sp1, lbs[3], ubs[3], npoint=npoint)
+    p1_sp2 = :(x^4)
+    p1_sp2_LB, p1_sp2_UB = bound_univariate(p1_sp2, lbs[2], ubs[2], npoint=npoint)
+
+    #Lift bounds to space of (x₂, x₃)
+    l_p1_LB_1, l_p1_UB_1 = lift_OA([1], [2], p1_sp1_LB, p1_sp1_UB, lbs, ubs)
+    l_p1_LB_2, l_p1_UB_2 = lift_OA([2], [1], p1_sp2_LB, p1_sp2_UB, lbs, ubs)
+
+    #Combine to get bounds on -x3 * x2^4
+    p1_LB, p1_UB = prodBounds(l_p1_LB_1, l_p1_UB_1, l_p1_LB_2, l_p1_UB_2)
+
+    #Part 2, bound the -x2 * x3^4 term
+    p2_sp1 = :( -1*x)
+    p2_sp1_LB, p2_sp1_UB = bound_univariate(p2_sp1, lbs[2], ubs[2], npoint=npoint)
+    p2_sp2 = :(x^4)
+    p2_sp2_LB, p2_sp2_UB = bound_univariate(p2_sp2, lbs[3], ubs[3], npoint=npoint)
+
+    #Lift bounds to space of (x₂, x₃)
+    l_p2_LB_1, l_p2_UB_1 = lift_OA([2], [1], p2_sp1_LB, p2_sp1_UB, lbs, ubs)
+    l_p2_LB_2, l_p2_UB_2 = lift_OA([1], [2], p2_sp2_LB, p2_sp2_UB, lbs, ubs)
+
+    #Combine to get bounds on -x2 * x3^4
+    p2_LB, p2_UB = prodBounds(l_p2_LB_1, l_p2_UB_1, l_p2_LB_2, l_p2_UB_2)
+
+    #Part 3, bound the x1 * x2^2 term
+    p3_sp1 = :(1*x)
+    p3_sp1_LB, p3_sp1_UB = bound_univariate(p3_sp1, lbs[1], ubs[1], npoint=npoint)
+    p3_sp2 = :(x^2)
+    p3_sp2_LB, p3_sp2_UB = bound_univariate(p3_sp2, lbs[2], ubs[2], npoint=npoint)
+
+    #Lift bounds to space of (x₁, x₂)
+    l_p3_LB_1, l_p3_UB_1 = lift_OA([2], [1], p3_sp1_LB, p3_sp1_UB, lbs, ubs)
+    l_p3_LB_2, l_p3_UB_2 = lift_OA([1], [2], p3_sp2_LB, p3_sp2_UB, lbs, ubs)
+
+    #Combine to get bounds on x1 * x2^2
+    p3_LB, p3_UB = prodBounds(l_p3_LB_1, l_p3_UB_1, l_p3_LB_2, l_p3_UB_2)
+
+    #Lift all bounds to 3d space
+    l_p1_LB_3d, l_p1_UB_3d = lift_OA([1], [2,3], p1_LB, p1_UB, lbs, ubs)
+    l_p2_LB_3d, l_p2_UB_3d = lift_OA([1], [2,3], p2_LB, p2_UB, lbs, ubs)
+    l_p3_LB_3d, l_p3_UB_3d = lift_OA([3], [1,2], p3_LB, p3_UB, lbs, ubs)
+
+    #Sum the bounds to recover 3d bounds
+    LB_1, UB_1 = sumBounds(l_p1_LB_3d, l_p1_UB_3d, l_p2_LB_3d, l_p2_UB_3d, false)
+    LB_2, UB_2 = sumBounds(LB_1, UB_1, l_p3_LB_3d, l_p3_UB_3d, false)
+
+    LB_inputs = [tup[1:end-1] for tup in LB_2]
+    open("nfunc11_n$(npoint)_bounds.txt", "w") do file 
+        write(file, "dx_1\n")
+        for tup in LB_inputs
+            write(file, string(tup[1], ",", tup[2], ",", tup[3], "\n"))
+        end
+    end
+end
 ###########################################
 
 bound_func4(2)
@@ -529,6 +679,51 @@ bound_func8(75)
 bound_func8(100)
 bound_func8(200)
 
+bound_func9(2)
+bound_func9(3)
+bound_func9(4)
+bound_func9(5)
+bound_func9(6)
+bound_func9(7)
+bound_func9(8)
+bound_func9(9)
+bound_func9(10)
+bound_func9(25)
+bound_func9(50)
+bound_func9(75)
+bound_func9(100)
+bound_func9(200)
+
+bound_func10(2)
+bound_func10(3)
+bound_func10(4)
+bound_func10(5)
+bound_func10(6)
+bound_func10(7)
+bound_func10(8)
+bound_func10(9)
+bound_func10(10)
+bound_func10(25)
+bound_func10(50)
+bound_func10(75)
+bound_func10(100)
+bound_func10(200)
+
+
+bound_func11(2)
+bound_func11(3)
+bound_func11(4)
+bound_func11(5)
+bound_func11(6)
+bound_func11(7)
+bound_func11(8)
+bound_func11(9)
+bound_func11(10)
+bound_func11(25)
+bound_func11(50)
+bound_func11(75)
+bound_func11(100)
+bound_func11(200)
 ####################################
 # end
 # bound_func(1)
