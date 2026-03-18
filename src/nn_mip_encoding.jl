@@ -7,39 +7,61 @@ include("nv/activation.jl")
 include("nv/network.jl")
 include("nv/constraints.jl")
 include("nv/util.jl")
+include("nv/alpha_crown.jl")
 
-function add_controller_constraints!(netModel, network_nnet_address, input_set,last_layer_activation=Id())
+function add_controller_constraints!(netModel, network_nnet_address, input_set,
+                                     last_layer_activation=Id(); use_crown::Bool=false)
     """
-    Encode controller as MIP. Directly taken from OVERTVerify
+    Encode controller as MIP. Directly taken from OVERTVerify.
+
+    Optional keyword argument `use_crown` (default false): when true, use
+    α-CROWN (get_bounds_crown) instead of MaxSens (get_bounds) to compute
+    per-neuron pre-activation bounds. CROWN bounds are tighter, producing
+    smaller big-M values and a tighter LP relaxation.
     """
     #Isolate MIP model
     model = netModel
-    #Read network file 
+    #Read network file
     network = read_nnet(network_nnet_address, last_layer_activation=last_layer_activation)
     #Initialize neurons (adds variables)
     neurons = init_neurons(model, network)
     #Initialize deltas (adds binary variables)
     deltas = init_deltas(model, network)
-    #Use Taylor Johnson paper (https://arxiv.org/abs/1708.03322) to get bounds  
-    bounds = get_bounds(network, input_set)
+    #Compute per-neuron bounds
+    if use_crown
+        bounds = get_bounds_crown(network, input_set)
+    else
+        #Use Taylor Johnson paper (https://arxiv.org/abs/1708.03322) to get bounds
+        bounds = get_bounds(network, input_set)
+    end
     #Add NN MIP model to the given model
     #This is defined in the constraints.jl file. Appears to be the Tjeng paper encoding
     encode_network!(model, network, neurons, deltas, bounds, BoundedMixedIntegerLP())
     return neurons
 end
 
-function add_controller_constraints!(model, network_nnet_address, input_set, input_vars, output_vars; last_layer_activation=Id())
+function add_controller_constraints!(model, network_nnet_address, input_set, input_vars, output_vars;
+                                     last_layer_activation=Id(), use_crown::Bool=false)
     """
-    Encode controller as MIP. Directly taken from OVERTVerify
+    Encode controller as MIP. Directly taken from OVERTVerify.
+
+    Optional keyword argument `use_crown` (default false): when true, use
+    α-CROWN (get_bounds_crown) instead of MaxSens (get_bounds) to compute
+    per-neuron pre-activation bounds.
     """
-    #Read network file 
+    #Read network file
     network = read_nnet(network_nnet_address, last_layer_activation=last_layer_activation)
     #Initialize neurons (adds variables)
     neurons = init_neurons(model, network)
     #Initialize deltas (adds binary variables)
     deltas = init_deltas(model, network)
-    #Use Taylor Johnson paper (https://arxiv.org/abs/1708.03322) to get bounds  
-    bounds = get_bounds(network, input_set)
+    #Compute per-neuron bounds
+    if use_crown
+        bounds = get_bounds_crown(network, input_set)
+    else
+        #Use Taylor Johnson paper (https://arxiv.org/abs/1708.03322) to get bounds
+        bounds = get_bounds(network, input_set)
+    end
     #Add NN MIP model to the given model
     #This is defined in the constraints.jl file. Appears to be the Tjeng paper encoding
     encode_network!(model, network, neurons, deltas, bounds, BoundedMixedIntegerLP())
