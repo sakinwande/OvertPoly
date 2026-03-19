@@ -824,4 +824,318 @@ end
 
 end  # @testset "Alpha optimisation benchmark on real networks"
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Tests 17–20: CROWN back-substitution
+#
+# Test 17: Correctness on small synthetic network (tightness + soundness).
+# Test 18: Provably-tighter example — back-sub must strictly beat interval CROWN.
+# Test 19: Real networks — back-sub ≤ interval CROWN per neuron (tightness).
+# Test 20: Back-sub + alpha optimisation — result tighter than back-sub with α=0.
+# ──────────────────────────────────────────────────────────────────────────────
+
+@testset "CROWN back-substitution" begin
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Test 17: Small 2-layer synthetic network — tightness vs interval CROWN
+    #          and soundness via 1000 random samples.
+    # ─────────────────────────────────────────────────────────────────────────
+    @testset "Back-sub tighter/equal than interval CROWN on 2-layer net" begin
+        # Same 2-layer network as Test 2.
+        W1 = [ 1.0  2.0;
+              -1.0  1.0;
+               0.5 -0.5;
+               2.0  0.5]
+        b1 = [0.1, -0.3, 0.2, -0.5]
+        W2 = [1.0 -1.0  0.5  0.2;
+              0.3  0.7 -0.4  1.0]
+        b2 = [0.0, 0.1]
+
+        net = make_network(W1, b1, ReLU(), W2, b2, Id())
+        input_box = Hyperrectangle(low=[-1.0, -1.0], high=[1.0, 1.0])
+
+        crown_interval = forward_crown(net, input_box)
+        crown_backsub  = forward_crown_backsub(net, input_box)
+
+        @test length(crown_backsub) == length(net.layers)
+
+        # Tightness: back-sub bounds must be at least as tight as interval CROWN.
+        # Width of [l, u] is u - l; smaller is tighter.
+        for k in 1:length(net.layers)
+            for j in eachindex(crown_interval[k].lower)
+                width_interval = crown_interval[k].upper[j] - crown_interval[k].lower[j]
+                width_backsub  = crown_backsub[k].upper[j]  - crown_backsub[k].lower[j]
+                # Back-sub width must not exceed interval CROWN width (tol for fp rounding).
+                @test width_backsub ≤ width_interval + 1e-8
+            end
+        end
+
+        # Soundness: 1000 random samples must lie within back-sub bounds.
+        n_samples = 1000
+        lo = low(input_box);  hi = high(input_box);  n_in = length(lo)
+        for _ in 1:n_samples
+            x0 = lo .+ rand(n_in) .* (hi .- lo)
+            pre_acts = true_preactivations(net, x0)
+            for k in 1:length(net.layers)
+                for j in eachindex(pre_acts[k])
+                    @test pre_acts[k][j] ≥ crown_backsub[k].lower[j] - 1e-9
+                    @test pre_acts[k][j] ≤ crown_backsub[k].upper[j] + 1e-9
+                end
+            end
+        end
+    end
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Test 18: Provably-tighter example
+    #
+    # Network: 1 input x₀ ∈ [0, 1]
+    #   Layer 1 (ReLU): z₁ = ReLU(x₀)    (W1 = [1], b1 = [0])
+    #                   z₂ = ReLU(-x₀ + 0.5)  (W1 second row: [-1], b1 = [0.5])
+    #   Layer 2 (Id):   output = z₂   (W2 = [0, 1], b2 = [0])
+    #
+    # For the output neuron (layer 2, neuron 1 = z₂):
+    #   Interval CROWN: z₁ ∈ [0, 1], z₂ ∈ [0, 0.5] → pre-act = z₂ → upper = 0.5
+    #   Back-sub: ẑ₂ = -x₀ + 0.5. Neuron 2 at layer 1: l̂ = -1+0.5 = -0.5, û = 0+0.5 = 0.5
+    #     Upper relaxation: slope = 0.5/(0.5-(-0.5)) = 0.5, intercept = 0.5*0.5/1.0 = 0.25
+    #     z₂ ≤ 0.5·ẑ₂ + 0.25 = 0.5·(-x₀+0.5) + 0.25 = -0.5x₀ + 0.5
+    #     max over x₀ ∈ [0,1]: at x₀=0 → 0.5.  Wait — same bound.
+    #
+    # Use a different construction where back-sub provably wins:
+    #   Layer 1 (Id):  z₁ = x₀, z₂ = -x₀ + 0.5   (no ReLU → exact identity)
+    #   Layer 2 (Id):  output_1 = z₁ + z₂ = x₀ + (-x₀ + 0.5) = 0.5   (exact)
+    #
+    # Interval CROWN (without back-sub):
+    #   z₁ ∈ [0, 1], z₂ ∈ [-0.5, 0.5]  → output_1 ∈ [-0.5, 1.5]  (width 2)
+    # Back-sub (propagates through Identity layers exactly):
+    #   output_1 = 0.5 exactly → bounds [0.5, 0.5]  (width 0)
+    #
+    # This is a clear win for back-sub because Id layers don't widen bounds in
+    # back-sub (Λ passes through exactly), but interval CROWN accumulates width
+    # from the two separate interval inputs [0,1] and [-0.5, 0.5].
+    # ─────────────────────────────────────────────────────────────────────────
+    @testset "Back-sub strictly tighter: cancellation through Id layers" begin
+        # x₀ ∈ [0, 1], 1D input
+        # Layer 1 (Id, 2 neurons):  z₁ = x₀,  z₂ = -x₀ + 0.5
+        W1_canc = reshape([1.0; -1.0], 2, 1)   # 2×1
+        b1_canc = [0.0, 0.5]
+        # Layer 2 (Id, 1 neuron): output = z₁ + z₂
+        W2_canc = reshape([1.0, 1.0], 1, 2)    # 1×2
+        b2_canc = [0.0]
+
+        net_canc  = make_network(W1_canc, b1_canc, Id(), W2_canc, b2_canc, Id())
+        input_box = Hyperrectangle(low=[0.0], high=[1.0])
+
+        crown_int = forward_crown(net_canc, input_box)
+        crown_bs  = forward_crown_backsub(net_canc, input_box)
+
+        # Interval CROWN at layer 2 should give a wide bound (width ≥ 1).
+        width_interval_L2 = crown_int[2].upper[1] - crown_int[2].lower[1]
+        @test width_interval_L2 ≥ 1.0
+
+        # Back-sub at layer 2 should give the exact value 0.5 (width = 0).
+        @test isapprox(crown_bs[2].lower[1], 0.5; atol=1e-10)
+        @test isapprox(crown_bs[2].upper[1], 0.5; atol=1e-10)
+
+        # Soundness: must contain all realisable values (which is exactly {0.5}).
+        lo = low(input_box);  hi = high(input_box)
+        for _ in 1:200
+            x0 = [lo[1] + rand() * (hi[1] - lo[1])]
+            pre_acts = true_preactivations(net_canc, x0)
+            for k in 1:2
+                for j in eachindex(pre_acts[k])
+                    @test pre_acts[k][j] ≥ crown_bs[k].lower[j] - 1e-9
+                    @test pre_acts[k][j] ≤ crown_bs[k].upper[j] + 1e-9
+                end
+            end
+        end
+
+        # Back-sub strictly tighter than interval CROWN at layer 2.
+        @test crown_bs[2].upper[1] - crown_bs[2].lower[1]  <
+              crown_int[2].upper[1] - crown_int[2].lower[1] - 0.5
+    end
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Test 19: Real networks — back-sub ≤ interval CROWN per neuron (tightness)
+    #          and soundness via 500 random samples.
+    # ─────────────────────────────────────────────────────────────────────────
+
+    """
+        compare_backsub_vs_interval(net, input_box; n_samples=500, tol=1e-8)
+
+    Compare back-substitution CROWN, interval CROWN, and MaxSens on `net`.
+    Returns per-layer average bound widths (post-activation) and soundness violation.
+    """
+    function compare_backsub_vs_interval(net::Network, input_box::Hyperrectangle;
+                                          n_samples::Int=500, tol::Float64=1e-8)
+        n_layers = length(net.layers)
+
+        # Post-activation bounds (same format as get_bounds)
+        bounds_backsub   = get_bounds_crown_backsub(net, input_box)
+        bounds_interval  = get_bounds_crown(net, input_box)
+        bounds_maxsens   = get_bounds(net, input_box)
+
+        # Pre-activation bounds for soundness check
+        pre_backsub = forward_crown_backsub(net, input_box)
+
+        # Per-layer average widths
+        avg_width_backsub  = Float64[]
+        avg_width_interval = Float64[]
+        avg_width_maxsens  = Float64[]
+        tighter_vs_interval = Bool[]
+        tighter_vs_maxsens  = Bool[]
+
+        for k in 2:n_layers+1
+            w_bs = high(bounds_backsub[k])   .- low(bounds_backsub[k])
+            w_iv = high(bounds_interval[k])  .- low(bounds_interval[k])
+            w_ms = high(bounds_maxsens[k])   .- low(bounds_maxsens[k])
+            push!(avg_width_backsub,  mean_vec(w_bs))
+            push!(avg_width_interval, mean_vec(w_iv))
+            push!(avg_width_maxsens,  mean_vec(w_ms))
+            push!(tighter_vs_interval, all(w_bs .- w_iv .<= tol))
+            push!(tighter_vs_maxsens,  all(w_bs .- w_ms .<= tol))
+        end
+
+        # Soundness check via sampling
+        lo = low(input_box);  hi = high(input_box);  n_in = length(lo)
+        max_violation = 0.0
+        for _ in 1:n_samples
+            x0 = lo .+ rand(n_in) .* (hi .- lo)
+            pre_acts = true_preactivations(net, x0)
+            for k in 1:n_layers
+                for j in eachindex(pre_acts[k])
+                    viol_lo = pre_backsub[k].lower[j] - pre_acts[k][j]
+                    viol_hi = pre_acts[k][j] - pre_backsub[k].upper[j]
+                    max_violation = max(max_violation, viol_lo, viol_hi)
+                end
+            end
+        end
+
+        return (
+            avg_width_backsub   = avg_width_backsub,
+            avg_width_interval  = avg_width_interval,
+            avg_width_maxsens   = avg_width_maxsens,
+            tighter_vs_interval = tighter_vs_interval,
+            tighter_vs_maxsens  = tighter_vs_maxsens,
+            max_soundness_violation = max_violation,
+        )
+    end
+
+    repo_root = joinpath(@__DIR__, "..")
+
+    @testset "Back-sub vs interval CROWN on real networks" begin
+        # Network configurations (same as Tests 9-12)
+        networks_cfg = [
+            ("Single Pendulum",
+             joinpath(repo_root, "Networks", "ARCH-COMP-2023", "nnet",
+                      "controllerSinglePendulum.nnet"),
+             Hyperrectangle(low=[1.0, 0.0], high=[1.2, 0.2])),
+            ("TORA",
+             joinpath(repo_root, "Networks", "ARCH-COMP-2023", "nnet",
+                      "controllerTORA.nnet"),
+             Hyperrectangle(low=[0.6, -0.7, -0.4, 0.5],
+                            high=[0.7, -0.6, -0.3, 0.6])),
+            ("Unicycle",
+             joinpath(repo_root, "Networks", "ARCH-COMP-2023", "nnet",
+                      "controllerUnicycle.nnet"),
+             Hyperrectangle(low=[9.50, -4.50, 2.10, 1.50],
+                            high=[9.55, -4.45, 2.11, 1.51])),
+            ("ACC",
+             joinpath(repo_root, "Networks", "ARCH-COMP-2023", "nnet",
+                      "controllerACC.nnet"),
+             let ϵ = 1e-8
+                 Hyperrectangle(
+                     low  = [30.0 - ϵ, 1.40 - ϵ, 30.0 - ϵ, 79.0,  1.8],
+                     high = [30.0 + ϵ, 1.40 + ϵ, 30.2 + ϵ, 100.0, 2.2])
+             end),
+        ]
+
+        for (name, net_path, input_box) in networks_cfg
+            @testset "$name" begin
+                @assert isfile(net_path) "Expected network file not found: $net_path"
+                net = read_nnet(net_path; last_layer_activation=Id())
+
+                result = compare_backsub_vs_interval(net, input_box;
+                                                      n_samples=500, tol=1e-8)
+
+                println("\n--- $name (back-sub vs interval CROWN vs MaxSens) ---")
+                for (k, (wbs, wiv, wms, t_iv, t_ms)) in enumerate(zip(
+                        result.avg_width_backsub, result.avg_width_interval,
+                        result.avg_width_maxsens, result.tighter_vs_interval,
+                        result.tighter_vs_maxsens))
+                    pct_vs_interval = wiv > 0.0 ? 100.0 * (wiv - wbs) / wiv : 0.0
+                    println("  Layer $k: backsub=$(round(wbs, digits=6))  " *
+                            "interval=$(round(wiv, digits=6))  " *
+                            "maxsens=$(round(wms, digits=6))  " *
+                            "improvement_vs_interval=$(round(pct_vs_interval, digits=2))%  " *
+                            "tighter_vs_interval=$t_iv")
+                end
+                println("  Max soundness violation: $(result.max_soundness_violation)")
+
+                # Soundness: no back-sub bound violated by any sampled input
+                @test result.max_soundness_violation ≤ 1e-9
+
+                # Tightness: back-sub ≤ interval CROWN per neuron (within tolerance)
+                @test all(result.tighter_vs_interval)
+
+                # Back-sub is also tighter than or equal to MaxSens
+                @test all(result.tighter_vs_maxsens)
+            end
+        end
+    end
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Test 20: Back-sub + alpha optimisation is tighter than back-sub with α=0
+    #          Uses the same 2-layer synthetic network as Test 2.
+    # ─────────────────────────────────────────────────────────────────────────
+    @testset "Back-sub with optimised alpha vs alpha=0" begin
+        W1 = [ 1.0  2.0;
+              -1.0  1.0;
+               0.5 -0.5;
+               2.0  0.5]
+        b1 = [0.1, -0.3, 0.2, -0.5]
+        W2 = [1.0 -1.0  0.5  0.2;
+              0.3  0.7 -0.4  1.0]
+        b2 = [0.0, 0.1]
+
+        net = make_network(W1, b1, ReLU(), W2, b2, Id())
+        input_box = Hyperrectangle(low=[-1.0, -1.0], high=[1.0, 1.0])
+
+        # Back-sub with α=0 (default)
+        bs_base = forward_crown_backsub(net, input_box)
+
+        # Optimise α then run back-sub with optimised α
+        alpha_opt = optimise_alpha(net, input_box; n_iter=30, lr=0.1)
+        bs_opt    = forward_crown_backsub(net, input_box; alpha=alpha_opt)
+
+        # α optimisation should tighten or preserve lower bounds (never loosen).
+        for k in 1:length(net.layers)
+            for j in eachindex(bs_base[k].lower)
+                @test bs_opt[k].lower[j] ≥ bs_base[k].lower[j] - 1e-9
+                # Upper bounds must be unaffected by α.
+                @test isapprox(bs_opt[k].upper[j], bs_base[k].upper[j]; atol=1e-9)
+            end
+        end
+
+        # Soundness of back-sub + alpha_opt via 500 random samples.
+        lo = low(input_box);  hi = high(input_box);  n_in = length(lo)
+        for _ in 1:500
+            x0 = lo .+ rand(n_in) .* (hi .- lo)
+            pre_acts = true_preactivations(net, x0)
+            for k in 1:length(net.layers)
+                for j in eachindex(pre_acts[k])
+                    @test pre_acts[k][j] ≥ bs_opt[k].lower[j] - 1e-9
+                    @test pre_acts[k][j] ≤ bs_opt[k].upper[j] + 1e-9
+                end
+            end
+        end
+
+        println("\n--- Back-sub + alpha opt vs back-sub baseline (2-layer synthetic) ---")
+        for k in 1:length(net.layers)
+            delta_lower = bs_opt[k].lower .- bs_base[k].lower
+            println("  Layer $k: max Δlower = $(maximum(delta_lower)), " *
+                    "mean Δlower = $(mean_vec(delta_lower))")
+        end
+    end
+
+end  # @testset "CROWN back-substitution"
+
 println("\nAll alpha-CROWN tests passed.")
