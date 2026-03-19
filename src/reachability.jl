@@ -539,7 +539,7 @@ function multi_step_hybreach(concEvery, query)
     """
     Method to compute hybrid reachable sets by using concrete reach sets as a base and then using symbolic reach sets to refine the reachable set
     """
-    totalReachSets = [domain]
+    totalReachSets = [query.problem.domain]
     symReachSets = []
     totalsteps = copy(query.ntime)
     numConc = ceil(totalsteps/concEvery)

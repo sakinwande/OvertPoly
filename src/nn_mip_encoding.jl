@@ -9,65 +9,88 @@ include("nv/constraints.jl")
 include("nv/util.jl")
 include("nv/alpha_crown.jl")
 
+"""
+    count_unstable_neurons(network::Network, bounds::Vector{Hyperrectangle})
+
+Count the number of unstable neurons (l̂ < 0 < û) per layer given post-activation
+bounds. Unstable neurons require a binary variable in BoundedMixedIntegerLP.
+Returns a Vector{Int} of per-layer unstable counts (one per ReLU layer).
+"""
+function count_unstable_neurons(network::Network, bounds::Vector{Hyperrectangle})
+    counts = Int[]
+    for (k, layer) in enumerate(network.layers)
+        layer.activation isa ReLU || continue
+        # bounds[k+1] are post-activation; we need pre-activation bounds.
+        # Re-derive pre-activation bounds from the post-activation input bounds[k].
+        pre = approximate_affine_map(layer, bounds[k])
+        l̂, û = low(pre), high(pre)
+        push!(counts, count(j -> l̂[j] < 0.0 < û[j], eachindex(l̂)))
+    end
+    return counts
+end
+
 function add_controller_constraints!(netModel, network_nnet_address, input_set,
-                                     last_layer_activation=Id(); use_crown::Bool=false)
+                                     last_layer_activation=Id();
+                                     use_crown::Bool=true, verbose::Bool=false)
     """
     Encode controller as MIP. Directly taken from OVERTVerify.
 
-    Optional keyword argument `use_crown` (default false): when true, use
-    α-CROWN (get_bounds_crown) instead of MaxSens (get_bounds) to compute
-    per-neuron pre-activation bounds. CROWN bounds are tighter, producing
-    smaller big-M values and a tighter LP relaxation.
+    Optional keyword arguments:
+    - `use_crown` (default true): use CROWN back-substitution (get_bounds_crown_backsub)
+      for tighter per-neuron pre-activation bounds, reducing unstable neurons and big-M values.
+      Set to false to use MaxSens interval arithmetic (original behaviour).
+    - `verbose` (default false): print unstable neuron counts for both methods.
     """
-    #Isolate MIP model
     model = netModel
-    #Read network file
     network = read_nnet(network_nnet_address, last_layer_activation=last_layer_activation)
-    #Initialize neurons (adds variables)
     neurons = init_neurons(model, network)
-    #Initialize deltas (adds binary variables)
-    deltas = init_deltas(model, network)
-    #Compute per-neuron bounds
+    deltas  = init_deltas(model, network)
+
     if use_crown
-        bounds = get_bounds_crown(network, input_set)
+        bounds = get_bounds_crown_backsub(network, input_set)
+        if verbose
+            bounds_maxsens = get_bounds(network, input_set)
+            unstable_crown    = count_unstable_neurons(network, bounds)
+            unstable_maxsens  = count_unstable_neurons(network, bounds_maxsens)
+            @info "Unstable neurons — MaxSens: $unstable_maxsens  CROWN: $unstable_crown  (eliminated: $(sum(unstable_maxsens) - sum(unstable_crown)))"
+        end
     else
-        #Use Taylor Johnson paper (https://arxiv.org/abs/1708.03322) to get bounds
         bounds = get_bounds(network, input_set)
     end
-    #Add NN MIP model to the given model
-    #This is defined in the constraints.jl file. Appears to be the Tjeng paper encoding
+
     encode_network!(model, network, neurons, deltas, bounds, BoundedMixedIntegerLP())
     return neurons
 end
 
 function add_controller_constraints!(model, network_nnet_address, input_set, input_vars, output_vars;
-                                     last_layer_activation=Id(), use_crown::Bool=false)
+                                     last_layer_activation=Id(),
+                                     use_crown::Bool=true, verbose::Bool=false)
     """
     Encode controller as MIP. Directly taken from OVERTVerify.
 
-    Optional keyword argument `use_crown` (default false): when true, use
-    α-CROWN (get_bounds_crown) instead of MaxSens (get_bounds) to compute
-    per-neuron pre-activation bounds.
+    Optional keyword arguments:
+    - `use_crown` (default true): use CROWN back-substitution for tighter bounds.
+    - `verbose` (default false): print unstable neuron counts for both methods.
     """
-    #Read network file
     network = read_nnet(network_nnet_address, last_layer_activation=last_layer_activation)
-    #Initialize neurons (adds variables)
     neurons = init_neurons(model, network)
-    #Initialize deltas (adds binary variables)
-    deltas = init_deltas(model, network)
-    #Compute per-neuron bounds
+    deltas  = init_deltas(model, network)
+
     if use_crown
-        bounds = get_bounds_crown(network, input_set)
+        bounds = get_bounds_crown_backsub(network, input_set)
+        if verbose
+            bounds_maxsens = get_bounds(network, input_set)
+            unstable_crown   = count_unstable_neurons(network, bounds)
+            unstable_maxsens = count_unstable_neurons(network, bounds_maxsens)
+            @info "Unstable neurons — MaxSens: $unstable_maxsens  CROWN: $unstable_crown  (eliminated: $(sum(unstable_maxsens) - sum(unstable_crown)))"
+        end
     else
-        #Use Taylor Johnson paper (https://arxiv.org/abs/1708.03322) to get bounds
         bounds = get_bounds(network, input_set)
     end
-    #Add NN MIP model to the given model
-    #This is defined in the constraints.jl file. Appears to be the Tjeng paper encoding
+
     encode_network!(model, network, neurons, deltas, bounds, BoundedMixedIntegerLP())
-    #Relate the NN variables to the dynamics variables
-    @constraint(model, neurons[1] .== input_vars)  # set inputvars
-    @constraint(model, output_vars .== neurons[end])  # set outputvars
+    @constraint(model, neurons[1] .== input_vars)
+    @constraint(model, output_vars .== neurons[end])
     return bounds[end]
 end
 

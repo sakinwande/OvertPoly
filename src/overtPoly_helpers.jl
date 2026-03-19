@@ -1069,14 +1069,10 @@ function divBounds(lb1, ub1, lb2, ub2)
     # Method to divide bound 1 by bound 2.
     # Assumes that 0 is not in the interval of bound 2
     # """
-    try
-        @assert minimum([tup[end] for tup in lb2]) > 0 || maximum([tup[end] for tup in ub2]) < 0
-    catch
-        println("Division by zero")
-    end
+    @assert minimum([tup[end] for tup in lb2]) > 0 || maximum([tup[end] for tup in ub2]) < 0 "divBounds: divisor interval contains zero"
 
-    #Find the union of the inputs 
-    #NOTE: Assume lb and ub have the same inputs 
+    #Find the union of the inputs
+    #NOTE: Assume lb and ub have the same inputs
 
     bound1Inps = [tup[1:end-1] for tup in lb1]
     bound2Inps = [tup[1:end-1] for tup in lb2]
@@ -1092,18 +1088,18 @@ function divBounds(lb1, ub1, lb2, ub2)
     divLB = []
     divUB = []
 
-    for inp in unionInps 
+    for inp in unionInps
         ind1 = findall(x->x[1:end-1] == inp, lb1_i)[1]
-        lb1 = lb1_i[ind1][end]
-        ub1 = ub1_i[ind1][end]
+        lb1_val = lb1_i[ind1][end]
+        ub1_val = ub1_i[ind1][end]
 
         ind2 = findall(x->x[1:end-1] == inp, lb2_i)[1]
-        lb2 = lb2_i[ind2][end]
-        ub2 = ub2_i[ind2][end]
+        lb2_val = lb2_i[ind2][end]
+        ub2_val = ub2_i[ind2][end]
 
         #Compute the division, use interval arithmetic, assumes 0 is not in interval 2
-        lb = lb1/ub2
-        ub = ub1/lb2
+        lb = lb1_val/ub2_val
+        ub = ub1_val/lb2_val
 
         push!(divLB, (inp..., lb))
         push!(divUB, (inp..., ub))
@@ -1530,14 +1526,10 @@ function divBounds(lb1, ub1, lb2, ub2)
     # Method to divide bound 1 by bound 2.
     # Assumes that 0 is not in the interval of bound 2
     # """
-    try
-        @assert minimum([tup[end] for tup in lb2]) > 0 || maximum([tup[end] for tup in ub2]) < 0
-    catch
-        println("Division by zero")
-    end
+    @assert minimum([tup[end] for tup in lb2]) > 0 || maximum([tup[end] for tup in ub2]) < 0 "divBounds: divisor interval contains zero"
 
-    #Find the union of the inputs 
-    #NOTE: Assume lb and ub have the same inputs 
+    #Find the union of the inputs
+    #NOTE: Assume lb and ub have the same inputs
     #Define the output bounds
     divLB = []
     divUB = []

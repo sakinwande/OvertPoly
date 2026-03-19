@@ -7,13 +7,13 @@ using LazySets
 using Random
 using Plasmo
 
-function encode_dynamics!(query::GraphPolyQuery)
+function encode_dynamics!(query::GraphPolyQuery; enc_func=ccEncoding!)
     #create an optigraph to store the model
     graph = OptiGraph()
-    #create a vector of models for the dynamics 
+    #create a vector of models for the dynamics
     dynNodes = @optinode(graph, nodes[1:length(query.problem.varList)])
     ind = 0
-    #Iterate through elements of varList and add appropriate variables to the appropriate model 
+    #Iterate through elements of varList and add appropriate variables to the appropriate model
     for sym in query.problem.varList
         #print(sym)
         ind += 1
@@ -23,7 +23,7 @@ function encode_dynamics!(query::GraphPolyQuery)
         yUB = [tup[end] for tup in UB]
         yLB = [tup[end] for tup in LB]
 
-        dynNodes[ind] = ccEncoding!(xS, yLB, yUB, Tri, query, query.problem.varList[ind], ind, dynNodes[ind])
+        dynNodes[ind] = enc_func(xS, yLB, yUB, Tri, query, query.problem.varList[ind], ind, dynNodes[ind])
     end
 
     #Reuse mod dict to store graph, dynNodes, and neural network 
@@ -96,12 +96,12 @@ function conc_reach_solve(query;threads=0, digits=15)
     return reach_set 
 end
 
-function concreach!(query::GraphPolyQuery; digits=15)
+function concreach!(query::GraphPolyQuery; digits=15, enc_func=ccEncoding!)
     query.problem.bounds = query.problem.bound_func(query.problem, npoint=query.N_overt)
     query.var_dict = Dict{Symbol,Any}()
     query.mod_dict = Dict{Symbol,Any}()
 
-    encode_dynamics!(query)
+    encode_dynamics!(query; enc_func=enc_func)
 
     #Encode the network and link the control to the dynamics
     if !isnothing(query.network_file)
@@ -118,19 +118,19 @@ function concreach!(query::GraphPolyQuery; digits=15)
     return reach_set, query.problem.bounds
 end
 
-function multi_step_concreach(query::GraphPolyQuery; digits=15)
+function multi_step_concreach(query::GraphPolyQuery; digits=15, enc_func=ccEncoding!)
     """
     Method to solve the concrete reachability problem using MIP for multiple time steps.
     """
     input_set = query.problem.domain
     reachSets = [input_set]
     boundSets = []
-    
+
     #t1 = Dates.now()
-    
+
     for i = 1:query.ntime
         query.problem.domain = reachSets[end]
-        reachSet, boundSet = concreach!(query; digits=digits)
+        reachSet, boundSet = concreach!(query; digits=digits, enc_func=enc_func)
         push!(reachSets, reachSet)
         push!(boundSets, boundSet)
     end
@@ -140,7 +140,7 @@ function multi_step_concreach(query::GraphPolyQuery; digits=15)
 end
 
 ##################Implementing Sym Encoding###########
-function encode_sym_dynamics!(symQuery::GraphPolyQuery, x_dim)
+function encode_sym_dynamics!(symQuery::GraphPolyQuery, x_dim; enc_func=ccEncoding!)
     """
     Method to encode symbolic dynamics. Takes symQuery as input
     """
@@ -159,7 +159,7 @@ function encode_sym_dynamics!(symQuery::GraphPolyQuery, x_dim)
             yUB = [tup[end] for tup in UB]
             yLB = [tup[end] for tup in LB]
 
-            ccEncoding!(xS, yLB, yUB, Tri, symQuery, sym_t, x_ind, dynNodes[x_ind])
+            enc_func(xS, yLB, yUB, Tri, symQuery, sym_t, x_ind, dynNodes[x_ind])
         end
 
         f_t = Meta.parse("f_$(t_ind)")
@@ -300,7 +300,7 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=144
     set_optimizer(maxGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => outputFlag, "Threads" => threads, "TimeLimit" => timeout))
     # set_optimizer(maxGraph, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0))
     #NOTE: Optimize each variable separately
-    for sym in query.problem.varList 
+    for sym in symQuery.problem.varList
         sym_t = Meta.parse("$(sym)_$(t_sym)") 
         v = symQuery.var_dict[sym_t][end][1]
         dv = symQuery.var_dict[sym_t][2][1]
@@ -321,7 +321,7 @@ function sym_reach_solve(symQuery::GraphPolyQuery, t_sym; threads=0, timeout=144
     return reach_set
 end
 
-function symreach(symQuery::GraphPolyQuery,reachSets, depMat,t_sym; threads=0, timeout=14400, digits=15)
+function symreach(symQuery::GraphPolyQuery, reachSets, depMat, t_sym; threads=0, timeout=14400, digits=15, enc_func=ccEncoding!)
     """
     Method to symbolically solve the reachability problem. Agnostic to how the boundSets are computed
 
@@ -334,7 +334,7 @@ function symreach(symQuery::GraphPolyQuery,reachSets, depMat,t_sym; threads=0, t
     symQuery.mod_dict = Dict{Symbol,Any}()
 
     x_dim = length(symQuery.problem.varList) #state dimension
-    encode_sym_dynamics!(symQuery, x_dim)
+    encode_sym_dynamics!(symQuery, x_dim; enc_func=enc_func)
     neurList = encode_sym_control!(symQuery, reachSets)
     sym_link(symQuery, neurList, depMat)
 
@@ -342,24 +342,24 @@ function symreach(symQuery::GraphPolyQuery,reachSets, depMat,t_sym; threads=0, t
     return sym_set
 end
 
-function hybreach(symQuery::GraphPolyQuery, depMat, t_sym, reachSets = nothing, boundSets=nothing)
+function hybreach(symQuery::GraphPolyQuery, depMat, t_sym, reachSets=nothing, boundSets=nothing; enc_func=ccEncoding!)
     """
     Hybrid symbolic method to compute reachable sets. Uses concrete reachability to compute the bounds and then uses symbolic reachability to compute the reach set
     """
 
     if isnothing(boundSets)
         concQuery = deepcopy(symQuery)
-        reachSets,boundSets = multi_step_concreach(concQuery)
+        reachSets, boundSets = multi_step_concreach(concQuery; enc_func=enc_func)
     end
     symQuery.problem.bounds = boundSets
     symQuery.ntime = t_sym
-    sym_set = symreach(symQuery, reachSets, depMat, t_sym)
+    sym_set = symreach(symQuery, reachSets, depMat, t_sym; enc_func=enc_func)
     return sym_set
 end
 
-function multi_step_hybreach(hybQuery, depMat, concInt)
+function multi_step_hybreach(hybQuery, depMat, concInt; enc_func=ccEncoding!)
     """
-    Hybrid symbolic reachability. Requires concretization intervals 
+    Hybrid symbolic reachability. Requires concretization intervals
     """
 
     hyb_reachSets = [hybQuery.problem.domain]
@@ -367,17 +367,17 @@ function multi_step_hybreach(hybQuery, depMat, concInt)
     conc_reachSets = [hybQuery.problem.domain]
 
     cquery = deepcopy(hybQuery)
-    squery = deepcopy(hybQuery)  
+    squery = deepcopy(hybQuery)
     for int in concInt
         #Bound the function over the desired interval
-        cquery.ntime = int 
-        reachSets,boundSets = multi_step_concreach(cquery)
+        cquery.ntime = int
+        reachSets, boundSets = multi_step_concreach(cquery; enc_func=enc_func)
         push!(conc_boundSets, boundSets...)
         push!(conc_reachSets, reachSets[2:end]...)
 
         squery.problem.bounds = boundSets
         squery.ntime = int
-        hySet = symreach(squery, reachSets, depMat, int) 
+        hySet = symreach(squery, reachSets, depMat, int; enc_func=enc_func)
         push!(hyb_reachSets, hySet)
         cquery.problem.domain = hySet
     end

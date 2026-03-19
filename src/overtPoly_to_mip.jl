@@ -180,6 +180,108 @@ function ccEncoding!(xS, yLB, yUB, Tri, query::FlatPolyQuery,sym, ind)
 
 end
 
+function dccEncoding!(xS, yLB, yUB, Tri, query::GraphPolyQuery, sym, ind, model)
+    """
+    Disaggregated Convex Combination (DCC) encoding of a piecewise affine function.
+    Replaces the global λ variables in CC with per-simplex disaggregated weights δ[i],
+    yielding a tighter LP relaxation at the cost of more continuous variables.
+
+    Reference: Vielma, Ahmed & Nemhauser (2010), "Mixed-Integer Models for Nonseparable
+    Piecewise-Linear Optimization: Unifying Framework and Extensions"
+    """
+    d = size(xS[1], 1)    # Dimension of the input space
+    n = size(Tri, 1)       # Number of simplices
+
+    uCoef = query.problem.control_coef[ind][1]
+
+    # Binary variables: one per simplex (same as CC)
+    b = @variable(model, b[1:n], Bin)
+    @constraint(model, sum(b) == 1)
+
+    # Disaggregated weights: one vector per simplex, length d+1
+    δ = [@variable(model, [1:length(Tri[i])], lower_bound=0) for i in 1:n]
+    for i in 1:n
+        @constraint(model, sum(δ[i]) == b[i])
+    end
+
+    # State and output variables
+    @variable(model, x[1:d])
+    @variable(model, y)
+    @variable(model, yᵤ)
+    @variable(model, yₗ)
+    @variable(model, u)
+
+    # x as disaggregated convex combination of vertices
+    intermVar = sum(sum(δ[i][k] * [xS[Tri[i][k]]...] for k in 1:length(Tri[i])) for i in 1:n)
+    for j in 1:d
+        @constraint(model, x[j] == intermVar[j])
+    end
+
+    # y bounds via disaggregated weights
+    @constraint(model, yₗ == sum(sum(δ[i][k] * yLB[Tri[i][k]] for k in 1:length(Tri[i])) for i in 1:n))
+    @constraint(model, yᵤ == sum(sum(δ[i][k] * yUB[Tri[i][k]] for k in 1:length(Tri[i])) for i in 1:n))
+    @constraint(model, yₗ + uCoef * u <= y)
+    @constraint(model, y <= yᵤ + uCoef * u)
+
+    query.var_dict[sym] = [x, [y], [u]]
+    return model
+end
+
+function dccEncoding!(xS, yLB, yUB, Tri, query::FlatPolyQuery, sym, ind)
+    """
+    Disaggregated Convex Combination (DCC) encoding of a piecewise affine function.
+    Replaces the global λ variables in CC with per-simplex disaggregated weights δ[i],
+    yielding a tighter LP relaxation at the cost of more continuous variables.
+
+    Reference: Vielma, Ahmed & Nemhauser (2010), "Mixed-Integer Models for Nonseparable
+    Piecewise-Linear Optimization: Unifying Framework and Extensions"
+    """
+    d = size(xS[1], 1)    # Dimension of the input space
+    n = size(Tri, 1)       # Number of simplices
+    dU = query.problem.control_dim
+
+    uCoef = query.problem.control_coef[ind]
+    model = query.mod_dict[sym]
+
+    bin_var  = Meta.parse("b_$(sym)")
+    delt_var = Meta.parse("δ_$(sym)")
+    x_sym    = Meta.parse("x_$(sym)")
+    y_sym    = Meta.parse("y_$(sym)")
+    yₗ_sym   = Meta.parse("yₗ_$(sym)")
+    yᵤ_sym   = Meta.parse("yᵤ_$(sym)")
+    u_sym    = Meta.parse("u_$(sym)")
+
+    # Binary variables: one per simplex (same as CC)
+    b = @variable(model, [1:n], Bin, base_name = "$bin_var")
+    @constraint(model, sum(b) <= 1)
+
+    # Disaggregated weights: one vector per simplex, length d+1
+    δ = [@variable(model, [1:length(Tri[i])], lower_bound=0,
+                   base_name = "$(delt_var)_$(i)") for i in 1:n]
+    for i in 1:n
+        @constraint(model, sum(δ[i]) == b[i])
+    end
+
+    # State and output variables
+    x  = @variable(model, [1:d],  base_name = "$x_sym")
+    y  = @variable(model, [1:1],  base_name = "$y_sym")
+    yₗ = @variable(model, [1:1],  base_name = "$yₗ_sym")
+    yᵤ = @variable(model, [1:1],  base_name = "$yᵤ_sym")
+    u  = @variable(model, [1:dU], base_name = "$u_sym")
+
+    # x as disaggregated convex combination of vertices
+    @constraint(model, x .== sum(sum(δ[i][k] * [xS[Tri[i][k]]...] for k in 1:length(Tri[i])) for i in 1:n))
+
+    # y bounds via disaggregated weights
+    @constraint(model, yₗ[1] == sum(sum(δ[i][k] * yLB[Tri[i][k]] for k in 1:length(Tri[i])) for i in 1:n))
+    @constraint(model, yᵤ[1] == sum(sum(δ[i][k] * yUB[Tri[i][k]] for k in 1:length(Tri[i])) for i in 1:n))
+    @constraint(model, yₗ[1] .+ uCoef .* u .<= y[1])
+    @constraint(model, y[1] .<= yᵤ[1] .+ uCoef .* u)
+
+    query.var_dict[sym] = [x, y, u]
+    return model
+end
+
 function mip_summary(model)
     MathOptInterface = MOI
     const_types = list_of_constraint_types(model)

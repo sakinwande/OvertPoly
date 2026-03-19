@@ -1138,4 +1138,220 @@ end  # @testset "Alpha optimisation benchmark on real networks"
 
 end  # @testset "CROWN back-substitution"
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Tests 21–24: Binary variable elimination on real networks
+#
+# For each of the 4 real networks (Single Pendulum, TORA, Unicycle, ACC):
+#   1. Compute MaxSens post-activation bounds via get_bounds.
+#   2. Compute CROWN back-substitution post-activation bounds via get_bounds_crown_backsub.
+#   3. Count unstable neurons (binary variables) under each method.
+#   4. Print a per-layer table: total neurons, unstable(MaxSens), unstable(CROWN), eliminated.
+#   5. Assert CROWN never increases unstable count vs MaxSens (per layer, tolerance 0).
+#   6. Assert soundness: true pre-activations lie within forward_crown_backsub bounds
+#      for 200 random samples.
+#
+# Algorithm reference: Zhang et al. "Efficient Neural Network Robustness Certification
+# with General Activation Functions" (NeurIPS 2018); Tjeng et al. "Evaluating
+# Robustness of Neural Networks with Mixed Integer Programming" (ICLR 2019).
+# ──────────────────────────────────────────────────────────────────────────────
+
+"""
+    report_binary_elimination(network, input_box, net_name; n_samples=200)
+
+Compute and print a binary variable elimination table comparing MaxSens and
+CROWN back-substitution for `network` over `input_box`.
+
+Returns a named tuple with per-layer counts and soundness result.
+
+# Soundness guarantee
+Asserts that all 200 sampled pre-activations lie within the CROWN back-sub
+pre-activation bounds (forward_crown_backsub). Violations are flagged.
+
+# Preconditions
+- `network` is a valid `Network` with ReLU hidden layers and Id output layer.
+- `input_box` is a `Hyperrectangle` representing the input domain.
+
+# Postconditions
+- `unstable_crown[k] ≤ unstable_maxsens[k]` for all ReLU layers k (verified by caller).
+- `max_soundness_violation ≤ 0` (within floating-point tolerance).
+"""
+function report_binary_elimination(network::Network, input_box::Hyperrectangle,
+                                   net_name::String; n_samples::Int=200)
+    # ── Compute bounds ──────────────────────────────────────────────────────
+    bounds_maxsens = get_bounds(network, input_box)
+    bounds_crown   = get_bounds_crown_backsub(network, input_box)
+
+    # ── Count unstable neurons per ReLU layer ────────────────────────────────
+    # count_unstable_neurons iterates only ReLU layers (skips Id).
+    unstable_maxsens = count_unstable_neurons(network, bounds_maxsens)
+    unstable_crown   = count_unstable_neurons(network, bounds_crown)
+
+    # ── Build per-layer table data ────────────────────────────────────────────
+    # Collect (layer_index, n_neurons) for ReLU layers only (matching count order).
+    relu_layers = [(k, layer) for (k, layer) in enumerate(network.layers)
+                   if layer.activation isa ReLU]
+
+    # ── Print table ──────────────────────────────────────────────────────────
+    println("\n─── Binary Variable Elimination: $net_name ───")
+    println(Printf.@sprintf("  %-8s  %-10s  %-16s  %-14s  %-10s",
+                             "Layer", "Neurons", "Unstable(MaxSens)",
+                             "Unstable(CROWN)", "Eliminated"))
+    println("  " * "─"^64)
+
+    total_neurons    = 0
+    total_ms         = 0
+    total_crown      = 0
+    total_eliminated = 0
+
+    for (idx, (k, layer)) in enumerate(relu_layers)
+        n_neu  = n_nodes(layer)
+        n_ms   = unstable_maxsens[idx]
+        n_cr   = unstable_crown[idx]
+        n_elim = n_ms - n_cr
+        println(Printf.@sprintf("  L%-7d  %-10d  %-16d  %-14d  %-10d",
+                                 k, n_neu, n_ms, n_cr, n_elim))
+        total_neurons    += n_neu
+        total_ms         += n_ms
+        total_crown      += n_cr
+        total_eliminated += n_elim
+    end
+
+    println("  " * "─"^64)
+    println(Printf.@sprintf("  %-8s  %-10d  %-16d  %-14d  %-10d",
+                             "TOTAL", total_neurons, total_ms, total_crown,
+                             total_eliminated))
+
+    # ── Soundness check via random sampling ──────────────────────────────────
+    # Use forward_crown_backsub pre-activation bounds directly.
+    pre_crown = forward_crown_backsub(network, input_box)
+    n_layers  = length(network.layers)
+    lo = low(input_box);  hi = high(input_box);  n_in = length(lo)
+
+    max_violation = 0.0
+    for _ in 1:n_samples
+        x0       = lo .+ rand(n_in) .* (hi .- lo)
+        pre_acts = true_preactivations(network, x0)
+        for k in 1:n_layers
+            lb_k = pre_crown[k].lower
+            ub_k = pre_crown[k].upper
+            for j in eachindex(pre_acts[k])
+                viol_lo = lb_k[j] - pre_acts[k][j]   # > 0 → LB unsound
+                viol_hi = pre_acts[k][j] - ub_k[j]   # > 0 → UB unsound
+                max_violation = max(max_violation, viol_lo, viol_hi)
+            end
+        end
+    end
+
+    println("  Max soundness violation (must be ≤ 0): $max_violation")
+
+    return (
+        relu_layers       = relu_layers,
+        unstable_maxsens  = unstable_maxsens,
+        unstable_crown    = unstable_crown,
+        total_neurons     = total_neurons,
+        total_ms          = total_ms,
+        total_crown       = total_crown,
+        total_eliminated  = total_eliminated,
+        max_soundness_violation = max_violation,
+    )
+end
+
+@testset "Binary variable elimination on real networks" begin
+
+    repo_root = joinpath(@__DIR__, "..")
+
+    # Network configurations: (name, nnet_path, input_box)
+    # Input domains sourced from the corresponding example scripts:
+    #   Single Pendulum: implicit in test file (Tests 9-12 above)
+    #   TORA:    tora_overtPoly_distrOpt.jl   line 38
+    #   Unicycle: unicycle_overtPoly_distrOpt.jl line 40
+    #   ACC:     acc_overtPoly_graph.jl — acc_control() applied to domain line 78
+    networks_cfg = [
+        ("Single Pendulum",
+         joinpath(repo_root, "Networks", "ARCH-COMP-2023", "nnet",
+                  "controllerSinglePendulum.nnet"),
+         Hyperrectangle(low=[1.0, 0.0], high=[1.2, 0.2])),
+
+        ("TORA",
+         joinpath(repo_root, "Networks", "ARCH-COMP-2023", "nnet",
+                  "controllerTORA.nnet"),
+         Hyperrectangle(low=[0.6, -0.7, -0.4, 0.5],
+                        high=[0.7, -0.6, -0.3, 0.6])),
+
+        ("Unicycle",
+         joinpath(repo_root, "Networks", "ARCH-COMP-2023", "nnet",
+                  "controllerUnicycle.nnet"),
+         Hyperrectangle(low=[9.50, -4.50, 2.10, 1.50],
+                        high=[9.55, -4.45, 2.11, 1.51])),
+
+        ("ACC",
+         joinpath(repo_root, "Networks", "ARCH-COMP-2023", "nnet",
+                  "controllerACC.nnet"),
+         let ϵ = 1e-8
+             Hyperrectangle(
+                 low  = [30.0 - ϵ, 1.40 - ϵ, 30.0 - ϵ, 79.0,  1.8],
+                 high = [30.0 + ϵ, 1.40 + ϵ, 30.2 + ϵ, 100.0, 2.2])
+         end),
+    ]
+
+    # ── Test 21: Single Pendulum ──────────────────────────────────────────────
+    @testset "Binary var elimination: Single Pendulum" begin
+        name, net_path, input_box = networks_cfg[1]
+        @assert isfile(net_path) "Expected network file not found: $net_path"
+        net    = read_nnet(net_path; last_layer_activation=Id())
+        result = report_binary_elimination(net, input_box, name; n_samples=200)
+
+        # Soundness: CROWN back-sub pre-activation bounds valid for all samples.
+        @test result.max_soundness_violation ≤ 1e-9
+
+        # Monotonicity: CROWN never increases unstable count vs MaxSens (per layer).
+        for (idx, _) in enumerate(result.relu_layers)
+            @test result.unstable_crown[idx] ≤ result.unstable_maxsens[idx]
+        end
+    end
+
+    # ── Test 22: TORA ─────────────────────────────────────────────────────────
+    @testset "Binary var elimination: TORA" begin
+        name, net_path, input_box = networks_cfg[2]
+        @assert isfile(net_path) "Expected network file not found: $net_path"
+        net    = read_nnet(net_path; last_layer_activation=Id())
+        result = report_binary_elimination(net, input_box, name; n_samples=200)
+
+        @test result.max_soundness_violation ≤ 1e-9
+
+        for (idx, _) in enumerate(result.relu_layers)
+            @test result.unstable_crown[idx] ≤ result.unstable_maxsens[idx]
+        end
+    end
+
+    # ── Test 23: Unicycle ─────────────────────────────────────────────────────
+    @testset "Binary var elimination: Unicycle" begin
+        name, net_path, input_box = networks_cfg[3]
+        @assert isfile(net_path) "Expected network file not found: $net_path"
+        net    = read_nnet(net_path; last_layer_activation=Id())
+        result = report_binary_elimination(net, input_box, name; n_samples=200)
+
+        @test result.max_soundness_violation ≤ 1e-9
+
+        for (idx, _) in enumerate(result.relu_layers)
+            @test result.unstable_crown[idx] ≤ result.unstable_maxsens[idx]
+        end
+    end
+
+    # ── Test 24: ACC ──────────────────────────────────────────────────────────
+    @testset "Binary var elimination: ACC" begin
+        name, net_path, input_box = networks_cfg[4]
+        @assert isfile(net_path) "Expected network file not found: $net_path"
+        net    = read_nnet(net_path; last_layer_activation=Id())
+        result = report_binary_elimination(net, input_box, name; n_samples=200)
+
+        @test result.max_soundness_violation ≤ 1e-9
+
+        for (idx, _) in enumerate(result.relu_layers)
+            @test result.unstable_crown[idx] ≤ result.unstable_maxsens[idx]
+        end
+    end
+
+end  # @testset "Binary variable elimination on real networks"
+
 println("\nAll alpha-CROWN tests passed.")
