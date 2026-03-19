@@ -359,4 +359,224 @@ end
 
 end  # @testset "alpha-CROWN bound propagation"
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Real-network tests: CROWN vs MaxSens on production .nnet files
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Helper: mean of a vector (avoid Statistics dependency)
+mean_vec(v) = sum(v) / length(v)
+
+"""
+    compare_crown_maxsens(net, input_box; n_samples=500, tol=1e-8)
+
+Run CROWN and MaxSens bound propagation on `net` over `input_box`.
+Returns a named tuple with per-layer width statistics and comparison results.
+
+Soundness check: sample `n_samples` random inputs and verify that true
+pre-activation values lie within the CROWN pre-activation bounds (from
+`forward_crown`).  Note: `get_bounds_crown` returns *post*-activation bounds;
+soundness must be checked against *pre*-activation bounds from `forward_crown`.
+
+Tightness check: CROWN post-activation width ≤ MaxSens post-activation width per
+neuron (up to `tol`) for every layer, using `get_bounds_crown` vs `get_bounds`.
+"""
+function compare_crown_maxsens(net::Network, input_box::Hyperrectangle;
+                                n_samples::Int=500, tol::Float64=1e-8)
+    # Post-activation bounds for tightness comparison (same format as get_bounds)
+    bounds_crown_post   = get_bounds_crown(net, input_box)
+    bounds_maxsens_post = get_bounds(net, input_box)
+
+    # Pre-activation bounds for soundness check
+    crown_pre = forward_crown(net, input_box)  # Vector{CrownBounds}
+
+    n_layers = length(net.layers)
+    @assert length(bounds_crown_post)   == n_layers + 1
+    @assert length(bounds_maxsens_post) == n_layers + 1
+    @assert length(crown_pre)           == n_layers
+
+    # Per-layer average width (high - low per dimension, then mean)
+    avg_width_crown   = Float64[]
+    avg_width_maxsens = Float64[]
+    tighter           = Bool[]  # true if crown ≤ maxsens for ALL neurons at this layer
+
+    for k in 2:n_layers+1   # skip k=1 (input set, identical for both)
+        w_c = high(bounds_crown_post[k])   .- low(bounds_crown_post[k])
+        w_m = high(bounds_maxsens_post[k]) .- low(bounds_maxsens_post[k])
+        push!(avg_width_crown,   mean_vec(w_c))
+        push!(avg_width_maxsens, mean_vec(w_m))
+        push!(tighter,           all(w_c .- w_m .<= tol))
+    end
+
+    # Soundness: sample random inputs and check true pre-activation values
+    # lie within the CROWN pre-activation bounds (forward_crown output).
+    lo = low(input_box);  hi = high(input_box);  n_in = length(lo)
+    max_violation = 0.0
+    for _ in 1:n_samples
+        x0 = lo .+ rand(n_in) .* (hi .- lo)
+        pre_acts = true_preactivations(net, x0)
+        for k in 1:n_layers
+            lb_k = crown_pre[k].lower   # pre-activation lower bound, layer k
+            ub_k = crown_pre[k].upper   # pre-activation upper bound, layer k
+            for j in eachindex(pre_acts[k])
+                viol_lo = lb_k[j] - pre_acts[k][j]   # > 0 means unsound (LB too high)
+                viol_hi = pre_acts[k][j] - ub_k[j]   # > 0 means unsound (UB too low)
+                max_violation = max(max_violation, viol_lo, viol_hi)
+            end
+        end
+    end
+
+    return (
+        avg_width_crown   = avg_width_crown,
+        avg_width_maxsens = avg_width_maxsens,
+        tighter           = tighter,
+        max_soundness_violation = max_violation,
+    )
+end
+
+@testset "Real networks: CROWN vs MaxSens bound comparison" begin
+
+    # Absolute path of this file — used to build repo-relative paths robustly.
+    repo_root = joinpath(@__DIR__, "..")
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Test 9: Single Pendulum ARCH-COMP — 2-input controller
+    # Network: Networks/ARCH-COMP-2023/nnet/controllerSinglePendulum.nnet
+    # Input domain from single_pend_overtPoly_graph.jl:
+    #   Hyperrectangle(low=[1., 0.], high=[1.2, 0.2])
+    # ──────────────────────────────────────────────────────────────────────────
+    @testset "Single Pendulum ARCH-COMP controller" begin
+        net_path  = joinpath(repo_root, "Networks", "ARCH-COMP-2023", "nnet",
+                             "controllerSinglePendulum.nnet")
+        @assert isfile(net_path) "Expected network file not found: $net_path"
+        net       = read_nnet(net_path; last_layer_activation=Id())
+        input_box = Hyperrectangle(low=[1.0, 0.0], high=[1.2, 0.2])
+
+        result = compare_crown_maxsens(net, input_box; n_samples=500, tol=1e-8)
+
+        println("\n--- Single Pendulum ARCH-COMP ---")
+        for (k, (wc, wm, t)) in enumerate(zip(result.avg_width_crown,
+                                               result.avg_width_maxsens,
+                                               result.tighter))
+            println("  Layer $(k): avg CROWN post-act width = $(round(wc, digits=6)), " *
+                    "avg MaxSens post-act width = $(round(wm, digits=6)), " *
+                    "CROWN tighter = $t")
+        end
+        println("  Max pre-activation soundness violation (should be ≤ 0): " *
+                "$(result.max_soundness_violation)")
+
+        # Soundness: no CROWN pre-activation bound violated by any sampled input
+        @test result.max_soundness_violation ≤ 1e-9
+
+        # Tightness: CROWN post-activation width ≤ MaxSens per neuron (within tol)
+        @test all(result.tighter)
+    end
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Test 10: TORA controller — 4-input controller
+    # Network: Networks/ARCH-COMP-2023/nnet/controllerTORA.nnet
+    # Input domain from tora_overtPoly_distrOpt.jl:
+    #   Hyperrectangle(low=[0.6,-0.7,-0.4,0.5], high=[0.7,-0.6,-0.3,0.6])
+    # ──────────────────────────────────────────────────────────────────────────
+    @testset "TORA controller" begin
+        net_path  = joinpath(repo_root, "Networks", "ARCH-COMP-2023", "nnet",
+                             "controllerTORA.nnet")
+        @assert isfile(net_path) "Expected network file not found: $net_path"
+        net       = read_nnet(net_path; last_layer_activation=Id())
+        input_box = Hyperrectangle(low=[0.6, -0.7, -0.4, 0.5],
+                                   high=[0.7, -0.6, -0.3, 0.6])
+
+        result = compare_crown_maxsens(net, input_box; n_samples=500, tol=1e-8)
+
+        println("\n--- TORA ---")
+        for (k, (wc, wm, t)) in enumerate(zip(result.avg_width_crown,
+                                               result.avg_width_maxsens,
+                                               result.tighter))
+            println("  Layer $(k): avg CROWN post-act width = $(round(wc, digits=6)), " *
+                    "avg MaxSens post-act width = $(round(wm, digits=6)), " *
+                    "CROWN tighter = $t")
+        end
+        println("  Max pre-activation soundness violation (should be ≤ 0): " *
+                "$(result.max_soundness_violation)")
+
+        @test result.max_soundness_violation ≤ 1e-9
+        @test all(result.tighter)
+    end
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Test 11: Unicycle controller — 4-input, 2-output controller
+    # Network: Networks/ARCH-COMP-2023/nnet/controllerUnicycle.nnet
+    # Input domain from unicycle_overtPoly_distrOpt.jl:
+    #   Hyperrectangle(low=[9.50,-4.50,2.10,1.50], high=[9.55,-4.45,2.11,1.51])
+    # ──────────────────────────────────────────────────────────────────────────
+    @testset "Unicycle controller" begin
+        net_path  = joinpath(repo_root, "Networks", "ARCH-COMP-2023", "nnet",
+                             "controllerUnicycle.nnet")
+        @assert isfile(net_path) "Expected network file not found: $net_path"
+        net       = read_nnet(net_path; last_layer_activation=Id())
+        input_box = Hyperrectangle(low=[9.50, -4.50, 2.10, 1.50],
+                                   high=[9.55, -4.45, 2.11, 1.51])
+
+        result = compare_crown_maxsens(net, input_box; n_samples=500, tol=1e-8)
+
+        println("\n--- Unicycle ---")
+        for (k, (wc, wm, t)) in enumerate(zip(result.avg_width_crown,
+                                               result.avg_width_maxsens,
+                                               result.tighter))
+            println("  Layer $(k): avg CROWN post-act width = $(round(wc, digits=6)), " *
+                    "avg MaxSens post-act width = $(round(wm, digits=6)), " *
+                    "CROWN tighter = $t")
+        end
+        println("  Max pre-activation soundness violation (should be ≤ 0): " *
+                "$(result.max_soundness_violation)")
+
+        @test result.max_soundness_violation ≤ 1e-9
+        @test all(result.tighter)
+    end
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Test 12: ACC controller — 5-input controller
+    # Network: Networks/ARCH-COMP-2023/nnet/controllerACC.nnet
+    # Network inputs (from acc_overtPoly_graph.jl acc_control function):
+    #   [vSet, tGap, vEgo, dRel, vRel]
+    # Using representative domain around initial condition:
+    #   domain = Hyperrectangle(low=[90,32,-ϵ,10,30,-ϵ], high=[110,32.2,ϵ,11,30.2,ϵ])
+    # Network input domain derived via acc_control():
+    #   vSet=30 (constant), tGap=1.4 (constant),
+    #   vEgo ∈ [30-ϵ, 30.2+ϵ],
+    #   dRel ∈ [90-11, 110-10] = [79, 100],
+    #   vRel ∈ [32-30.2, 32.2-30] = [1.8, 2.2]
+    # ──────────────────────────────────────────────────────────────────────────
+    @testset "ACC controller" begin
+        net_path  = joinpath(repo_root, "Networks", "ARCH-COMP-2023", "nnet",
+                             "controllerACC.nnet")
+        @assert isfile(net_path) "Expected network file not found: $net_path"
+        net       = read_nnet(net_path; last_layer_activation=Id())
+
+        # Network inputs: [vSet, tGap, vEgo, dRel, vRel]
+        # Derived from acc_control() applied to the example domain
+        ϵ_acc = 1e-8
+        input_box = Hyperrectangle(
+            low  = [30.0 - ϵ_acc, 1.40 - ϵ_acc, 30.0 - ϵ_acc, 79.0,  1.8],
+            high = [30.0 + ϵ_acc, 1.40 + ϵ_acc, 30.2 + ϵ_acc, 100.0, 2.2],
+        )
+
+        result = compare_crown_maxsens(net, input_box; n_samples=500, tol=1e-8)
+
+        println("\n--- ACC ---")
+        for (k, (wc, wm, t)) in enumerate(zip(result.avg_width_crown,
+                                               result.avg_width_maxsens,
+                                               result.tighter))
+            println("  Layer $(k): avg CROWN post-act width = $(round(wc, digits=6)), " *
+                    "avg MaxSens post-act width = $(round(wm, digits=6)), " *
+                    "CROWN tighter = $t")
+        end
+        println("  Max pre-activation soundness violation (should be ≤ 0): " *
+                "$(result.max_soundness_violation)")
+
+        @test result.max_soundness_violation ≤ 1e-9
+        @test all(result.tighter)
+    end
+
+end  # @testset "Real networks: CROWN vs MaxSens bound comparison"
+
 println("\nAll alpha-CROWN tests passed.")
