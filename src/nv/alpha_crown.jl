@@ -380,30 +380,26 @@ function optimise_alpha(network::Network, input_set::Hyperrectangle;
         end
     end
 
-    # Objective: sum of all lower pre-activation bounds for unstable neurons.
-    # We maximise this by ascent.
+    # Objective: sum of ALL pre-activation lower bounds across all layers.
+    #
+    # The α-CROWN gain is indirect: α_j controls the post-activation lower bound
+    # of an unstable neuron in layer k (higher α → tighter lower relaxation →
+    # tighter post-activation interval → tighter bounds in layers k+1, k+2, …).
+    # The direct pre-activation lower bound at the unstable neuron itself is
+    # l̂_{k,j} which does not depend on α[k][j] (α affects the post-activation
+    # interval that feeds forward, not the pre-activation bound of that neuron).
+    #
+    # Therefore the correct objective to maximise is the sum of all pre-activation
+    # lower bounds across ALL layers and ALL neurons (including non-ReLU output
+    # layers), since these are the big-M values that matter for the MILP encoding.
+    #
+    # Reference: Xu et al. ICLR 2021, Eq. (6) — maximise lower bound of the
+    # verification objective, which subsumes sum of all neuron lower bounds.
     function objective(α)
         crown = forward_crown(network, input_set; alpha=α)
         total = 0.0
         for k in 1:n_layers
-            if network.layers[k].activation isa ReLU
-                l̂ = crown[k].lower
-                û = crown[k].upper
-                for j in eachindex(l̂)
-                    if l̂[j] < 0.0 < û[j]
-                        # For unstable neurons, the lower bound is α_j * l̂_j (≤ 0),
-                        # but we want it as close to 0 as possible (maximise).
-                        total += α[k][j] * l̂[j]   # negative contribution; higher α → worse
-                        # Actually we want to maximise the *effective* post-activation
-                        # lower bound, which is max(0, α_j * l̂_j) = 0 always.
-                        # So the real α-CROWN gain is in later layers: tighter post-
-                        # activation bounds propagate forward.  Use the pre-activation
-                        # lower bound of the *next* layer as the objective.
-                    end
-                end
-                # Better: use sum of pre-activation lower bounds of ALL layers.
-                total += sum(l̂)
-            end
+            total += sum(crown[k].lower)
         end
         return total
     end

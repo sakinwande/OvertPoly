@@ -19,6 +19,7 @@ Tests cover:
 
 using Test
 using LazySets
+import Printf
 
 # Activate project and load the nv utilities.
 # nn_mip_encoding.jl pulls in all nv/ includes plus alpha_crown.jl.
@@ -578,5 +579,249 @@ end
     end
 
 end  # @testset "Real networks: CROWN vs MaxSens bound comparison"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Tests 13–16: Alpha optimisation benchmark on real networks
+#
+# For each of the 4 real networks (single pendulum, TORA, unicycle, ACC) with
+# their Hyperrectangle input domains, we:
+#   1. Compute CROWN bounds with α=0 (base)
+#   2. Optimise α and compute CROWN bounds with optimised α
+#   3. Check that optimised bounds never loosen (soundness monotonicity)
+#   4. Check soundness of optimised bounds via random sampling
+#   5. Print per-layer improvement statistics for the report
+#
+# The key metric is the improvement in PRE-ACTIVATION lower bounds:
+#   Δlower_{k,j} = crown_opt[k].lower[j] - crown_base[k].lower[j]  (≥ 0)
+# Positive Δlower means tighter (higher) lower bound → smaller big-M → tighter MILP.
+# ──────────────────────────────────────────────────────────────────────────────
+
+"""
+    benchmark_alpha_opt(net, input_box, net_name; n_samples=500, n_iter=50, lr=0.1)
+
+Run alpha-optimisation benchmark for a single network and input box.
+Returns a named tuple with per-layer statistics for reporting.
+
+Prints a summary table to stdout.
+"""
+function benchmark_alpha_opt(net::Network, input_box::Hyperrectangle, net_name::String;
+                              n_samples::Int=500, n_iter::Int=50, lr::Float64=0.1)
+    n_layers = length(net.layers)
+
+    # Step 1: base CROWN bounds (α = 0)
+    crown_base = forward_crown(net, input_box)
+
+    # Step 2: optimise α
+    alpha_opt = optimise_alpha(net, input_box; n_iter=n_iter, lr=lr)
+
+    # Step 3: CROWN bounds with optimised α
+    crown_opt = forward_crown(net, input_box; alpha=alpha_opt)
+
+    # Per-layer statistics
+    # n_unstable[k]   : number of unstable neurons at layer k (in base CROWN)
+    # mean_δlower[k]  : mean improvement in lower bound across all neurons at layer k
+    # max_δlower[k]   : max improvement in lower bound at layer k
+    # any_meaningful[k]: true if max improvement > 0.01
+    n_unstable    = Int[]
+    mean_δlower   = Float64[]
+    max_δlower    = Float64[]
+    any_meaningful = Bool[]
+
+    for k in 1:n_layers
+        l̂_base = crown_base[k].lower
+        û_base  = crown_base[k].upper
+        l̂_opt  = crown_opt[k].lower
+
+        unstable_count = count(j -> l̂_base[j] < 0.0 < û_base[j], eachindex(l̂_base))
+        push!(n_unstable, unstable_count)
+
+        δlower = l̂_opt .- l̂_base   # element-wise improvement (≥ 0 if sound)
+        push!(mean_δlower,    mean_vec(δlower))
+        push!(max_δlower,     maximum(δlower))
+        push!(any_meaningful, maximum(δlower) > 0.01)
+    end
+
+    # Print summary table
+    println("\n─── $net_name ───")
+    println("  Alpha optimisation: n_iter=$n_iter, lr=$lr")
+    println("  $(Printf.@sprintf("%-8s %-12s %-10s %-10s %-12s", "Layer", "#Unstable", "Mean Δl̂", "Max Δl̂", "Meaningful?"))")
+    for k in 1:n_layers
+        layer_type = net.layers[k].activation isa ReLU ? "ReLU" : "Id"
+        println("  $(Printf.@sprintf("%-8s %-12d %-10.6f %-10.6f %-12s",
+                 "L$k($layer_type)", n_unstable[k],
+                 mean_δlower[k], max_δlower[k],
+                 any_meaningful[k] ? "YES" : "no"))")
+    end
+
+    # Soundness check: sample random inputs, verify true pre-activations ≤ crown_opt bounds
+    lo = low(input_box);  hi = high(input_box);  n_in = length(lo)
+    max_lb_violation = 0.0
+    max_ub_violation = 0.0
+    for _ in 1:n_samples
+        x0 = lo .+ rand(n_in) .* (hi .- lo)
+        pre_acts = true_preactivations(net, x0)
+        for k in 1:n_layers
+            for j in eachindex(pre_acts[k])
+                lb_viol = crown_opt[k].lower[j] - pre_acts[k][j]   # > 0 → unsound LB
+                ub_viol = pre_acts[k][j] - crown_opt[k].upper[j]   # > 0 → unsound UB
+                max_lb_violation = max(max_lb_violation, lb_viol)
+                max_ub_violation = max(max_ub_violation, ub_viol)
+            end
+        end
+    end
+    println("  Max LB soundness violation (must be ≤ 0): $max_lb_violation")
+    println("  Max UB soundness violation (must be ≤ 0): $max_ub_violation")
+
+    return (
+        crown_base     = crown_base,
+        crown_opt      = crown_opt,
+        alpha_opt      = alpha_opt,
+        n_unstable     = n_unstable,
+        mean_δlower    = mean_δlower,
+        max_δlower     = max_δlower,
+        any_meaningful = any_meaningful,
+        max_lb_violation = max_lb_violation,
+        max_ub_violation = max_ub_violation,
+    )
+end
+
+@testset "Alpha optimisation benchmark on real networks" begin
+
+    repo_root = joinpath(@__DIR__, "..")
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Test 13: Single Pendulum — alpha optimisation benchmark
+    # ──────────────────────────────────────────────────────────────────────────
+    @testset "Alpha opt benchmark: Single Pendulum" begin
+        net_path  = joinpath(repo_root, "Networks", "ARCH-COMP-2023", "nnet",
+                             "controllerSinglePendulum.nnet")
+        @assert isfile(net_path) "Expected network file not found: $net_path"
+        net       = read_nnet(net_path; last_layer_activation=Id())
+        input_box = Hyperrectangle(low=[1.0, 0.0], high=[1.2, 0.2])
+
+        result = benchmark_alpha_opt(net, input_box, "Single Pendulum";
+                                     n_samples=500, n_iter=50, lr=0.1)
+
+        # Soundness: optimised bounds must be valid for all sampled inputs
+        @test result.max_lb_violation ≤ 1e-9
+        @test result.max_ub_violation ≤ 1e-9
+
+        # Monotonicity: optimised lower bounds must be ≥ base lower bounds (within tol)
+        for k in eachindex(result.crown_base)
+            for j in eachindex(result.crown_base[k].lower)
+                δ = result.crown_opt[k].lower[j] - result.crown_base[k].lower[j]
+                @test δ ≥ -1e-9
+            end
+        end
+
+        # Upper bounds must be unaffected by α (α only affects lower relaxation slope)
+        for k in eachindex(result.crown_base)
+            for j in eachindex(result.crown_base[k].upper)
+                @test isapprox(result.crown_opt[k].upper[j],
+                               result.crown_base[k].upper[j]; atol=1e-9)
+            end
+        end
+    end
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Test 14: TORA — alpha optimisation benchmark
+    # ──────────────────────────────────────────────────────────────────────────
+    @testset "Alpha opt benchmark: TORA" begin
+        net_path  = joinpath(repo_root, "Networks", "ARCH-COMP-2023", "nnet",
+                             "controllerTORA.nnet")
+        @assert isfile(net_path) "Expected network file not found: $net_path"
+        net       = read_nnet(net_path; last_layer_activation=Id())
+        input_box = Hyperrectangle(low=[0.6, -0.7, -0.4, 0.5],
+                                   high=[0.7, -0.6, -0.3, 0.6])
+
+        result = benchmark_alpha_opt(net, input_box, "TORA";
+                                     n_samples=500, n_iter=50, lr=0.1)
+
+        @test result.max_lb_violation ≤ 1e-9
+        @test result.max_ub_violation ≤ 1e-9
+
+        for k in eachindex(result.crown_base)
+            for j in eachindex(result.crown_base[k].lower)
+                δ = result.crown_opt[k].lower[j] - result.crown_base[k].lower[j]
+                @test δ ≥ -1e-9
+            end
+        end
+
+        for k in eachindex(result.crown_base)
+            for j in eachindex(result.crown_base[k].upper)
+                @test isapprox(result.crown_opt[k].upper[j],
+                               result.crown_base[k].upper[j]; atol=1e-9)
+            end
+        end
+    end
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Test 15: Unicycle — alpha optimisation benchmark
+    # ──────────────────────────────────────────────────────────────────────────
+    @testset "Alpha opt benchmark: Unicycle" begin
+        net_path  = joinpath(repo_root, "Networks", "ARCH-COMP-2023", "nnet",
+                             "controllerUnicycle.nnet")
+        @assert isfile(net_path) "Expected network file not found: $net_path"
+        net       = read_nnet(net_path; last_layer_activation=Id())
+        input_box = Hyperrectangle(low=[9.50, -4.50, 2.10, 1.50],
+                                   high=[9.55, -4.45, 2.11, 1.51])
+
+        result = benchmark_alpha_opt(net, input_box, "Unicycle";
+                                     n_samples=500, n_iter=50, lr=0.1)
+
+        @test result.max_lb_violation ≤ 1e-9
+        @test result.max_ub_violation ≤ 1e-9
+
+        for k in eachindex(result.crown_base)
+            for j in eachindex(result.crown_base[k].lower)
+                δ = result.crown_opt[k].lower[j] - result.crown_base[k].lower[j]
+                @test δ ≥ -1e-9
+            end
+        end
+
+        for k in eachindex(result.crown_base)
+            for j in eachindex(result.crown_base[k].upper)
+                @test isapprox(result.crown_opt[k].upper[j],
+                               result.crown_base[k].upper[j]; atol=1e-9)
+            end
+        end
+    end
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Test 16: ACC — alpha optimisation benchmark
+    # ──────────────────────────────────────────────────────────────────────────
+    @testset "Alpha opt benchmark: ACC" begin
+        net_path  = joinpath(repo_root, "Networks", "ARCH-COMP-2023", "nnet",
+                             "controllerACC.nnet")
+        @assert isfile(net_path) "Expected network file not found: $net_path"
+        net       = read_nnet(net_path; last_layer_activation=Id())
+        ϵ_acc = 1e-8
+        input_box = Hyperrectangle(
+            low  = [30.0 - ϵ_acc, 1.40 - ϵ_acc, 30.0 - ϵ_acc, 79.0,  1.8],
+            high = [30.0 + ϵ_acc, 1.40 + ϵ_acc, 30.2 + ϵ_acc, 100.0, 2.2],
+        )
+
+        result = benchmark_alpha_opt(net, input_box, "ACC";
+                                     n_samples=500, n_iter=50, lr=0.1)
+
+        @test result.max_lb_violation ≤ 1e-9
+        @test result.max_ub_violation ≤ 1e-9
+
+        for k in eachindex(result.crown_base)
+            for j in eachindex(result.crown_base[k].lower)
+                δ = result.crown_opt[k].lower[j] - result.crown_base[k].lower[j]
+                @test δ ≥ -1e-9
+            end
+        end
+
+        for k in eachindex(result.crown_base)
+            for j in eachindex(result.crown_base[k].upper)
+                @test isapprox(result.crown_opt[k].upper[j],
+                               result.crown_base[k].upper[j]; atol=1e-9)
+            end
+        end
+    end
+
+end  # @testset "Alpha optimisation benchmark on real networks"
 
 println("\nAll alpha-CROWN tests passed.")
