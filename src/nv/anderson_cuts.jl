@@ -214,51 +214,93 @@ function add_anderson_cuts!(model, network::Network,
         unstable = findall(j -> l̂[j] < 0.0 < û[j], 1:n_k)
         length(unstable) < 2 && continue
 
-        layer_cuts = 0
-        for (a_idx, i) in enumerate(unstable)
-            layer_cuts >= max_cuts_per_layer && break
-            for j in unstable
-                i == j && continue
-                layer_cuts >= max_cuts_per_layer && break
+        # Precompute ẑ_j affine expressions once per unstable neuron j
+        # (avoids rebuilding the sum O(n²) times in the inner loop)
+        ẑ_exprs = Dict{Int, AffExpr}()
+        for j in unstable  # j is a neuron index (value), not an index into `unstable`
+            e = AffExpr(b[j])
+            for m in eachindex(z_prev)
+                add_to_expression!(e, W[j, m], z_prev[m])
+            end
+            ẑ_exprs[j] = e
+        end
 
-                l_act, u_act, l_inact, u_inact = conditional_preact_bounds(
+        layer_cuts = 0
+        # Iterate over unordered pairs {i,j} only (i < j) to avoid double-counting.
+        # Cuts for δ_i are added when processing pair (i,j); cuts for δ_j when (j,i)
+        # would be processed — we cover both directions by adding cuts for BOTH
+        # δ_i and δ_j within the same pair iteration.
+        for a_idx in eachindex(unstable)
+            layer_cuts >= max_cuts_per_layer && break
+            i = unstable[a_idx]
+            for b_idx in (a_idx+1):lastindex(unstable)
+                layer_cuts >= max_cuts_per_layer && break
+                j = unstable[b_idx]
+
+                # Cuts on ẑ_j conditioned on δ_i
+                l_act_j, u_act_j, l_inact_j, u_inact_j = conditional_preact_bounds(
                     layer, bounds_prev, i, j)
 
-                # ẑ_j expression in terms of z_prev
-                ẑ_j_expr = sum(W[j, m] * z_prev[m] for m in eachindex(z_prev)) + b[j]
+                ẑ_j = ẑ_exprs[j]
 
-                # --- Cuts conditioned on δ_i = 1 (active) ---
-                if isnan(l_act) && isnan(u_act)
-                    # δ_i = 1 is infeasible — fix δ_i to 0
+                if isnan(l_act_j) && isnan(u_act_j)
                     @constraint(model, δ[i] == 0)
                     n_fixed += 1
                 else
-                    if !isnan(l_act) && l_act > l̂[j] + tol
-                        # ẑ_j ≥ l̂_j + (l_act - l̂_j)*δ_i
-                        @constraint(model, ẑ_j_expr >= l̂[j] + (l_act - l̂[j]) * δ[i])
+                    if !isnan(l_act_j) && l_act_j > l̂[j] + tol
+                        @constraint(model, ẑ_j >= l̂[j] + (l_act_j - l̂[j]) * δ[i])
                         n_cuts += 1; layer_cuts += 1
                     end
-                    if !isnan(u_act) && u_act < û[j] - tol
-                        # ẑ_j ≤ û_j - (û_j - u_act)*δ_i
-                        @constraint(model, ẑ_j_expr <= û[j] - (û[j] - u_act) * δ[i])
+                    if !isnan(u_act_j) && u_act_j < û[j] - tol
+                        @constraint(model, ẑ_j <= û[j] - (û[j] - u_act_j) * δ[i])
                         n_cuts += 1; layer_cuts += 1
                     end
                 end
 
-                # --- Cuts conditioned on δ_i = 0 (inactive) ---
-                if isnan(l_inact) && isnan(u_inact)
-                    # δ_i = 0 is infeasible — fix δ_i to 1
+                if isnan(l_inact_j) && isnan(u_inact_j)
                     @constraint(model, δ[i] == 1)
                     n_fixed += 1
                 else
-                    if !isnan(l_inact) && l_inact > l̂[j] + tol
-                        # ẑ_j ≥ l̂_j + (l_inact - l̂_j)*(1 - δ_i)
-                        @constraint(model, ẑ_j_expr >= l̂[j] + (l_inact - l̂[j]) * (1 - δ[i]))
+                    if !isnan(l_inact_j) && l_inact_j > l̂[j] + tol
+                        @constraint(model, ẑ_j >= l̂[j] + (l_inact_j - l̂[j]) * (1 - δ[i]))
                         n_cuts += 1; layer_cuts += 1
                     end
-                    if !isnan(u_inact) && u_inact < û[j] - tol
-                        # ẑ_j ≤ û_j - (û_j - u_inact)*(1 - δ_i)
-                        @constraint(model, ẑ_j_expr <= û[j] - (û[j] - u_inact) * (1 - δ[i]))
+                    if !isnan(u_inact_j) && u_inact_j < û[j] - tol
+                        @constraint(model, ẑ_j <= û[j] - (û[j] - u_inact_j) * (1 - δ[i]))
+                        n_cuts += 1; layer_cuts += 1
+                    end
+                end
+
+                # Cuts on ẑ_i conditioned on δ_j (symmetric direction)
+                l_act_i, u_act_i, l_inact_i, u_inact_i = conditional_preact_bounds(
+                    layer, bounds_prev, j, i)
+
+                ẑ_i = ẑ_exprs[i]
+
+                if isnan(l_act_i) && isnan(u_act_i)
+                    @constraint(model, δ[j] == 0)
+                    n_fixed += 1
+                else
+                    if !isnan(l_act_i) && l_act_i > l̂[i] + tol
+                        @constraint(model, ẑ_i >= l̂[i] + (l_act_i - l̂[i]) * δ[j])
+                        n_cuts += 1; layer_cuts += 1
+                    end
+                    if !isnan(u_act_i) && u_act_i < û[i] - tol
+                        @constraint(model, ẑ_i <= û[i] - (û[i] - u_act_i) * δ[j])
+                        n_cuts += 1; layer_cuts += 1
+                    end
+                end
+
+                if isnan(l_inact_i) && isnan(u_inact_i)
+                    @constraint(model, δ[j] == 1)
+                    n_fixed += 1
+                else
+                    if !isnan(l_inact_i) && l_inact_i > l̂[i] + tol
+                        @constraint(model, ẑ_i >= l̂[i] + (l_inact_i - l̂[i]) * (1 - δ[j]))
+                        n_cuts += 1; layer_cuts += 1
+                    end
+                    if !isnan(u_inact_i) && u_inact_i < û[i] - tol
+                        @constraint(model, ẑ_i <= û[i] - (û[i] - u_inact_i) * (1 - δ[j]))
                         n_cuts += 1; layer_cuts += 1
                     end
                 end
