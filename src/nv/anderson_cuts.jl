@@ -216,9 +216,12 @@ function add_anderson_cuts!(model, network::Network,
 
         # Precompute ẑ_j affine expressions once per unstable neuron j
         # (avoids rebuilding the sum O(n²) times in the inner loop)
-        ẑ_exprs = Dict{Int, AffExpr}()
+        # Use variable type from z_prev to support both JuMP.VariableRef and Plasmo.NodeVariableRef
+        VT = eltype(z_prev)
+        ẑ_exprs = Dict{Int, GenericAffExpr{Float64, VT}}()
         for j in unstable  # j is a neuron index (value), not an index into `unstable`
-            e = AffExpr(b[j])
+            e = GenericAffExpr{Float64, VT}()
+            add_to_expression!(e, b[j])
             for m in eachindex(z_prev)
                 add_to_expression!(e, W[j, m], z_prev[m])
             end
@@ -311,15 +314,3 @@ function add_anderson_cuts!(model, network::Network,
     return (n_cuts, n_fixed)
 end
 
-# OptiNode overload (Plasmo distributed models)
-function add_anderson_cuts!(model::Plasmo.OptiNode,
-                             network::Network,
-                             neurons::Vector,
-                             deltas::Vector,
-                             bounds::Vector{Hyperrectangle};
-                             tol::Float64 = 1e-6,
-                             max_cuts_per_layer::Int = typemax(Int))
-    # Delegate to the JuMP Model inside the OptiNode
-    return add_anderson_cuts!(model.model, network, neurons, deltas, bounds;
-                               tol=tol, max_cuts_per_layer=max_cuts_per_layer)
-end

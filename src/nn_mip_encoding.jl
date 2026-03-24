@@ -33,7 +33,8 @@ end
 function add_controller_constraints!(netModel, network_nnet_address, input_set,
                                      last_layer_activation=Id();
                                      use_crown::Bool=true, verbose::Bool=false,
-                                     use_anderson::Bool=false)
+                                     use_anderson::Bool=false,
+                                     max_cuts_per_layer::Int=typemax(Int))
     """
     Encode controller as MIP. Directly taken from OVERTVerify.
 
@@ -63,7 +64,8 @@ function add_controller_constraints!(netModel, network_nnet_address, input_set,
     encode_network!(model, network, neurons, deltas, bounds, BoundedMixedIntegerLP())
 
     if use_anderson
-        n_cuts, n_fixed = add_anderson_cuts!(model, network, neurons, deltas, bounds)
+        n_cuts, n_fixed = add_anderson_cuts!(model, network, neurons, deltas, bounds;
+                                              max_cuts_per_layer=max_cuts_per_layer)
         verbose && @info "Anderson cuts: $n_cuts cuts added, $n_fixed binaries fixed"
     end
 
@@ -73,7 +75,8 @@ end
 function add_controller_constraints!(model, network_nnet_address, input_set, input_vars, output_vars;
                                      last_layer_activation=Id(),
                                      use_crown::Bool=true, verbose::Bool=false,
-                                     use_anderson::Bool=false)
+                                     use_anderson::Bool=false,
+                                     max_cuts_per_layer::Int=typemax(Int))
     """
     Encode controller as MIP. Directly taken from OVERTVerify.
 
@@ -101,7 +104,8 @@ function add_controller_constraints!(model, network_nnet_address, input_set, inp
     encode_network!(model, network, neurons, deltas, bounds, BoundedMixedIntegerLP())
 
     if use_anderson
-        n_cuts, n_fixed = add_anderson_cuts!(model, network, neurons, deltas, bounds)
+        n_cuts, n_fixed = add_anderson_cuts!(model, network, neurons, deltas, bounds;
+                                              max_cuts_per_layer=max_cuts_per_layer)
         verbose && @info "Anderson cuts: $n_cuts cuts added, $n_fixed binaries fixed"
     end
 
