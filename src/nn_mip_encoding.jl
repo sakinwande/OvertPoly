@@ -8,6 +8,7 @@ include("nv/network.jl")
 include("nv/constraints.jl")
 include("nv/util.jl")
 include("nv/alpha_crown.jl")
+include("nv/anderson_cuts.jl")
 
 """
     count_unstable_neurons(network::Network, bounds::Vector{Hyperrectangle})
@@ -31,15 +32,16 @@ end
 
 function add_controller_constraints!(netModel, network_nnet_address, input_set,
                                      last_layer_activation=Id();
-                                     use_crown::Bool=true, verbose::Bool=false)
+                                     use_crown::Bool=true, verbose::Bool=false,
+                                     use_anderson::Bool=false)
     """
     Encode controller as MIP. Directly taken from OVERTVerify.
 
     Optional keyword arguments:
-    - `use_crown` (default true): use CROWN back-substitution (get_bounds_crown_backsub)
-      for tighter per-neuron pre-activation bounds, reducing unstable neurons and big-M values.
-      Set to false to use MaxSens interval arithmetic (original behaviour).
-    - `verbose` (default false): print unstable neuron counts for both methods.
+    - `use_crown` (default true): use CROWN back-substitution for tighter big-M bounds.
+    - `verbose` (default false): print unstable neuron counts and Anderson cut stats.
+    - `use_anderson` (default false): add pairwise Anderson conditional cuts after the
+      standard BoundedMixedIntegerLP encoding, tightening the LP relaxation.
     """
     model = netModel
     network = read_nnet(network_nnet_address, last_layer_activation=last_layer_activation)
@@ -59,18 +61,26 @@ function add_controller_constraints!(netModel, network_nnet_address, input_set,
     end
 
     encode_network!(model, network, neurons, deltas, bounds, BoundedMixedIntegerLP())
+
+    if use_anderson
+        n_cuts, n_fixed = add_anderson_cuts!(model, network, neurons, deltas, bounds)
+        verbose && @info "Anderson cuts: $n_cuts cuts added, $n_fixed binaries fixed"
+    end
+
     return neurons
 end
 
 function add_controller_constraints!(model, network_nnet_address, input_set, input_vars, output_vars;
                                      last_layer_activation=Id(),
-                                     use_crown::Bool=true, verbose::Bool=false)
+                                     use_crown::Bool=true, verbose::Bool=false,
+                                     use_anderson::Bool=false)
     """
     Encode controller as MIP. Directly taken from OVERTVerify.
 
     Optional keyword arguments:
     - `use_crown` (default true): use CROWN back-substitution for tighter bounds.
-    - `verbose` (default false): print unstable neuron counts for both methods.
+    - `verbose` (default false): print unstable neuron counts and Anderson cut stats.
+    - `use_anderson` (default false): add pairwise Anderson conditional cuts.
     """
     network = read_nnet(network_nnet_address, last_layer_activation=last_layer_activation)
     neurons = init_neurons(model, network)
@@ -89,6 +99,12 @@ function add_controller_constraints!(model, network_nnet_address, input_set, inp
     end
 
     encode_network!(model, network, neurons, deltas, bounds, BoundedMixedIntegerLP())
+
+    if use_anderson
+        n_cuts, n_fixed = add_anderson_cuts!(model, network, neurons, deltas, bounds)
+        verbose && @info "Anderson cuts: $n_cuts cuts added, $n_fixed binaries fixed"
+    end
+
     @constraint(model, neurons[1] .== input_vars)
     @constraint(model, output_vars .== neurons[end])
     return bounds[end]
