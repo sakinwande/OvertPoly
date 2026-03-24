@@ -7,14 +7,21 @@ using LazySets
 using Random
 
 
-function encode_dynamics!(query::FlatPolyQuery)
+function encode_dynamics!(query::FlatPolyQuery; enc_func=ccEncoding!)
     """
-    Method to encode the dynamics as a MIP (using the Gessler et al. method)
+    Method to encode the dynamics as a MIP.
+
+    The encoding function is selected via the `enc_func` keyword argument:
+      - `ccEncoding!`   — Convex Combination (CC), fewest constraints but looser LP relaxation
+      - `dccEncoding!`  — Disaggregated CC (DCC), tighter LP relaxation, more continuous vars
+      - `dlogEncoding!` — Disaggregated Logarithmic (DLOG), fewest binary variables (⌈log₂n⌉)
+
+    Default is `ccEncoding!` to preserve backward compatibility.
     """
     i = 0
     #For each model with an overt approximation, encode the dynamics in a MIP model, and add to the corresponding dictionaryl
     optimizer = JuMP.optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0)
-    
+
     if isnothing(query.mod_dict)
         model = Model(optimizer)
         print("Model dict not define in encode dynamics?")
@@ -27,7 +34,7 @@ function encode_dynamics!(query::FlatPolyQuery)
         end
     end
 
-    #Define the bounds for input variables 
+    #Define the bounds for input variables
     stateDim = dim(query.problem.domain)
     stateBounds = extrema(query.problem.domain)
     stateVec = @variable(model, [1:stateDim], base_name = "X")
@@ -51,7 +58,7 @@ function encode_dynamics!(query::FlatPolyQuery)
         yUB = [tup[end] for tup in UB]
         yLB = [tup[end] for tup in LB]
         query.mod_dict[sym] = model
-        ccEncoding!(xS, yLB, yUB, Tri, query,sym,i)
+        enc_func(xS, yLB, yUB, Tri, query, sym, i)
     end
 end
 
