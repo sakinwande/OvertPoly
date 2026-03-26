@@ -228,86 +228,96 @@ function add_anderson_cuts!(model, network::Network,
             ẑ_exprs[j] = e
         end
 
-        layer_cuts = 0
-        # Iterate over unordered pairs {i,j} only (i < j) to avoid double-counting.
-        # Cuts for δ_i are added when processing pair (i,j); cuts for δ_j when (j,i)
-        # would be processed — we cover both directions by adding cuts for BOTH
-        # δ_i and δ_j within the same pair iteration.
-        for a_idx in eachindex(unstable)
-            layer_cuts >= max_cuts_per_layer && break
-            i = unstable[a_idx]
-            for b_idx in (a_idx+1):lastindex(unstable)
-                layer_cuts >= max_cuts_per_layer && break
-                j = unstable[b_idx]
+        # Collect all candidate cuts with scores; apply binary fixes immediately.
+        # Each entry: (score, expr, is_lb, base, improvement, delta_var, use_complement)
+        #   score          = improvement / unconditional_width  (relative tightening)
+        #   is_lb          = true for lower-bound cut, false for upper-bound cut
+        #   base           = l̂[n] (lb cut) or û[n] (ub cut)
+        #   improvement    = conditional_bound - base  (always > 0)
+        #   delta_var      = the binary variable δ[i] or δ[j]
+        #   use_complement = false → multiply by δ, true → multiply by (1-δ)
+        candidates = Tuple{Float64, GenericAffExpr{Float64,VT}, Bool, Float64, Float64, Any, Bool}[]
 
-                # Cuts on ẑ_j conditioned on δ_i
+        for a_idx in eachindex(unstable)
+            i = unstable[a_idx]
+            width_i = û[i] - l̂[i]
+            for b_idx in (a_idx+1):lastindex(unstable)
+                j = unstable[b_idx]
+                width_j = û[j] - l̂[j]
+
+                # Conditional bounds on ẑ_j given δ_i
                 l_act_j, u_act_j, l_inact_j, u_inact_j = conditional_preact_bounds(
                     layer, bounds_prev, i, j)
 
-                ẑ_j = ẑ_exprs[j]
-
                 if isnan(l_act_j) && isnan(u_act_j)
-                    @constraint(model, δ[i] == 0)
-                    n_fixed += 1
+                    @constraint(model, δ[i] == 0); n_fixed += 1
                 else
                     if !isnan(l_act_j) && l_act_j > l̂[j] + tol
-                        @constraint(model, ẑ_j >= l̂[j] + (l_act_j - l̂[j]) * δ[i])
-                        n_cuts += 1; layer_cuts += 1
+                        imp = l_act_j - l̂[j]
+                        push!(candidates, (imp/width_j, ẑ_exprs[j], true,  l̂[j], imp, δ[i], false))
                     end
                     if !isnan(u_act_j) && u_act_j < û[j] - tol
-                        @constraint(model, ẑ_j <= û[j] - (û[j] - u_act_j) * δ[i])
-                        n_cuts += 1; layer_cuts += 1
+                        imp = û[j] - u_act_j
+                        push!(candidates, (imp/width_j, ẑ_exprs[j], false, û[j], imp, δ[i], false))
                     end
                 end
 
                 if isnan(l_inact_j) && isnan(u_inact_j)
-                    @constraint(model, δ[i] == 1)
-                    n_fixed += 1
+                    @constraint(model, δ[i] == 1); n_fixed += 1
                 else
                     if !isnan(l_inact_j) && l_inact_j > l̂[j] + tol
-                        @constraint(model, ẑ_j >= l̂[j] + (l_inact_j - l̂[j]) * (1 - δ[i]))
-                        n_cuts += 1; layer_cuts += 1
+                        imp = l_inact_j - l̂[j]
+                        push!(candidates, (imp/width_j, ẑ_exprs[j], true,  l̂[j], imp, δ[i], true))
                     end
                     if !isnan(u_inact_j) && u_inact_j < û[j] - tol
-                        @constraint(model, ẑ_j <= û[j] - (û[j] - u_inact_j) * (1 - δ[i]))
-                        n_cuts += 1; layer_cuts += 1
+                        imp = û[j] - u_inact_j
+                        push!(candidates, (imp/width_j, ẑ_exprs[j], false, û[j], imp, δ[i], true))
                     end
                 end
 
-                # Cuts on ẑ_i conditioned on δ_j (symmetric direction)
+                # Conditional bounds on ẑ_i given δ_j (symmetric direction)
                 l_act_i, u_act_i, l_inact_i, u_inact_i = conditional_preact_bounds(
                     layer, bounds_prev, j, i)
 
-                ẑ_i = ẑ_exprs[i]
-
                 if isnan(l_act_i) && isnan(u_act_i)
-                    @constraint(model, δ[j] == 0)
-                    n_fixed += 1
+                    @constraint(model, δ[j] == 0); n_fixed += 1
                 else
                     if !isnan(l_act_i) && l_act_i > l̂[i] + tol
-                        @constraint(model, ẑ_i >= l̂[i] + (l_act_i - l̂[i]) * δ[j])
-                        n_cuts += 1; layer_cuts += 1
+                        imp = l_act_i - l̂[i]
+                        push!(candidates, (imp/width_i, ẑ_exprs[i], true,  l̂[i], imp, δ[j], false))
                     end
                     if !isnan(u_act_i) && u_act_i < û[i] - tol
-                        @constraint(model, ẑ_i <= û[i] - (û[i] - u_act_i) * δ[j])
-                        n_cuts += 1; layer_cuts += 1
+                        imp = û[i] - u_act_i
+                        push!(candidates, (imp/width_i, ẑ_exprs[i], false, û[i], imp, δ[j], false))
                     end
                 end
 
                 if isnan(l_inact_i) && isnan(u_inact_i)
-                    @constraint(model, δ[j] == 1)
-                    n_fixed += 1
+                    @constraint(model, δ[j] == 1); n_fixed += 1
                 else
                     if !isnan(l_inact_i) && l_inact_i > l̂[i] + tol
-                        @constraint(model, ẑ_i >= l̂[i] + (l_inact_i - l̂[i]) * (1 - δ[j]))
-                        n_cuts += 1; layer_cuts += 1
+                        imp = l_inact_i - l̂[i]
+                        push!(candidates, (imp/width_i, ẑ_exprs[i], true,  l̂[i], imp, δ[j], true))
                     end
                     if !isnan(u_inact_i) && u_inact_i < û[i] - tol
-                        @constraint(model, ẑ_i <= û[i] - (û[i] - u_inact_i) * (1 - δ[j]))
-                        n_cuts += 1; layer_cuts += 1
+                        imp = û[i] - u_inact_i
+                        push!(candidates, (imp/width_i, ẑ_exprs[i], false, û[i], imp, δ[j], true))
                     end
                 end
             end
+        end
+
+        # Sort by score descending; add the top-K cuts
+        sort!(candidates; by=first, rev=true)
+        n_to_add = min(length(candidates), max_cuts_per_layer)
+        for (_, expr, is_lb, base, imp, delta_var, use_complement) in candidates[1:n_to_add]
+            multiplier = use_complement ? (1 - delta_var) : delta_var
+            if is_lb
+                @constraint(model, expr >= base + imp * multiplier)
+            else
+                @constraint(model, expr <= base - imp * multiplier)
+            end
+            n_cuts += 1
         end
     end
 

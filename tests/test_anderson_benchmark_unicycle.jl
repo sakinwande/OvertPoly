@@ -38,7 +38,7 @@ w            = 1e-4
 dig          = 15
 const DOMAIN = Hyperrectangle(low=[9.50,-4.50,2.10,1.50], high=[9.55,-4.45,2.11,1.51])
 depMat       = [[1,0,1,1],[0,1,1,1],[0,0,1,0],[0,0,0,1]]
-const CONC_INT = [10, 10, 5]
+const CONC_INT = [10, 10, 10]
 const N_OVERT  = 2
 
 function unicycle_dynamics(x, u)
@@ -143,9 +143,7 @@ println("concInt: $CONC_INT  ($(sum(CONC_INT)) total steps), dt: $dt")
 println("="^60)
 
 conditions = [
-    ("Baseline (no cuts)",   false, typemax(Int)),
-    ("Anderson, cap=500",    true,  500),
-    ("Anderson, cap=1000",   true,  1000),
+    ("Anderson, cap=100",    true,  100),
 ]
 
 results = []

@@ -106,7 +106,7 @@ end
 
 const DOMAIN  = Hyperrectangle(low=[0.6, -0.7, -0.4, 0.5], high=[0.7, -0.6, -0.3, 0.6])
 const N_OVERT = 2
-const N_STEPS = 10
+const N_STEPS = 20
 
 TORA = GraphPolyProblem(
     exprList, nothing, control_coef, DOMAIN,
@@ -154,9 +154,7 @@ println("N_overt: $N_OVERT, dt: $dt")
 println("="^60)
 
 conditions = [
-    ("Baseline (no cuts)",   false, typemax(Int)),
-    ("Anderson, cap=50",     true,  50),
-    ("Anderson, cap=200",    true,  200),
+    ("Anderson, cap=100",    true,  100),
 ]
 
 results = []
