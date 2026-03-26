@@ -777,9 +777,9 @@ function gen_interpol(oA)
     #Note that we are not exactly extrapolating, but we run into floating point soundness issues with irrational numbers, and so we allow for extrapolation to avoid this. We would never interpolation outside of the bounds anyway
     #WARNING: This may not be sound. We need to find a better way to handle this
         if size(outMat)[2] > 2
-        interp = linear_interpolation(tupVecs, AmatT, extrapolation_bc = Interpolations.Line())
+        interp = LinearInterpolation(tupVecs, AmatT, extrapolation_bc = Interpolations.Line())
     else
-        interp = linear_interpolation(tupVecs, Amat, extrapolation_bc = Interpolations.Line())
+        interp = LinearInterpolation(tupVecs, Amat, extrapolation_bc = Interpolations.Line())
 
     end
     return interp    
@@ -1166,7 +1166,7 @@ function get_subgrids(unionInps)
     sub_grids = [unique(tup[i] for tup in tupList) for i in 1:dim]
     return sub_grids
 end
-function prodBounds(lb1, ub1, lb2, ub2, a1Flag = false, a2Flag = false) 
+function prodBounds(lb1, ub1, lb2, ub2, a1Flag = false, a2Flag = false; use_mccormick::Bool = true)
     """
     Method to compute bounds for the product of two functions defined over the same domain
 
@@ -1225,7 +1225,7 @@ function prodBounds(lb1, ub1, lb2, ub2, a1Flag = false, a2Flag = false)
         #Use the sub-grids to get grid coordinates 
         coords = collect(Iterators.product(coordinates...))
 
-        if dim == 2
+        if dim == 2 && use_mccormick
             McCormickFlag = true
             #Use a McCormick envelope to get the bounds
             lb1_l = min([lb1_int(coord...) for coord in coords]...)
