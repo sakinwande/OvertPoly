@@ -1,4 +1,4 @@
-# OvertPoly
+# crest
 
 ## Environment setup 
 Before doing anything, activate the OvertPoly Julia
